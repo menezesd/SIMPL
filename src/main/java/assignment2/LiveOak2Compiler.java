@@ -131,7 +131,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 );
             }
             method = MainMethod.getInstance();
-            // method type is already set in MainMethod.getInstance(); cannot assign to getter
+            // Set the main method's return type to the declared return type
+            method.setType(returnType);
         } else {
             // create Method object
             method = new MethodNode(methodName, returnType);
@@ -541,8 +542,16 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
         Expression expr = getExpr(f, method);
 
-        // write sam code (no type check to match original LiveOak-0 behaviour)
+        // write sam code
         sam += expr.getSamCode();
+
+        // Type check: returned expression must be compatible with method return type
+        if (!method.getType().isCompatibleWith(expr.getType())) {
+            throw new TypeErrorException(
+                "Return statement type mismatch: " + method.getType() + " and " + expr.getType(),
+                f.lineNo()
+            );
+        }
 
         // Jump to clean up
         Label returnLabel = method.mostRecent(LabelType.RETURN);
@@ -686,7 +695,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 // Exprt -> (Expr ? Expr : Expr)
                 if (CompilerUtils.check(f, '?')) {
                     Expression ternaryExpr = getTernaryExpr(f, method);
-                    expr = new Expression(expr.getSamCode() + ternaryExpr.getSamCode(), expr.getType());
+                    // The overall expression type becomes the ternary expression's type
+                    expr = new Expression(expr.getSamCode() + ternaryExpr.getSamCode(), ternaryExpr.getType());
                 }
                 // Exprt -> (Expr Binop Expr)
                 else {
