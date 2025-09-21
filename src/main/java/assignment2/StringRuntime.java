@@ -1,5 +1,10 @@
 package assignment2;
 
+import assignment2.BinopType;
+import assignment2.CompilerException;
+import assignment2.OperatorUtils;
+import assignment2.SyntaxErrorException;
+
 public final class StringRuntime {
     private StringRuntime() {}
 
@@ -246,6 +251,104 @@ public final class StringRuntime {
 
         // Exit method
         sam += exitFuncLabel.getName() + ":\n";
+
+        return sam;
+    }
+
+    public static String compareString(char op) throws CompilerException {
+        if (OperatorUtils.getBinopType(op) != BinopType.COMPARISON) {
+            throw new SyntaxErrorException(
+                "compareString receive invalid operation: " + op,
+                -1
+            );
+        }
+
+        // expects parameters (2 strings) already on the stack
+        Label enterFuncLabel = new Label();
+        Label exitFuncLabel = new Label();
+        Label startLoopLabel = new Label();
+        Label stopLoopLabel = new Label();
+
+        String sam = "";
+
+        // call method
+        sam += "LINK\n";
+        sam += "JSR " + enterFuncLabel.getName() + "\n";
+        sam += "UNLINK\n";
+        sam += "ADDSP -1\n"; // free second param, only first param remain with new value
+        sam += "JUMP " + exitFuncLabel.getName() + "\n";
+
+        // method definition
+        sam += enterFuncLabel.getName() + ":\n";
+        sam += "PUSHIMM 0\n"; // local 2: counter
+        sam += "PUSHIMM 0\n"; // local 3: result
+
+        // loop...
+        sam += startLoopLabel.getName() + ":\n";
+        // reach end of string 1?
+        sam += "PUSHOFF -2\n";
+        sam += "PUSHOFF 2\n";
+        sam += "ADD\n";
+        sam += "PUSHIND\n";
+        sam += "ISNIL\n";
+
+        // reach end of string 2?
+        sam += "PUSHOFF -1\n";
+        sam += "PUSHOFF 2\n";
+        sam += "ADD\n";
+        sam += "PUSHIND\n";
+        sam += "ISNIL\n";
+
+        // reach end of both string, is equal
+        sam += "AND\n";
+        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
+
+        // not end, comparing char by char
+        // get char of string 1
+        sam += "PUSHOFF -2\n";
+        sam += "PUSHOFF 2\n";
+        sam += "ADD\n";
+        sam += "PUSHIND\n";
+
+        // get char of string 2
+        sam += "PUSHOFF -1\n";
+        sam += "PUSHOFF 2\n";
+        sam += "ADD\n";
+        sam += "PUSHIND\n";
+
+        // compare and store result
+        sam += "CMP\n";
+        sam += "STOREOFF 3\n";
+
+        // check if done
+        sam += "PUSHOFF 3\n";
+        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
+
+        // not done, continue to next char
+        sam += "PUSHOFF 2\n";
+        sam += "PUSHIMM 1\n";
+        sam += "ADD\n";
+        sam += "STOREOFF 2\n";
+        sam += "JUMP " + startLoopLabel.getName() + "\n";
+
+        // Stop loop
+        sam += stopLoopLabel.getName() + ":\n";
+        sam += "PUSHOFF 3\n";
+        sam += "STOREOFF -2\n";
+        sam += "ADDSP -2\n";
+        sam += "RST\n";
+
+        // Exit method
+        sam += exitFuncLabel.getName() + ":\n";
+
+        if (op == '<') {
+            sam += "PUSHIMM 1\n";
+        } else if (op == '>') {
+            sam += "PUSHIMM -1\n";
+        } else {
+            sam += "PUSHIMM 0\n";
+        }
+        sam += "EQUAL\n";
 
         return sam;
     }
