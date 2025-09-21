@@ -711,66 +711,6 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
     }
 
-    // ===== New AST-based statement parsing (migration in progress) =====
-    private static assignment2.ast.Stmt parseStmtAST(SamTokenizer f, MethodNode method) throws CompilerException {
-        // Stmt -> ;
-        if (CompilerUtils.check(f, ';')) {
-            return new assignment2.ast.BlockStmt(java.util.Collections.emptyList()); // null statement as empty block
-        }
-
-        if (f.peekAtKind() != TokenType.WORD) {
-            throw new SyntaxErrorException("Statement must begin with identifier/keyword", f.lineNo());
-        }
-
-        // Stmt -> break;
-        if (f.test("break")) {
-            CompilerUtils.expectChar(f, ';', f.lineNo());
-            return new assignment2.ast.BreakStmt();
-        }
-        // Stmt -> return Expr;
-        else if (f.test("return")) {
-            assignment2.ast.Expr value = parseExprAST(f, method);
-            CompilerUtils.expectChar(f, ';', f.lineNo());
-            return new assignment2.ast.ReturnStmt(value);
-        }
-        // Stmt -> if (Expr) Block else Block;
-        else if (f.test("if")) {
-            CompilerUtils.expectChar(f, '(', f.lineNo());
-            assignment2.ast.Expr cond = parseExprAST(f, method);
-            CompilerUtils.expectChar(f, ')', f.lineNo());
-            assignment2.ast.Stmt thenBranch = parseBlockAST(f, method);
-            CompilerUtils.expectWord(f, "else", f.lineNo());
-            assignment2.ast.Stmt elseBranch = parseBlockAST(f, method);
-            return new assignment2.ast.IfStmt(cond, thenBranch, elseBranch);
-        }
-        // Stmt -> while (Expr) Block;
-        else if (f.test("while")) {
-            CompilerUtils.expectChar(f, '(', f.lineNo());
-            assignment2.ast.Expr cond = parseExprAST(f, method);
-            CompilerUtils.expectChar(f, ')', f.lineNo());
-            assignment2.ast.Stmt body = parseBlockAST(f, method);
-            return new assignment2.ast.WhileStmt(cond, body);
-        }
-        // Stmt -> Var = Expr;
-        else {
-            String ident = CompilerUtils.getWord(f);
-            Node var = CompilerUtils.requireVar(method, ident, f);
-            CompilerUtils.expectChar(f, '=', f.lineNo());
-            assignment2.ast.Expr value = parseExprAST(f, method);
-            CompilerUtils.expectChar(f, ';', f.lineNo());
-            return new assignment2.ast.AssignStmt(ident, value);
-        }
-    }
-
-    private static assignment2.ast.BlockStmt parseBlockAST(SamTokenizer f, MethodNode method) throws CompilerException {
-        CompilerUtils.expectChar(f, '{', f.lineNo());
-        java.util.ArrayList<assignment2.ast.Stmt> stmts = new java.util.ArrayList<>();
-        while (!CompilerUtils.check(f, '}')) {
-            stmts.add(parseStmtAST(f, method));
-        }
-        return new assignment2.ast.BlockStmt(stmts);
-    }
-
     // Removed legacy getUnopExpr, getBinopExpr, getTernaryExpr: all expression forms now handled by unified AST pipeline.
 
     static assignment2.ast.Expr getMethodCallExpr(
