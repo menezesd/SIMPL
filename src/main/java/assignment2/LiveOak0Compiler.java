@@ -1,5 +1,4 @@
 package assignment2;
-
 import edu.utexas.cs.sam.io.SamTokenizer;
 import edu.utexas.cs.sam.io.Tokenizer;
 import edu.utexas.cs.sam.io.Tokenizer.TokenType;
@@ -10,7 +9,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import assignment2.ast.*;
 
+/**
+ * LiveOak0 compiler front-end now producing an AST; includes constant folding integration.
+ */
 public class LiveOak0Compiler {
 
     public static void main(String[] args) throws IOException {
@@ -98,434 +101,217 @@ public class LiveOak0Compiler {
     }
 
     static String getProgram(SamTokenizer f) throws CompilerException {
+        // Parse entire program body into AST (top-level decls + main block)
+        BlockStmt bodyAst = parseBody(f);
+        // Generate prologue
         SamBuilder sb = new SamBuilder();
         sb.append("PUSHIMM 0\n");
         sb.append("LINK\n");
         sb.append("JSR main\n");
         sb.append("UNLINK\n");
         sb.append("STOP\n");
-
-        // LiveOak-0
+        // main label
         sb.label("main");
-        sb.append(getBody(f));
-
-        // Return whatever on top of the stack
+        // Generate statement code
+        CodegenStmtVisitor stmtGen = new CodegenStmtVisitor(mainMethod);
+        try {
+            sb.append(bodyAst.accept(stmtGen));
+        } catch (Exception e) {
+            throw new CompilerException("Statement codegen failed: " + e.getMessage(), -1);
+        }
+        // Return value convention: duplicate TOS into return slot, adjust stack, RST
         sb.append("DUP\n");
         sb.append("STOREOFF -1\n");
         sb.append("ADDSP -" + mainMethod.numLocalVariables() + "\n");
         sb.append("RST\n");
-
+        // Emit string runtime helpers once
+        sb.append(StringRuntime.emitAllStringFunctions());
         return sb.toString();
     }
 
     /*** Recursive operations
      ***/
-    static String getBody(SamTokenizer f) throws CompilerException {
-        SamBuilder sb = new SamBuilder();
-
-        // while start with "int | bool | String"
-        while (f.peekAtKind() == TokenType.WORD) {
-            sb.append(getVarDecl(f));
+    // ===== Statement Parsing to AST =====
+    private static BlockStmt parseBody(SamTokenizer f) throws CompilerException {
+        java.util.ArrayList<Stmt> topLevel = new java.util.ArrayList<>();
+        // Parse variable declarations appearing before the main block
+        while (f.peekAtKind() == TokenType.WORD && isTypeWord(f)) {
+            topLevel.addAll(parseVarDecls(f));
         }
-
-        // check EOF
+        // If EOF reached, wrap declarations in a block and return
         if (f.peekAtKind() == TokenType.EOF) {
-            return sb.toString();
+            return new BlockStmt(topLevel);
         }
-
-        // Then, get Block
-        sb.append(getBlock(f));
-
-        return sb.toString();
+        // Otherwise parse the main block and append its statements
+        BlockStmt block = parseBlock(f);
+        topLevel.addAll(block.getStatements());
+        return new BlockStmt(topLevel);
     }
 
-    static String getVarDecl(SamTokenizer f) throws CompilerException {
-        SamBuilder sb = new SamBuilder();
+    private static boolean isTypeWord(SamTokenizer f) {
+        if (f.peekAtKind() != TokenType.WORD) return false;
+        String w = f.getWord();
+        f.pushBack();
+        return w.equals("int") || w.equals("bool") || w.equals("String");
+    }
 
-        // VarDecl -> Type ...
+    private static java.util.List<Stmt> parseVarDecls(SamTokenizer f) throws CompilerException {
         Type varType = getType(f);
-
-        // while varName = a | b | c | ...
-        while (f.peekAtKind() == TokenType.WORD) {
-            // VarDecl -> Type Identifier1, Identifier2
+        java.util.List<Stmt> decls = new java.util.ArrayList<>();
+        boolean more;
+        do {
             String varName = getIdentifier(f);
-
-            // Check if the variable is already defined in the current scope
+            // register variable
             if (mainMethod.existSymbol(varName)) {
-                throw new CompilerException(
-                    "Variable '" + varName + "' is already defined in this scope",
-                    f.lineNo()
-                );
+                throw new CompilerException("Variable '" + varName + "' already defined", f.lineNo());
             }
-
-            // put variable in symbol table
             VariableNode variable = new VariableNode(varName, varType, false);
             mainMethod.addChild(variable);
-
-            // write sam code
-            sb.append("PUSHIMM 0\n");
-
-            if (CompilerUtils.check(f, ',')) {
-                continue;
-            } else if (CompilerUtils.check(f, ';')) {
-                break;
-            } else {
-                throw new SyntaxErrorException(
-                    "Expected ',' or `;` after each variable declaration",
-                    f.lineNo()
-                );
-            }
-        }
-
-        sb.append("\n");
-        return sb.toString();
+            decls.add(new VarDeclStmt(varName, varType, null));
+            more = CompilerUtils.consumeIf(f, ',');
+        } while (more);
+        CompilerUtils.expectChar(f, ';', f.lineNo());
+        return decls;
     }
 
-    static String getBlock(SamTokenizer f) throws CompilerException {
-        SamBuilder sb = new SamBuilder();
-
-        if (!CompilerUtils.check(f, '{')) {
-            throw new SyntaxErrorException(
-                "getBlock expects '{' at start of block",
-                f.lineNo()
-            );
-        }
-
-        // while not "}"
+    private static BlockStmt parseBlock(SamTokenizer f) throws CompilerException {
+        CompilerUtils.expectChar(f, '{', f.lineNo());
+        java.util.ArrayList<Stmt> stmts = new java.util.ArrayList<>();
         while (!CompilerUtils.check(f, '}')) {
-            sb.append(getStmt(f));
+            stmts.add(parseStmt(f));
         }
-
-        return sb.toString();
+        return new BlockStmt(stmts);
     }
 
-    static String getStmt(SamTokenizer f) throws CompilerException {
-        SamBuilder sb = new SamBuilder();
-
-        if (CompilerUtils.check(f, ';')) {
-            return ""; // Null statement
-        }
-
+    private static Stmt parseStmt(SamTokenizer f) throws CompilerException {
+        if (CompilerUtils.check(f, ';')) return new BlockStmt(java.util.Collections.emptyList()); // null statement as empty block
         if (f.peekAtKind() != TokenType.WORD) {
-            throw new SyntaxErrorException(
-                "getStmt expects TokenType.WORD at beginning of statement",
-                f.lineNo()
-            );
+            throw new SyntaxErrorException("Statement must begin with identifier/keyword", f.lineNo());
         }
-
-        if (f.test("if")) {
-            sb.append(getIfStmt(f));
-        } else if (f.test("while")) {
-            sb.append(getWhileStmt(f));
-        } else {
-            sb.append(getVarStmt(f));
-        }
-
-        return sb.toString();
-    }
-
-    static String getIfStmt(SamTokenizer f) throws CompilerException {
-        CompilerUtils.expect(f, "if", f.lineNo());
-
-        SamBuilder sb = new SamBuilder();
-
-        // labels used
-        Label stop_stmt = new Label();
-        Label false_block = new Label();
-
-        // if ( Expr ) ...
-        CompilerUtils.expect(f, '(', f.lineNo());
-
-        sb.append(getExpr(f).getSamCode());
-
-        CompilerUtils.expect(f, ')', f.lineNo());
-
-        sb.append("ISNIL\n");
-        sb.append("JUMPC " + false_block.getName() + "\n");
-
-        // Truth block:  // if ( Expr ) Block ...
-        sb.append(getBlock(f));
-        sb.append("JUMP " + stop_stmt.getName() + "\n");
-
-        // Checks 'else'
-        if (!CompilerUtils.getWord(f).equals("else")) {
-            throw new SyntaxErrorException(
-                "if statement expects 'else' between expressions",
-                f.lineNo()
-            );
-        }
-
-        // False block: (...) ? (...) : Expr
-        sb.append(false_block + ":\n");
-        sb.append(getBlock(f));
-
-        // Done if statement
-        sb.append(stop_stmt + ":\n");
-
-        return sb.toString();
-    }
-
-    static String getWhileStmt(SamTokenizer f) throws CompilerException {
-        CompilerUtils.expect(f, "while", f.lineNo());
-
-        SamBuilder sb = new SamBuilder();
-
-        // labels used
-        Label start_loop = new Label();
-        Label stop_loop = new Label();
-
-        // while ( Expr ) ...
-        CompilerUtils.expect(f, '(', f.lineNo());
-
-        sb.append(start_loop.getName() + ":\n");
-        sb.append(getExpr(f).getSamCode());
-
-        CompilerUtils.expect(f, ')', f.lineNo());
-
-        sb.append("ISNIL\n");
-        sb.append("JUMPC " + stop_loop.getName() + "\n");
-
-        // Continue loop
-        sb.append(getBlock(f));
-        sb.append("JUMP " + start_loop.getName() + "\n");
-
-        // Stop loop
-        sb.append(stop_loop.getName() + ":\n");
-
-        return sb.toString();
-    }
-
-    static String getVarStmt(SamTokenizer f) throws CompilerException {
-        SamBuilder sb = new SamBuilder();
-        Node variable = getVar(f);
-
+        if (f.test("if")) return parseIf(f);
+        if (f.test("while")) return parseWhile(f);
+        // assignment
+        String ident = CompilerUtils.getWord(f);
+        Node var = CompilerUtils.requireVar(mainMethod, ident, f);
         CompilerUtils.expect(f, '=', f.lineNo());
-
-        // getExpr() would return "exactly" one value on the stack
-        sb.append(getExpr(f).getSamCode());
-
-        // Store item on the stack to Node
-        sb.append("STOREOFF " + variable.getAddress() + "\n");
-
+        Expr value = parseExpr(f);
         CompilerUtils.expect(f, ';', f.lineNo());
-
-        return sb.toString();
+        return new AssignStmt(ident, value);
     }
 
-    static Expression getExpr(SamTokenizer f) throws CompilerException {
-        // TODO: Before getTerminal and getUnopExpr, make sure the FBR on TOS
-        // OR: maybe simplify this shit and remove all the JSR
-
-        if (CompilerUtils.check(f, '(')) {
-            // Expr -> ( Unop Expr )
-            try {
-                return getUnopExpr(f);
-            } catch (TypeErrorException e) {
-                // Expr -> ( Expr (...) )
-                Expression expr = getExpr(f);
-
-                // Raise if Expr -> ( Expr NOT('?' | ')' | Binop) )
-                if (f.peekAtKind() != TokenType.OPERATOR) {
-                    throw new SyntaxErrorException(
-                        "Expr -> Expr (...) expects '?' | ')' | Binop",
-                        f.lineNo()
-                    );
-                }
-
-                // Expr -> ( Expr ) , ends early
-                if (CompilerUtils.check(f, ')')) {
-                    return expr;
-                }
-
-                // Exprt -> (Expr ? Expr : Expr)
-                if (CompilerUtils.check(f, '?')) {
-                    expr = new Expression(expr.getSamCode() + getTernaryExpr(f).getSamCode(), expr.getType());
-                }
-                // Exprt -> (Expr Binop Expr)
-                else {
-                    expr = new Expression(expr.getSamCode() + getBinopExpr(f, expr).getSamCode(), expr.getType());
-                }
-
-                // Check closing ')'
-                CompilerUtils.expect(f, ')', f.lineNo());
-                return expr;
-            }
-        }
-        // Expr -> Var | Literal
-        else {
-            return getTerminal(f);
-        }
+    private static Stmt parseIf(SamTokenizer f) throws CompilerException {
+        CompilerUtils.expect(f, '(', f.lineNo());
+        Expr cond = parseExpr(f);
+        CompilerUtils.expect(f, ')', f.lineNo());
+        Stmt thenBranch = parseBlock(f);
+        CompilerUtils.expectWord(f, "else", f.lineNo());
+        Stmt elseBranch = parseBlock(f);
+        return new IfStmt(cond, thenBranch, elseBranch);
     }
 
-    static Expression getUnopExpr(SamTokenizer f) throws CompilerException {
-        // unop sam code
-        String unop_sam = getUnop(CompilerUtils.getOp(f));
-
-        // getExpr() would return "exactly" one value on the stack
-        Expression expr = getExpr(f);
-
-        // apply unop on expression
-        expr = new Expression(expr.getSamCode() + unop_sam, expr.getType());
-
-        return expr;
-    }
-
-    static Expression getBinopExpr(SamTokenizer f, Expression prevExpr)
-        throws CompilerException {
-        // binop sam code
-        String binop_sam = getBinop(CompilerUtils.getOp(f));
-
-        // // labels used
-        // String binop_label = new Label();
-
-        // // Start Frame
-        // sam += binop_label + ":\n";
-        // sam += "LINK\n";
-
-        // sam += "PUSHOFF -2\n";
-        Expression expr = getExpr(f);
-
-        // Type check
-        if (!expr.getType().isCompatibleWith(prevExpr.getType())) {
-            throw new TypeErrorException(
-                "Binop expr type mismatch: " +
-                prevExpr.getType() +
-                " and " +
-                expr.getType(),
-                f.lineNo()
-            );
-        }
-
-        expr = new Expression(expr.getSamCode() + binop_sam, expr.getType());
-
-        // // Stop Frame
-        // sam += "STOREOFF -2\n"; // store result on TOS
-        // sam += "UNLINK\n";
-        // sam += "RST\n";
-
-        // // Save the method in symbol table
-        // int address = CompilerUtils.getNextAddress(symbolTable);
-        // Node sam_func = new Node(binop_label, Type.SAM, sam, address);
-        // symbolTable.put(binop_label, sam_func);
-
-        return expr;
-    }
-
-    static Expression getTernaryExpr(SamTokenizer f) throws CompilerException {
-        // Generate sam code
-        Expression expr = new Expression();
-
-        // // labels used
-        // String start_ternary = new Label();
-        Label stop_ternary = new Label();
-        Label false_expr = new Label();
-
-        // // Start Frame
-        // sam += start_ternary + ":\n";
-        // sam += "LINK\n";
-
-        // // Expr ? (...) : (...)
-        expr = new Expression(expr.getSamCode() + "ISNIL\n", expr.getType());
-        expr = new Expression(expr.getSamCode() + "JUMPC " + false_expr.getName() + "\n", expr.getType());
-
-        // Truth expression:  (...) ? Expr : (..)
-        expr = new Expression(expr.getSamCode() + getExpr(f).getSamCode(), expr.getType());
-        expr = new Expression(expr.getSamCode() + "JUMP " + stop_ternary.getName() + "\n", expr.getType());
-
-        // Checks ':'
-        if (!CompilerUtils.check(f, ':')) {
-            throw new SyntaxErrorException(
-                "Ternary expects ':' between expressions",
-                f.lineNo()
-            );
-        }
-
-        // False expression: (...) ? (...) : Expr
-        expr = new Expression(expr.getSamCode() + false_expr.getName() + ":\n", expr.getType());
-        expr = new Expression(expr.getSamCode() + getExpr(f).getSamCode(), expr.getType());
-
-        // Stop Frame
-        expr = new Expression(expr.getSamCode() + stop_ternary.getName() + ":\n", expr.getType());
-
-        // // Save the method in symbol table
-        // int address = CompilerUtils.getNextAddress(symbolTable);
-        // Node sam_func = new Node(start_ternary, Type.SAM, sam, address);
-        // symbolTable.put(start_ternary, sam_func);
-
-        return expr;
-    }
-
-    /*** Non-recursive operations
-     ***/
-    static Node getVar(SamTokenizer f) throws CompilerException {
-        // Not a var, raise
-        if (f.peekAtKind() != TokenType.WORD) {
-            throw new SyntaxErrorException(
-                "getVar should starts with a WORD",
-                f.lineNo()
-            );
-        }
-
-        String varName = CompilerUtils.getWord(f);
-
-        // Lookup and require variable in current main method scope
-        return CompilerUtils.requireVar(mainMethod, varName, f);
+    private static Stmt parseWhile(SamTokenizer f) throws CompilerException {
+        CompilerUtils.expect(f, '(', f.lineNo());
+        Expr cond = parseExpr(f);
+        CompilerUtils.expect(f, ')', f.lineNo());
+        Stmt body = parseBlock(f);
+        return new WhileStmt(cond, body);
     }
 
     static Type getType(SamTokenizer f) throws CompilerException {
         // typeString = "int" | "bool" | "String"
         String typeString = CompilerUtils.getWord(f);
-        Type type = Type.fromString(typeString);
-
-        // typeString != INT | BOOL | STRING
-        if (type == null) {
-            throw new TypeErrorException(
-                "Invalid type: " + typeString,
-                f.lineNo()
-            );
-        }
-
-        return type;
+        return Type.parse(typeString, f.lineNo());
     }
 
-    static Expression getTerminal(SamTokenizer f) throws CompilerException {
-        TokenType type = f.peekAtKind();
-        switch (type) {
-            // Literal -> Num
-            case INTEGER:
-                int value = CompilerUtils.getInt(f);
-                return new Expression("PUSHIMM " + value + "\n", Type.INT);
-            // Literal -> String
-            case STRING:
-                String strValue = CompilerUtils.getString(f);
-                return new Expression(
-                    "PUSHIMMSTR \"" + strValue + "\"\n",
-                    Type.STRING
-                );
-            case WORD:
-                String boolOrVar = CompilerUtils.getWord(f);
-
-                // Literal -> "true" | "false"
-                if (boolOrVar.equals("true")) {
-                    return new Expression("PUSHIMM 1\n", Type.BOOL);
+    // ===== AST expression helpers =====
+    private static Expr parseExpr(SamTokenizer f) throws CompilerException {
+        if (CompilerUtils.check(f, '(')) {
+            if (f.test('~') || f.test('!')) { // unary
+                char op = CompilerUtils.getOp(f);
+                Expr inner = parseExpr(f);
+                CompilerUtils.expectChar(f, ')', f.lineNo());
+                Type t = inner.getType();
+                if (op == '~') {
+                    if (t != Type.INT && t != Type.STRING) {
+                        throw new TypeErrorException("'~' requires INT or STRING", f.lineNo());
+                    }
+                    return new UnaryExpr(op, inner, (t == Type.STRING) ? Type.STRING : Type.INT);
+                } else {
+                    if (t != Type.BOOL) throw new TypeErrorException("'!' requires BOOL", f.lineNo());
+                    return new UnaryExpr(op, inner, Type.BOOL);
                 }
-                if (boolOrVar.equals("false")) {
-                    return new Expression("PUSHIMM 0\n", Type.BOOL);
+            }
+            Expr first = parseExpr(f);
+            if (f.peekAtKind() != TokenType.OPERATOR) {
+                throw new SyntaxErrorException("Expected operator/?/) after expression", f.lineNo());
+            }
+            if (CompilerUtils.check(f, ')')) return assignment2.ast.ConstantFolder.fold(first); // grouping
+            if (CompilerUtils.check(f, '?')) { // ternary
+                Expr thenE = parseExpr(f);
+                CompilerUtils.expectChar(f, ':', f.lineNo());
+                Expr elseE = parseExpr(f);
+                if (!thenE.getType().isCompatibleWith(elseE.getType())) {
+                    throw new TypeErrorException("Ternary branch type mismatch", f.lineNo());
                 }
-
-                // Var -> Identifier
-                Node variable = CompilerUtils.requireVar(mainMethod, boolOrVar, f);
-
-                return new Expression(
-                    "PUSHOFF " + variable.getAddress() + "\n",
-                    variable.getType()
-                );
-            default:
-                throw new TypeErrorException(
-                    "getTerminal received invalid type " + type,
-                    f.lineNo()
-                );
+                CompilerUtils.expectChar(f, ')', f.lineNo());
+                return assignment2.ast.ConstantFolder.fold(new TernaryExpr(first, thenE, elseE, thenE.getType()));
+            }
+            char op = CompilerUtils.getOp(f);
+            Expr second = parseExpr(f);
+            CompilerUtils.expectChar(f, ')', f.lineNo());
+            return assignment2.ast.ConstantFolder.fold(buildBinary(first, op, second, f));
         }
+        return assignment2.ast.ConstantFolder.fold(parseTerminal(f));
+    }
+
+    private static Expr parseTerminal(SamTokenizer f) throws CompilerException {
+        TokenType tk = f.peekAtKind();
+        switch (tk) {
+            case INTEGER:
+                return new IntLitExpr(CompilerUtils.getInt(f));
+            case STRING:
+                return new StrLitExpr(CompilerUtils.getString(f));
+            case WORD: {
+                String w = CompilerUtils.getWord(f);
+                if (w.equals("true")) return new BoolLitExpr(true);
+                if (w.equals("false")) return new BoolLitExpr(false);
+                Node var = CompilerUtils.requireVar(mainMethod, w, f);
+                return new VarExpr(w, var.getAddress(), var.getType());
+            }
+            default:
+                throw new SyntaxErrorException("Unexpected token in expression", f.lineNo());
+        }
+    }
+
+    private static Expr buildBinary(Expr left, char op, Expr right, SamTokenizer f) throws CompilerException {
+        Type lt = left.getType();
+        Type rt = right.getType();
+        if (op == '*' && ((lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING))) return new BinaryExpr(left, op, right, Type.STRING);
+        if (op == '+' && lt == Type.STRING && rt == Type.STRING) return new BinaryExpr(left, op, right, Type.STRING);
+        if ((op == '<' || op == '>' || op == '=') && lt == Type.STRING && rt == Type.STRING) return new BinaryExpr(left, op, right, Type.BOOL);
+        if (op == '=' && lt.isCompatibleWith(rt)) return new BinaryExpr(left, op, right, Type.BOOL);
+        if (op == '&' || op == '|') {
+            if (lt != Type.BOOL || rt != Type.BOOL) throw new TypeErrorException("Logical op requires BOOL operands", f.lineNo());
+            return new BinaryExpr(left, op, right, Type.BOOL);
+        }
+        if (op == '+' || op == '-' || op == '*' || op == '/' || op == '%') {
+            if (lt != Type.INT || rt != Type.INT) throw new TypeErrorException("Arithmetic op requires INT operands", f.lineNo());
+            return new BinaryExpr(left, op, right, Type.INT);
+        }
+        if (op == '<' || op == '>' || op == '=') {
+            if (!lt.isCompatibleWith(rt)) throw new TypeErrorException("Comparison requires matching types", f.lineNo());
+            return new BinaryExpr(left, op, right, Type.BOOL);
+        }
+        throw new TypeErrorException("Unsupported operator: " + op, f.lineNo());
+    }
+
+
+    static Node getVar(SamTokenizer f) throws CompilerException {
+        if (f.peekAtKind() != TokenType.WORD) {
+            throw new SyntaxErrorException("Variable reference must start with identifier", f.lineNo());
+        }
+        String name = CompilerUtils.getWord(f);
+        return CompilerUtils.requireVar(mainMethod, name, f);
     }
 
     static String getIdentifier(SamTokenizer f) throws CompilerException {
@@ -542,7 +328,7 @@ public class LiveOak0Compiler {
     /*** HELPERS
      ***/
     public static final Pattern IDENTIFIER_PATTERN = Pattern.compile(
-        "^[a-zA-Z]([a-zA-Z0-9'_'])*$"
+        "^[A-Za-z][A-Za-z0-9_]*$"
     );
 
     public static String getUnop(char op) throws CompilerException {
@@ -581,96 +367,7 @@ public class LiveOak0Compiler {
     }
 
     public static String reverseString() {
-        // expects parameter (1 string) already on the stack
-        Label enterFuncLabel = new Label();
-        Label exitFuncLabel = new Label();
-        Label startLoopLabel = new Label();
-        Label stopLoopLabel = new Label();
-
-        String sam = "";
-
-        // call method
-        sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.getName() + "\n";
-        sam += "UNLINK\n";
-        sam += "JUMP " + exitFuncLabel.getName() + "\n";
-
-        // method definition
-        sam += enterFuncLabel.getName() + ":\n";
-        sam += "PUSHIMM 0\n"; // local 2: counter
-        sam += "PUSHIMM 0\n"; // local 3: increment address
-        sam += "PUSHIMM 0\n"; // local 4: result
-
-        // get string length and store in local 2
-        sam += "PUSHOFF -1\n";
-        sam += getStringLength();
-        sam += "STOREOFF 2\n";
-
-        // allocate space for resulting string
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "MALLOC\n";
-        sam += "STOREOFF 3\n";
-
-        // return this address
-        sam += "PUSHOFF 3\n";
-        sam += "STOREOFF 4\n";
-
-        // set EOS char first
-        sam += "PUSHOFF 3\n";
-        sam += "PUSHOFF 2\n";
-        sam += "ADD\n";
-        sam += "PUSHIMMCH '\\0'" + "\n";
-        sam += "STOREIND\n";
-
-        // loop (backward)...
-        sam += startLoopLabel.getName() + ":\n";
-
-        // end loop if counter == 0
-        sam += "PUSHOFF 2\n";
-        sam += "ISNIL\n";
-        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
-
-        // get current address
-        sam += "PUSHOFF 3\n";
-
-        // get current char
-        sam += "PUSHOFF -1\n";
-        sam += "PUSHOFF 2\n";
-        sam += "ADD\n";
-        sam += "PUSHIMM 1\n"; // subtract 1 because indexing
-        sam += "SUB\n";
-        sam += "PUSHIND\n";
-
-        // store char in address
-        sam += "STOREIND\n";
-
-        // increment address
-        sam += "PUSHOFF 3\n";
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "STOREOFF 3\n";
-
-        // decrement counter
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHIMM 1\n";
-        sam += "SUB\n";
-        sam += "STOREOFF 2\n";
-
-        // Continue loop
-        sam += "JUMP " + startLoopLabel.getName() + "\n";
-
-        // Stop loop
-        sam += stopLoopLabel.getName() + ":\n";
-        sam += "PUSHOFF 4\n";
-        sam += "STOREOFF -1\n";
-        sam += "ADDSP -3\n";
-        sam += "RST\n";
-
-        // Exit method
-        sam += exitFuncLabel.getName() + ":\n";
-
-        return sam;
+        // delegate to centralized StringRuntime implementation
+        return StringRuntime.reverseString();
     }
 }

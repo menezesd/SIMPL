@@ -11,6 +11,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import assignment2.ast.CodegenExprVisitor;
 
 public class LiveOak2Compiler extends LiveOak0Compiler {
     // Ensure '=' is treated as a comparison operator in expressions
@@ -113,23 +114,13 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         // MethodDecl -> Type MethodName (...
-        if (!CompilerUtils.check(f, '(')) {
-            throw new SyntaxErrorException(
-                "populateMethod expects '(' at start of get formals",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '(', f.lineNo());
 
         // Init method
         MethodNode method = null;
         if (methodName.equals("main")) {
             // MethodDecl -> Type main() ...
-            if (!CompilerUtils.check(f, ')')) {
-                throw new SyntaxErrorException(
-                    "main method should not receive formals",
-                    f.lineNo()
-                );
-            }
+            CompilerUtils.expectChar(f, ')', f.lineNo());
             method = MainMethod.getInstance();
             // Set the main method's return type to the declared return type
             method.setType(returnType);
@@ -141,34 +132,19 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             populateParams(f, method);
 
             // MethodDecl -> Type MethodName ( Formals? ) ...
-            if (!CompilerUtils.check(f, ')')) {
-                throw new SyntaxErrorException(
-                    "get method expects ')' at end of get formals",
-                    f.lineNo()
-                );
-            }
+            CompilerUtils.expectChar(f, ')', f.lineNo());
         }
         // Save Method in global scope
         globalNode.addChild(method);
 
         // MethodDecl -> Type MethodName ( Formals? ) { ...
-        if (!CompilerUtils.check(f, '{')) {
-            throw new SyntaxErrorException(
-                "populateMethod expects '{' at start of body",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '{', f.lineNo());
 
         // MethodDecl -> Type MethodName ( Formals? ) { Body ...
         populateLocals(f, method);
 
         // MethodDecl -> Type MethodName ( Formals? ) { Body }
-        if (!CompilerUtils.check(f, '}')) {
-            throw new SyntaxErrorException(
-                "populateMethod expects '}' at end of body",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '}', f.lineNo());
     }
 
     static void populateParams(SamTokenizer f, MethodNode method)
@@ -255,12 +231,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         // Skip the entire block in first pass
         Deque<Character> stack = new ArrayDeque<>();
 
-        if (!CompilerUtils.check(f, '{')) {
-            throw new SyntaxErrorException(
-                "skipBlock expects '{' at start of block",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '{', f.lineNo());
         stack.push('{');
 
         while (stack.size() > 0 && f.peekAtKind() != TokenType.EOF) {
@@ -295,6 +266,9 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         while (f.peekAtKind() != TokenType.EOF) {
             sb.append(getMethodDecl(f));
         }
+
+        // Emit shared string runtime functions at the bottom
+        sb.append(StringRuntime.emitAllStringFunctions());
         return sb.toString();
     }
 
@@ -315,12 +289,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         sb.append(methodName + ":\n");
 
         // MethodDecl -> Type MethodName (...
-        if (!CompilerUtils.check(f, '(')) {
-            throw new SyntaxErrorException(
-                "get method expects '(' at start of get formals",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '(', f.lineNo());
 
         // MethodDecl -> Type MethodName ( Formals? ) ...
         while (f.peekAtKind() == TokenType.WORD) {
@@ -334,31 +303,16 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 break;
             }
         }
-        if (!CompilerUtils.check(f, ')')) {
-            throw new SyntaxErrorException(
-                "get method expects ')' at end of get formals",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, ')', f.lineNo());
 
         // MethodDecl -> Type MethodName ( Formals? ) { ...
-        if (!CompilerUtils.check(f, '{')) {
-            throw new SyntaxErrorException(
-                "get method expects '{' at start of body",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '{', f.lineNo());
 
         // MethodDecl -> Type MethodName ( Formals? ) { Body ...
         sb.append(getBody(f, method));
 
         // MethodDecl -> Type MethodName ( Formals? ) { Body }
-        if (!CompilerUtils.check(f, '}')) {
-            throw new SyntaxErrorException(
-                "get method expects '}' at end of body",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '}', f.lineNo());
 
         // Check return method at the end
         if (
@@ -441,12 +395,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         throws CompilerException {
         SamBuilder sb = new SamBuilder();
 
-        if (!CompilerUtils.check(f, '{')) {
-            throw new SyntaxErrorException(
-                "getBlock expects '{' at start of block",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectChar(f, '{', f.lineNo());
 
         while (!CompilerUtils.check(f, '}')) {
             sb.append(getStmt(f, method));
@@ -500,12 +449,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
     static String getBreakStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        if (!CompilerUtils.check(f, "break")) {
-            throw new SyntaxErrorException(
-                "break statement expects 'break'",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectWord(f, "break", f.lineNo());
 
         Label breakLabel = method.mostRecent(LabelType.BREAK);
         if (breakLabel == null) {
@@ -522,23 +466,15 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
     static String getReturnStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        if (!CompilerUtils.check(f, "return")) {
-            throw new SyntaxErrorException(
-                "getReturnStmt expects 'return' at beginining",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectWord(f, "return", f.lineNo());
         SamBuilder sb = new SamBuilder();
-
-        Expression expr = getExpr(f, method);
-
-        // write sam code
-        sb.append(expr.getSamCode());
-
-        // Type check: returned expression must be compatible with method return type
-        if (!method.getType().isCompatibleWith(expr.getType())) {
+        // Use new AST-based parser for return expression (migration step)
+        assignment2.ast.Expr astExpr = parseExprAST(f, method);
+        String sam = generateExpr(astExpr);
+        sb.append(sam);
+        if (!method.getType().isCompatibleWith(astExpr.getType())) {
             throw new TypeErrorException(
-                "Return statement type mismatch: " + method.getType() + " and " + expr.getType(),
+                "Return statement type mismatch: " + method.getType() + " and " + astExpr.getType(),
                 f.lineNo()
             );
         }
@@ -569,7 +505,9 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         // if ( Expr ) ...
         CompilerUtils.expect(f, '(', f.lineNo());
 
-        sb.append(getExpr(f, method).getSamCode());
+    // AST migration: parse condition via new AST path
+    assignment2.ast.Expr condAst = parseExprAST(f, method);
+    sb.append(generateExpr(condAst));
 
         CompilerUtils.expect(f, ')', f.lineNo());
 
@@ -581,12 +519,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         sb.append("JUMP " + stop_stmt.getName() + "\n");
 
         // Checks 'else'
-        if (!CompilerUtils.getWord(f).equals("else")) {
-            throw new SyntaxErrorException(
-                "if statement expects 'else' between expressions",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expectWord(f, "else", f.lineNo());
 
         // False block: (...) ? (...) : Expr
         sb.append(false_block.getName() + ":\n");
@@ -615,7 +548,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         CompilerUtils.expect(f, '(', f.lineNo());
 
         sb.append(start_loop.getName() + ":\n");
-        sb.append(getExpr(f, method).getSamCode());
+    assignment2.ast.Expr whileCondAst = parseExprAST(f, method);
+    sb.append(generateExpr(whileCondAst));
 
         CompilerUtils.expect(f, ')', f.lineNo());
 
@@ -642,10 +576,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
         CompilerUtils.expect(f, '=', f.lineNo());
 
-        Expression expr = getExpr(f, method);
-
-        // write sam code
-        sb.append(expr.getSamCode());
+    assignment2.ast.Expr assignAst = parseExprAST(f, method);
+        sb.append(generateExpr(assignAst));
 
         // Store item on the stack to Node
         sb.append("STOREOFF " + variable.getAddress() + "\n");
@@ -655,352 +587,186 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         return sb.toString();
     }
 
-    static Expression getExpr(SamTokenizer f, MethodNode method)
-        throws CompilerException {
+    // Legacy accessor removed: expressions now handled directly via AST
+
+    // ===== New AST-based expression parsing (migration in progress) =====
+    private static assignment2.ast.Expr parseExprAST(SamTokenizer f, MethodNode method) throws CompilerException {
         if (CompilerUtils.check(f, '(')) {
-            Expression expr = null;
-
-            // Expr -> ( Unop Expr )
-            if (f.test('~') || f.test('!')) {
-                expr = getUnopExpr(f, method);
-            } else {
-                // Expr -> ( Expr (...) )
-                expr = getExpr(f, method);
-
-                // Raise if Expr -> ( Expr NOT('?' | ')' | Binop) )
-                if (f.peekAtKind() != TokenType.OPERATOR) {
-                    throw new SyntaxErrorException(
-                        "Expr -> Expr (...) expects '?' | ')' | Binop",
-                        f.lineNo()
-                    );
-                }
-
-                // Expr -> ( Expr ) , ends early
-                if (CompilerUtils.check(f, ')')) {
-                    return expr;
-                }
-
-                // Exprt -> (Expr ? Expr : Expr)
-                if (CompilerUtils.check(f, '?')) {
-                    Expression ternaryExpr = getTernaryExpr(f, method);
-                    // The overall expression type becomes the ternary expression's type
-                    expr = new Expression(expr.getSamCode() + ternaryExpr.getSamCode(), ternaryExpr.getType());
-                }
-                // Exprt -> (Expr Binop Expr)
-                else {
-                    Expression binopExpr = getBinopExpr(f, expr, method);
-                    expr = new Expression(expr.getSamCode() + binopExpr.getSamCode(), binopExpr.getType());
+            if (f.test('~') || f.test('!')) { // unary
+                char op = CompilerUtils.getOp(f);
+                assignment2.ast.Expr inner = parseExprAST(f, method);
+                CompilerUtils.expectChar(f, ')', f.lineNo());
+                assignment2.Type t = inner.getType();
+                if (op == '~') {
+                    if (t != assignment2.Type.INT && t != assignment2.Type.STRING) {
+                        throw new TypeErrorException("'~' requires INT or STRING", f.lineNo());
+                    }
+                    return assignment2.ast.ConstantFolder.fold(new assignment2.ast.UnaryExpr(op, inner, (t == assignment2.Type.STRING) ? assignment2.Type.STRING : assignment2.Type.INT));
+                } else {
+                    if (t != assignment2.Type.BOOL) throw new TypeErrorException("'!' requires BOOL", f.lineNo());
+                    return assignment2.ast.ConstantFolder.fold(new assignment2.ast.UnaryExpr(op, inner, assignment2.Type.BOOL));
                 }
             }
+            assignment2.ast.Expr first = parseExprAST(f, method);
+            if (f.peekAtKind() != Tokenizer.TokenType.OPERATOR) {
+                throw new SyntaxErrorException("Expected operator/?/) after expression", f.lineNo());
+            }
+            if (CompilerUtils.check(f, ')')) return assignment2.ast.ConstantFolder.fold(first); // grouping
+            if (CompilerUtils.check(f, '?')) { // ternary
+                assignment2.ast.Expr thenE = parseExprAST(f, method);
+                CompilerUtils.expectChar(f, ':', f.lineNo());
+                assignment2.ast.Expr elseE = parseExprAST(f, method);
+                if (!thenE.getType().isCompatibleWith(elseE.getType())) {
+                    throw new TypeErrorException("Ternary branch type mismatch", f.lineNo());
+                }
+                CompilerUtils.expectChar(f, ')', f.lineNo());
+                return assignment2.ast.ConstantFolder.fold(new assignment2.ast.TernaryExpr(first, thenE, elseE, thenE.getType()));
+            }
+            char op = CompilerUtils.getOp(f);
+            assignment2.ast.Expr second = parseExprAST(f, method);
+            CompilerUtils.expectChar(f, ')', f.lineNo());
+            return assignment2.ast.ConstantFolder.fold(buildBinaryAST(first, op, second, f));
+        }
+        return assignment2.ast.ConstantFolder.fold(parseTerminalAST(f, method));
+    }
 
-            // Check closing ')'
-            CompilerUtils.expect(f, ')', f.lineNo());
-            return expr;
-        } else {
-            return getTerminal(f, method);
+    private static assignment2.ast.Expr parseTerminalAST(SamTokenizer f, MethodNode method) throws CompilerException {
+        Tokenizer.TokenType tk = f.peekAtKind();
+        switch (tk) {
+            case INTEGER:
+                return new assignment2.ast.IntLitExpr(CompilerUtils.getInt(f));
+            case STRING:
+                return new assignment2.ast.StrLitExpr(CompilerUtils.getString(f));
+            case WORD: {
+                String w = CompilerUtils.getWord(f);
+                if (w.equals("true")) return new assignment2.ast.BoolLitExpr(true);
+                if (w.equals("false")) return new assignment2.ast.BoolLitExpr(false);
+                // Could be method or variable
+                Node sym = method.lookupSymbol(w);
+                if (sym == null) throw new SyntaxErrorException("Undeclared symbol: " + w, f.lineNo());
+                if (sym instanceof MethodNode) {
+                    MethodNode callee = (MethodNode) sym;
+                    CompilerUtils.expectChar(f, '(', f.lineNo());
+                    java.util.ArrayList<assignment2.ast.Expr> args = new java.util.ArrayList<>();
+                    int paramCount = callee.numParameters();
+                    int argCount = 0;
+                    if (!CompilerUtils.check(f, ')')) { // has args
+                        do {
+                            assignment2.ast.Expr arg = parseExprAST(f, method);
+                            if (argCount >= paramCount) {
+                                throw new SyntaxErrorException("Too many arguments for method '" + callee.getName() + "'", f.lineNo());
+                            }
+                            VariableNode formal = callee.parameters.get(argCount);
+                            if (!arg.getType().isCompatibleWith(formal.getType())) {
+                                throw new TypeErrorException("Argument type mismatch for parameter '" + formal.getName() + "'", f.lineNo());
+                            }
+                            args.add(arg);
+                            argCount++;
+                        } while (CompilerUtils.check(f, ','));
+                        CompilerUtils.expectChar(f, ')', f.lineNo());
+                    }
+                    if (argCount != paramCount) {
+                        throw new SyntaxErrorException("Incorrect number of arguments for method '" + callee.getName() + "'", f.lineNo());
+                    }
+                    return new assignment2.ast.CallExpr(callee, args);
+                }
+                // variable
+                VariableNode var = (VariableNode) sym;
+                return new assignment2.ast.VarExpr(w, var.getAddress(), var.getType());
+            }
+            default:
+                throw new SyntaxErrorException("Unexpected token in expression", f.lineNo());
         }
     }
 
-    static Expression getUnopExpr(SamTokenizer f, MethodNode method)
-        throws CompilerException {
-        // Not an operator, raise
-        if (f.peekAtKind() != TokenType.OPERATOR) {
-            throw new TypeErrorException(
-                "getUnopExpr expects an OPERATOR",
-                f.lineNo()
-            );
+    private static assignment2.ast.Expr buildBinaryAST(assignment2.ast.Expr left, char op, assignment2.ast.Expr right, SamTokenizer f) throws CompilerException {
+        assignment2.Type lt = left.getType();
+        assignment2.Type rt = right.getType();
+        if (op == '*' && ((lt == assignment2.Type.STRING && rt == assignment2.Type.INT) || (lt == assignment2.Type.INT && rt == assignment2.Type.STRING))) return new assignment2.ast.BinaryExpr(left, op, right, assignment2.Type.STRING);
+        if (op == '+' && lt == assignment2.Type.STRING && rt == assignment2.Type.STRING) return new assignment2.ast.BinaryExpr(left, op, right, assignment2.Type.STRING);
+        if ((op == '<' || op == '>' || op == '=') && lt == assignment2.Type.STRING && rt == assignment2.Type.STRING) return new assignment2.ast.BinaryExpr(left, op, right, assignment2.Type.BOOL);
+        if (op == '=' && lt.isCompatibleWith(rt)) return new assignment2.ast.BinaryExpr(left, op, right, assignment2.Type.BOOL);
+        if (op == '&' || op == '|') {
+            if (lt != assignment2.Type.BOOL || rt != assignment2.Type.BOOL) throw new TypeErrorException("Logical op requires BOOL operands", f.lineNo());
+            return new assignment2.ast.BinaryExpr(left, op, right, assignment2.Type.BOOL);
         }
-        char op = CompilerUtils.getOp(f);
-
-        // getExpr() would return "exactly" one value on the stack
-        Expression expr = getExpr(f, method);
-
-        /*** Special case
-         ***/
-        if (op == '~' && expr.getType() == Type.STRING) {
-            expr = new Expression(expr.getSamCode() + reverseString(), Type.STRING);
-        } /*** Basic cases
-         ***/else {
-            // Type check
-            if (
-                op == '~' && expr.getType() != Type.INT && expr.getType() != Type.STRING
-            ) {
-                throw new TypeErrorException(
-                    "Bitwise NOT operation requires INT | STRING operand, but got " +
-                    expr.getType(),
-                    f.lineNo()
-                );
-            }
-
-            // apply unop on expression
-            expr = new Expression(expr.getSamCode() + getUnop(op), expr.getType());
+        if (op == '+' || op == '-' || op == '*' || op == '/' || op == '%') {
+            if (lt != assignment2.Type.INT || rt != assignment2.Type.INT) throw new TypeErrorException("Arithmetic op requires INT operands", f.lineNo());
+            return new assignment2.ast.BinaryExpr(left, op, right, assignment2.Type.INT);
         }
-
-        return expr;
+        if (op == '<' || op == '>' || op == '=') {
+            if (!lt.isCompatibleWith(rt)) throw new TypeErrorException("Comparison requires matching types", f.lineNo());
+            return new assignment2.ast.BinaryExpr(left, op, right, assignment2.Type.BOOL);
+        }
+        throw new TypeErrorException("Unsupported operator: " + op, f.lineNo());
     }
 
-    static Expression getBinopExpr(
-        SamTokenizer f,
-        Expression prevExpr,
-        MethodNode method
-    ) throws CompilerException {
-        // parse operator
-        if (f.peekAtKind() != TokenType.OPERATOR) {
-            throw new TypeErrorException("getBinopExpr expects an OPERATOR", f.lineNo());
+    // Direct codegen helper replacing legacy Expression wrapper
+    private static String generateExpr(assignment2.ast.Expr astExpr) throws CompilerException {
+        CodegenExprVisitor v = new CodegenExprVisitor();
+        try {
+            return astExpr.accept(v);
+        } catch (CompilerException ce) {
+            throw ce;
+        } catch (Exception e) {
+            throw new CompilerException("AST expression codegen failed: " + e.getMessage(), -1);
         }
-        char op = CompilerUtils.getOp(f);
-        Expression expr = getExpr(f, method);
-        // String repeat
-        if (
-            op == '*' &&
-            ((prevExpr.getType() == Type.STRING && expr.getType() == Type.INT) ||
-                (prevExpr.getType() == Type.INT && expr.getType() == Type.STRING))
-        ) {
-            return new Expression(expr.getSamCode() + repeatString(prevExpr.getType(), expr.getType()), Type.STRING);
-        }
-        // String concatenation
-        if (
-            op == '+' &&
-            prevExpr.getType() == Type.STRING &&
-            expr.getType() == Type.STRING
-        ) {
-            return new Expression(expr.getSamCode() + concatString(), Type.STRING);
-        }
-        // String comparison
-        if (
-            getBinopType(op) == BinopType.COMPARISON &&
-            prevExpr.getType() == Type.STRING &&
-            expr.getType() == Type.STRING
-        ) {
-            return new Expression(expr.getSamCode() + compareString(op), Type.BOOL);
-        }
-        // Assignment in expression context: treat as comparison, return BOOL
-        if (op == '=') {
-            if (!prevExpr.getType().isCompatibleWith(expr.getType())) {
-                throw new TypeErrorException(
-                    "Assignment in expression type mismatch: " +
-                    prevExpr.getType() +
-                    " and " +
-                    expr.getType(),
-                    f.lineNo()
-                );
-            }
-            return new Expression(expr.getSamCode() + getBinop(op), Type.BOOL);
-        }
-        // Logical and comparison binops: require same type, return BOOL
-        BinopType binopType = getBinopType(op);
-        if (binopType == BinopType.BITWISE || binopType == BinopType.COMPARISON) {
-            if (!expr.getType().isCompatibleWith(prevExpr.getType())) {
-                throw new TypeErrorException(
-                    "Binop expr type mismatch: " +
-                    prevExpr.getType() +
-                    " and " +
-                    expr.getType(),
-                    f.lineNo()
-                );
-            }
-            if (binopType == BinopType.BITWISE && (prevExpr.getType() != Type.BOOL || expr.getType() != Type.BOOL)) {
-                throw new TypeErrorException(
-                    "Logical operation '" +
-                    op +
-                    "' requires BOOL operands, but got " +
-                    prevExpr.getType() +
-                    " and " +
-                    expr.getType(),
-                    f.lineNo()
-                );
-            }
-            return new Expression(expr.getSamCode() + getBinop(op), Type.BOOL);
-        }
-        // Arithmetic binops: require INT, return INT
-        if (binopType == BinopType.ARITHMETIC) {
-            if (prevExpr.getType() != Type.INT || expr.getType() != Type.INT) {
-                throw new TypeErrorException(
-                    "Arithmetic operation '" +
-                    op +
-                    "' requires INT operands, but got " +
-                    prevExpr.getType() +
-                    " and " +
-                    expr.getType(),
-                    f.lineNo()
-                );
-            }
-            return new Expression(expr.getSamCode() + getBinop(op), Type.INT);
-        }
-        // Fallback (should not reach here)
-    throw new TypeErrorException("Unknown binop or type error.", f.lineNo());
     }
 
-    static Expression getTernaryExpr(SamTokenizer f, MethodNode method)
-        throws CompilerException {
-        // Generate sam code
-        Label stop_ternary = new Label();
-        Label false_expr = new Label();
-        SamBuilder sb = new SamBuilder();
-        sb.append("ISNIL\n");
-        sb.append("JUMPC " + false_expr.getName() + "\n");
+    // Removed legacy getUnopExpr, getBinopExpr, getTernaryExpr: all expression forms now handled by unified AST pipeline.
 
-        // Truth expression:  (...) ? Expr : (..)
-        Expression truthExpr = getExpr(f, method);
-        sb.append(truthExpr.getSamCode());
-        sb.append("JUMP " + stop_ternary.getName() + "\n");
-
-        // Checks ':'
-        if (!CompilerUtils.check(f, ':')) {
-            throw new SyntaxErrorException(
-                "Ternary expects ':' between expressions",
-                f.lineNo()
-            );
-        }
-
-        // False expression: (...) ? (...) : Expr
-        sb.append(false_expr.getName() + ":\n");
-        Expression falseExpr = getExpr(f, method);
-        sb.append(falseExpr.getSamCode());
-
-        // Type check return
-        if (!truthExpr.getType().isCompatibleWith(falseExpr.getType())) {
-            throw new TypeErrorException(
-                "Ternary expr type mismatch: " +
-                truthExpr.getType() +
-                " and " +
-                falseExpr.getType(),
-                f.lineNo()
-            );
-        }
-        // Stop Frame
-        sb.append(stop_ternary.getName() + ":\n");
-
-        return new Expression(sb.toString(), truthExpr.getType());
-    }
-
-    static Expression getMethodCallExpr(
+    static assignment2.ast.Expr getMethodCallExpr(
         SamTokenizer f,
         MethodNode scopeMethod,
         MethodNode callingMethod
     ) throws CompilerException {
-        SamBuilder sb = new SamBuilder();
-        sb.append("PUSHIMM 0\n"); // return value
-
-        if (!CompilerUtils.check(f, '(')) {
-            throw new SyntaxErrorException(
-                "getMethodCallExpr expects '(' at the start of actuals",
-                f.lineNo()
-            );
-        }
-
-        sb.append(getActuals(f, scopeMethod, callingMethod));
-        sb.append("LINK\n");
-        sb.append("JSR " + callingMethod.getName() + "\n");
-        sb.append("UNLINK\n");
-        sb.append("ADDSP -" + callingMethod.numParameters() + "\n");
-
-        if (!CompilerUtils.check(f, ')')) {
-            throw new SyntaxErrorException(
-                "getMethodCallExpr expects ')' at the end of actuals",
-                f.lineNo()
-            );
-        }
-
-        return new Expression(sb.toString(), callingMethod.getType());
-    }
-
-    static String getActuals(
-        SamTokenizer f,
-        MethodNode scopeMethod,
-        MethodNode callingMethod
-    ) throws CompilerException {
-        SamBuilder sb = new SamBuilder();
+        CompilerUtils.expectChar(f, '(', f.lineNo());
+        java.util.ArrayList<assignment2.ast.Expr> args = new java.util.ArrayList<>();
         int paramCount = callingMethod.numParameters();
         int argCount = 0;
-
-        do {
-            // check done processing all the actuals
-            if (f.test(')')) {
-                break;
-            }
-            // too many actuals provided
-            if (argCount > paramCount) {
-                throw new SyntaxErrorException(
-                    "Too many arguments provided for method '" +
-                    callingMethod.getName() +
-                    "'. Expected " +
-                    paramCount +
-                    " but got more.",
-                    f.lineNo()
-                );
-            }
-
-            Expression expr = getExpr(f, scopeMethod);
-            VariableNode currParam = callingMethod.parameters.get(argCount);
-
-            // Type check
-            if (!expr.getType().isCompatibleWith(currParam.getType())) {
-                throw new TypeErrorException(
-                    "Argument type mismatch for parameter '" +
-                    currParam.getName() +
-                    "': expected " +
-                    currParam.getType() +
-                    " but got " +
-                    expr.getType(),
-                    f.lineNo()
-                );
-            }
-
-            // write sam code
-            sb.append(expr.getSamCode());
-
-            // value field removed from Expression and VariableNode; nothing to assign here
-
-            argCount++;
-        } while (CompilerUtils.check(f, ','));
-
-        // too few actuals provided
-        if (argCount < paramCount) {
-            throw new SyntaxErrorException(
-                "Not enough arguments provided for method '" +
-                callingMethod.getName() +
-                "'. Expected " +
-                paramCount +
-                " but got " +
-                argCount,
-                f.lineNo()
-            );
+        if (!CompilerUtils.check(f, ')')) {
+            do {
+                assignment2.ast.Expr arg = parseExprAST(f, scopeMethod);
+                if (argCount >= paramCount) {
+                    throw new SyntaxErrorException("Too many arguments for method '" + callingMethod.getName() + "'", f.lineNo());
+                }
+                VariableNode formal = callingMethod.parameters.get(argCount);
+                if (!arg.getType().isCompatibleWith(formal.getType())) {
+                    throw new TypeErrorException("Argument type mismatch for parameter '" + formal.getName() + "'", f.lineNo());
+                }
+                args.add(arg);
+                argCount++;
+            } while (CompilerUtils.check(f, ','));
+            CompilerUtils.expectChar(f, ')', f.lineNo());
         }
-
-        return sb.toString();
+        if (argCount != paramCount) {
+            throw new SyntaxErrorException("Incorrect number of arguments for method '" + callingMethod.getName() + "'", f.lineNo());
+        }
+        return new assignment2.ast.CallExpr(callingMethod, args);
     }
 
+    // getActuals removed: handled directly in getMethodCallExpr / parseTerminalAST
+
     // getTerminal is now a recursive operation
-    static Expression getTerminal(SamTokenizer f, MethodNode method)
+    static assignment2.ast.Expr getTerminal(SamTokenizer f, MethodNode method)
         throws CompilerException {
         TokenType type = f.peekAtKind();
         switch (type) {
             // Expr -> Literal -> Num
             case INTEGER:
                 int value = CompilerUtils.getInt(f);
-                return new Expression(
-                    "PUSHIMM " + value + "\n",
-                    Type.INT
-                );
+                return new assignment2.ast.IntLitExpr(value);
             // Expr -> Literal -> String
             case STRING:
                 String strValue = CompilerUtils.getString(f);
-                return new Expression(
-                    "PUSHIMMSTR \"" + strValue + "\"\n",
-                    Type.STRING
-                );
+                return new assignment2.ast.StrLitExpr(strValue);
             // Expr -> MethodName | Var | Literal
             case WORD:
                 String name = CompilerUtils.getWord(f);
 
                 // Expr -> Literal -> "true" | "false"
-                if (name.equals("true")) {
-                    return new Expression("PUSHIMM 1\n", Type.BOOL);
-                }
-                if (name.equals("false")) {
-                    return new Expression("PUSHIMM 0\n", Type.BOOL);
-                }
+                if (name.equals("true")) return new assignment2.ast.BoolLitExpr(true);
+                if (name.equals("false")) return new assignment2.ast.BoolLitExpr(false);
 
                 // Expr -> MethodName | Var
                 Node node = CompilerUtils.requireVar(method, name, f);
@@ -1011,10 +777,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 }
                 // Expr -> Var
                 else if (node instanceof VariableNode) {
-                    return new Expression(
-                        "PUSHOFF " + node.getAddress() + "\n",
-                        node.getType()
-                    );
+                    VariableNode vn = (VariableNode) node;
+                    return new assignment2.ast.VarExpr(vn.getName(), vn.getAddress(), vn.getType());
                 } else {
                     throw new CompilerException(
                         "getTerminal trying to access invalid symbol: Node " +

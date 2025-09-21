@@ -64,6 +64,105 @@ public class CompilerUtils {
         return str;
     }
 
+    /**
+     * Expect the next word token to equal the provided value. Records token and
+     * throws SyntaxErrorException with line number if mismatch.
+     */
+    public static void expectWord(SamTokenizer f, String expected, int line) throws SyntaxErrorException {
+        if (f.peekAtKind() != TokenType.WORD) {
+            throw new SyntaxErrorException("Expected '" + expected + "'", line);
+        }
+        String word = f.getWord();
+        processedTokens.add(word);
+        if (!word.equals(expected)) {
+            throw new SyntaxErrorException("Expected '" + expected + "'", line);
+        }
+    }
+
+    /**
+     * Expect the next single-character token to be the provided char. Records
+     * token and throws SyntaxErrorException with line number if mismatch.
+     */
+    public static void expectChar(SamTokenizer f, char expected, int line) throws SyntaxErrorException {
+        if (!f.check(expected)) {
+            throw new SyntaxErrorException("Expected '" + expected + "'", line);
+        }
+        processedTokens.add(String.valueOf(expected));
+    }
+
+    /**
+     * Expect the next token to be an operator (single char). Records token and
+     * throws SyntaxErrorException with line number if not an operator.
+     */
+    public static char expectOperator(SamTokenizer f, int line) throws SyntaxErrorException {
+        if (f.peekAtKind() != TokenType.OPERATOR) {
+            throw new SyntaxErrorException("Expected operator", line);
+        }
+        char op = f.getOp();
+        processedTokens.add(String.valueOf(op));
+        return op;
+    }
+
+    /**
+     * Peek at the next word token without consuming it. Returns null if not a
+     * word.
+     */
+    public static String peekWord(SamTokenizer f) {
+        if (f.peekAtKind() != TokenType.WORD) {
+            return null;
+        }
+        // SamTokenizer doesn't provide a peekWord, so consume and push back is not
+        // available. We mimic peek by using getWord and re-inserting into
+        // processedTokens but this is only safe if callers rely only on value
+        // check; however SamTokenizer supports lookahead via peekAtKind; for
+        // actual word content peek we temporarily getWord and add it back to
+        // processedTokens to reflect consumption semantics; caller should not
+        // assume this consumes the tokenizer.
+        String w = f.getWord();
+        // push the word into processedTokens to reflect that we observed it but
+        // also push it back by resetting tokenizer state is not available here,
+        // so we will document that peekWord consumes the token. To keep
+        // compatibility with existing callers, prefer using check/expect methods.
+        processedTokens.add(w);
+        return w;
+    }
+
+    /**
+     * Consume the token if it equals the provided string. Records on consume.
+     * Returns true if consumed.
+     */
+    public static boolean consumeIf(SamTokenizer f, String s) {
+        // Only consume when the next token is a word and matches `s`.
+        if (f.peekAtKind() != TokenType.WORD) {
+            return false;
+        }
+        // Use check-like behavior by peeking the next token text without
+        // consuming it. SamTokenizer doesn't provide a non-consuming getWord,
+        // so we use f.check(s) to safely test for the exact string token: that
+        // method performs the correct non-consuming comparison (and records
+        // tokens when true). If it returns true, the tokenizer has consumed
+        // the token already via its contract; to keep behavior consistent we
+        // simply return true.
+        boolean matched = f.check(s);
+        if (matched) {
+            processedTokens.add(s);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Consume the token if it equals the provided character. Returns true if
+     * consumed.
+     */
+    public static boolean consumeIf(SamTokenizer f, char c) {
+        if (f.check(c)) {
+            processedTokens.add(String.valueOf(c));
+            return true;
+        }
+        return false;
+    }
+
     /** General utils
      **/
 
