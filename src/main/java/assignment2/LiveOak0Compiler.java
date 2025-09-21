@@ -98,50 +98,49 @@ public class LiveOak0Compiler {
     }
 
     static String getProgram(SamTokenizer f) throws CompilerException {
-        String pgm = "";
-        pgm += "PUSHIMM 0\n";
-        pgm += "LINK\n";
-        pgm += "JSR main\n";
-        pgm += "UNLINK\n";
-        pgm += "STOP\n";
+        SamBuilder sb = new SamBuilder();
+        sb.append("PUSHIMM 0\n");
+        sb.append("LINK\n");
+        sb.append("JSR main\n");
+        sb.append("UNLINK\n");
+        sb.append("STOP\n");
 
         // LiveOak-0
-        pgm += "main:\n";
-        pgm += getBody(f);
+        sb.label("main");
+        sb.append(getBody(f));
 
         // Return whatever on top of the stack
-        pgm += "DUP\n";
-        pgm += "STOREOFF -1\n";
-        pgm += "ADDSP -" + mainMethod.numLocalVariables() + "\n";
-        pgm += "RST\n";
+        sb.append("DUP\n");
+        sb.append("STOREOFF -1\n");
+        sb.append("ADDSP -" + mainMethod.numLocalVariables() + "\n");
+        sb.append("RST\n");
 
-        return pgm;
+        return sb.toString();
     }
 
     /*** Recursive operations
      ***/
     static String getBody(SamTokenizer f) throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // while start with "int | bool | String"
         while (f.peekAtKind() == TokenType.WORD) {
-            // VarDecl will store variable in Hashmap: identifier -> { type: TokenType, relative_address: int }
-            sam += getVarDecl(f);
+            sb.append(getVarDecl(f));
         }
 
         // check EOF
         if (f.peekAtKind() == TokenType.EOF) {
-            return sam;
+            return sb.toString();
         }
 
         // Then, get Block
-        sam += getBlock(f);
+        sb.append(getBlock(f));
 
-        return sam;
+        return sb.toString();
     }
 
     static String getVarDecl(SamTokenizer f) throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // VarDecl -> Type ...
         Type varType = getType(f);
@@ -155,9 +154,7 @@ public class LiveOak0Compiler {
             Node existNode = mainMethod.lookupSymbol(varName);
             if (existNode != null) {
                 throw new CompilerException(
-                    "Variable '" +
-                    varName +
-                    "' is already defined in this scope",
+                    "Variable '" + varName + "' is already defined in this scope",
                     f.lineNo()
                 );
             }
@@ -167,7 +164,7 @@ public class LiveOak0Compiler {
             mainMethod.addChild(variable);
 
             // write sam code
-            sam += "PUSHIMM 0\n";
+            sb.append("PUSHIMM 0\n");
 
             if (CompilerUtils.check(f, ',')) {
                 continue;
@@ -181,11 +178,12 @@ public class LiveOak0Compiler {
             }
         }
 
-        return sam + "\n";
+        sb.append("\n");
+        return sb.toString();
     }
 
     static String getBlock(SamTokenizer f) throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         if (!CompilerUtils.check(f, '{')) {
             throw new SyntaxErrorException(
@@ -196,17 +194,17 @@ public class LiveOak0Compiler {
 
         // while not "}"
         while (!CompilerUtils.check(f, '}')) {
-            sam += getStmt(f);
+            sb.append(getStmt(f));
         }
 
-        return sam;
+        return sb.toString();
     }
 
     static String getStmt(SamTokenizer f) throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         if (CompilerUtils.check(f, ';')) {
-            return sam; // Null statement
+            return ""; // Null statement
         }
 
         if (f.peekAtKind() != TokenType.WORD) {
@@ -217,21 +215,20 @@ public class LiveOak0Compiler {
         }
 
         if (f.test("if")) {
-            sam += getIfStmt(f);
+            sb.append(getIfStmt(f));
         } else if (f.test("while")) {
-            sam += getWhileStmt(f);
+            sb.append(getWhileStmt(f));
         } else {
-            sam += getVarStmt(f);
+            sb.append(getVarStmt(f));
         }
 
-        return sam;
+        return sb.toString();
     }
 
     static String getIfStmt(SamTokenizer f) throws CompilerException {
         CompilerUtils.expect(f, "if", f.lineNo());
 
-        // Generate sam code
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // labels used
         Label stop_stmt = new Label();
@@ -240,16 +237,16 @@ public class LiveOak0Compiler {
         // if ( Expr ) ...
         CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += getExpr(f).getSamCode();
+        sb.append(getExpr(f).getSamCode());
 
         CompilerUtils.expect(f, ')', f.lineNo());
 
-        sam += "ISNIL\n";
-        sam += "JUMPC " + false_block.getName() + "\n";
+        sb.append("ISNIL\n");
+        sb.append("JUMPC " + false_block.getName() + "\n");
 
         // Truth block:  // if ( Expr ) Block ...
-        sam += getBlock(f);
-        sam += "JUMP " + stop_stmt.getName() + "\n";
+        sb.append(getBlock(f));
+        sb.append("JUMP " + stop_stmt.getName() + "\n");
 
         // Checks 'else'
         if (!CompilerUtils.getWord(f).equals("else")) {
@@ -260,20 +257,19 @@ public class LiveOak0Compiler {
         }
 
         // False block: (...) ? (...) : Expr
-        sam += false_block + ":\n";
-        sam += getBlock(f);
+        sb.append(false_block + ":\n");
+        sb.append(getBlock(f));
 
         // Done if statement
-        sam += stop_stmt + ":\n";
+        sb.append(stop_stmt + ":\n");
 
-        return sam;
+        return sb.toString();
     }
 
     static String getWhileStmt(SamTokenizer f) throws CompilerException {
         CompilerUtils.expect(f, "while", f.lineNo());
 
-        // Generate sam code
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // labels used
         Label start_loop = new Label();
@@ -282,39 +278,39 @@ public class LiveOak0Compiler {
         // while ( Expr ) ...
         CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += start_loop.getName() + ":\n";
-        sam += getExpr(f).getSamCode();
+        sb.append(start_loop.getName() + ":\n");
+        sb.append(getExpr(f).getSamCode());
 
         CompilerUtils.expect(f, ')', f.lineNo());
 
-        sam += "ISNIL\n";
-        sam += "JUMPC " + stop_loop.getName() + "\n";
+        sb.append("ISNIL\n");
+        sb.append("JUMPC " + stop_loop.getName() + "\n");
 
         // Continue loop
-        sam += getBlock(f);
-        sam += "JUMP " + start_loop.getName() + "\n";
+        sb.append(getBlock(f));
+        sb.append("JUMP " + start_loop.getName() + "\n");
 
         // Stop loop
-        sam += stop_loop.getName() + ":\n";
+        sb.append(stop_loop.getName() + ":\n");
 
-        return sam;
+        return sb.toString();
     }
 
     static String getVarStmt(SamTokenizer f) throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
         Node variable = getVar(f);
 
         CompilerUtils.expect(f, '=', f.lineNo());
 
         // getExpr() would return "exactly" one value on the stack
-        sam += getExpr(f).getSamCode();
+        sb.append(getExpr(f).getSamCode());
 
         // Store item on the stack to Node
-    sam += "STOREOFF " + variable.getAddress() + "\n";
+        sb.append("STOREOFF " + variable.getAddress() + "\n");
 
         CompilerUtils.expect(f, ';', f.lineNo());
 
-        return sam;
+        return sb.toString();
     }
 
     static Expression getExpr(SamTokenizer f) throws CompilerException {
@@ -567,325 +563,34 @@ public class LiveOak0Compiler {
     );
 
     public static String getUnop(char op) throws CompilerException {
-        switch (op) {
-            // TODO: string bitwise
-            case '~':
-                return "PUSHIMM -1\nTIMES\n";
-            case '!':
-                return "PUSHIMM 1\nADD\nPUSHIMM 2\nMOD\n";
-            default:
-                throw new TypeErrorException(
-                    "getUnop received invalid input: " + op,
-                    -1
-                );
-        }
+        return OperatorUtils.getUnop(op);
     }
 
     public static String getBinop(char op) throws CompilerException {
-        switch (op) {
-            case '+':
-                return "ADD\n";
-            case '-':
-                return "SUB\n";
-            case '*':
-                return "TIMES\n";
-            case '/':
-                return "DIV\n";
-            case '%':
-                return "MOD\n";
-            case '&':
-                return "AND\n";
-            case '|':
-                return "OR\n";
-            case '>':
-                return "GREATER\n";
-            case '<':
-                return "LESS\n";
-            case '=':
-                return "EQUAL\n";
-            default:
-                throw new TypeErrorException(
-                    "getBinop received invalid input: " + op,
-                    -1
-                );
-        }
+        return OperatorUtils.getBinop(op);
     }
 
     public static BinopType getBinopType(char op) throws CompilerException {
-        switch (op) {
-            case '+':
-            case '-':
-            case '*':
-            case '/':
-            case '%':
-                return BinopType.ARITHMETIC;
-            case '&':
-            case '|':
-                return BinopType.BITWISE;
-            case '>':
-            case '<':
-            case '=':
-                return BinopType.COMPARISON;
-            default:
-                throw new TypeErrorException(
-                    "categorizeBinop received invalid input: " + op,
-                    -1
-                );
-        }
+        return OperatorUtils.getBinopType(op);
     }
 
     public static String repeatString(
         Type firstInputType,
         Type secondInputType
     ) {
-        // expects parameters already on the stack
-        Label enterFuncLabel = new Label();
-        Label exitFuncLabel = new Label();
-        Label startLoopLabel = new Label();
-        Label stopLoopLabel = new Label();
-        Label returnLabel = new Label();
-        Label invalidParamLabel = new Label();
-
-        String sam = "";
-
-        // prepare params, String always on top
-        if (firstInputType == Type.STRING) {
-            sam += "SWAP\n";
-        }
-
-        // call method
-        sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.getName() + "\n";
-        sam += "UNLINK\n";
-        sam += "ADDSP -1\n"; // free second param, only first param remain with new value
-        sam += "JUMP " + exitFuncLabel.getName() + "\n";
-
-        // method definition
-        sam += enterFuncLabel.getName() + ":\n";
-        sam += "PUSHIMM 0\n"; // local 1: loop counter
-        sam += "PUSHIMM 0\n"; // local 2: increment address
-        sam += "PUSHIMM 0\n"; // local 3: return address
-
-        // validate param, if n < 0 -> return
-        sam += "PUSHOFF -2\n";
-        sam += "ISNEG\n";
-        sam += "JUMPC " + invalidParamLabel.getName() + "\n";
-
-        // allocate memory for new string -> Address
-        sam += "PUSHOFF -1\n";
-        sam += getStringLength();
-        sam += "PUSHOFF -2\n";
-        sam += "TIMES\n";
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "MALLOC\n";
-        sam += "STOREOFF 3\n";
-
-        // return this address
-        sam += "PUSHOFF 3\n";
-        sam += "STOREOFF 4\n";
-
-        // loop...
-        sam += startLoopLabel.getName() + ":\n";
-        // check if done
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHOFF -2\n";
-        sam += "EQUAL\n";
-        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
-
-        // append str to memory
-        sam += "PUSHIMM 0\n"; // will return next address
-        sam += "PUSHOFF 3\n"; // param1: starting memory address
-        sam += "PUSHOFF -1\n"; // param2: string
-        sam += appendStringHeap();
-        sam += "STOREOFF 3\n";
-
-        // increase counter
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "STOREOFF 2\n";
-
-        // Continue loop
-        sam += "JUMP " + startLoopLabel.getName() + "\n";
-
-        // Stop loop
-        sam += stopLoopLabel.getName() + ":\n";
-        sam += "PUSHOFF 4\n";
-        sam += "STOREOFF -2\n";
-        sam += "JUMP " + returnLabel.getName() + "\n";
-
-        // Invalid param, return empty string
-        sam += invalidParamLabel.getName() + ":\n";
-        sam += "PUSHIMMSTR \"\"";
-        sam += "STOREOFF -2\n";
-        sam += "JUMP " + returnLabel.getName() + "\n";
-
-        // Return func
-        sam += returnLabel.getName() + ":\n";
-        sam += "ADDSP -3\n";
-        sam += "RST\n";
-
-        // Exit method
-        sam += exitFuncLabel.getName() + ":\n";
-
-        return sam;
+        return StringRuntime.repeatString(firstInputType, secondInputType);
     }
 
     public static String getStringLength() {
-        // expects parameters already on the stack
-        Label startCountLabel = new Label();
-        Label stopCountLabel = new Label();
-        String sam = "";
-
-        sam += "DUP\n";
-
-        // START
-        sam += startCountLabel.getName() + ":\n";
-        sam += "DUP\n";
-        sam += "PUSHIND\n";
-
-        // check end of string
-        sam += "ISNIL\n";
-        sam += "JUMPC " + stopCountLabel.getName() + "\n";
-
-        // increament count and continue loop
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "JUMP " + startCountLabel.getName() + "\n";
-
-        // STOP
-        sam += stopCountLabel.getName() + ":\n";
-        sam += "SWAP\n";
-        sam += "SUB\n";
-
-        return sam;
+        return StringRuntime.getStringLength();
     }
 
     public static String appendStringHeap() {
-        // expects parameters already on the stack, String on top, Mempry address
-        Label enterFuncLabel = new Label();
-        Label exitFuncLabel = new Label();
-        Label startLoopLabel = new Label();
-        Label stopLoopLabel = new Label();
-
-        String sam = "";
-
-        // call method
-        sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.getName() + "\n";
-        sam += "UNLINK\n";
-        sam += "ADDSP -2\n";
-        sam += "JUMP " + exitFuncLabel.getName() + "\n";
-
-        sam += enterFuncLabel.getName() + ":\n";
-        sam += "PUSHOFF -2\n";
-        sam += "PUSHOFF -1\n";
-
-        sam += startLoopLabel.getName() + ":\n";
-        // put char in TOS
-        // end loop if nil
-        sam += "PUSHOFF 3\n";
-        sam += "PUSHIND\n";
-        sam += "ISNIL\n";
-        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
-
-        // Save to allocated memory
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHOFF 3\n";
-        sam += "PUSHIND\n";
-        sam += "STOREIND\n";
-
-        // increase address current string
-        sam += "PUSHOFF 3\n";
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "STOREOFF 3\n";
-
-        // increase final address string
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "STOREOFF 2\n";
-
-        sam += "JUMP " + startLoopLabel.getName() + "\n";
-
-        sam += stopLoopLabel.getName() + ":\n";
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHIMMCH '\\0'" + "\n";
-        sam += "STOREIND\n";
-        sam += "PUSHOFF 2\n";
-        sam += "STOREOFF -3\n";
-        sam += "ADDSP -2\n";
-        sam += "RST\n";
-
-        // Exit method
-        sam += exitFuncLabel.getName() + ":\n";
-
-        return sam;
+        return StringRuntime.appendStringHeap();
     }
 
     public static String concatString() {
-        // expects parameters (2 strings) already on the stack
-        Label enterFuncLabel = new Label();
-        Label exitFuncLabel = new Label();
-
-        String sam = "";
-
-        // call method
-        sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.getName() + "\n";
-        sam += "UNLINK\n";
-        sam += "ADDSP -1\n"; // free second param, only first param remain with new value
-        sam += "JUMP " + exitFuncLabel.getName() + "\n";
-
-        // method definition
-        sam += enterFuncLabel.getName() + ":\n";
-        sam += "PUSHIMM 0\n"; // local 2: increment address
-        sam += "PUSHIMM 0\n"; // local 3: return address
-
-        // allocate space for resulting string
-        sam += "PUSHOFF -1\n";
-        sam += getStringLength();
-        sam += "PUSHOFF -2\n";
-        sam += getStringLength();
-        sam += "ADD\n";
-        sam += "PUSHIMM 1\n";
-        sam += "ADD\n";
-        sam += "MALLOC\n";
-        sam += "STOREOFF 2\n";
-
-        // return this address
-        sam += "PUSHOFF 2\n";
-        sam += "STOREOFF 3\n";
-
-        // append first string to memory
-        sam += "PUSHIMM 0\n"; // will return next address
-        sam += "PUSHOFF 2\n"; // param1: starting memory address
-        sam += "PUSHOFF -2\n"; // param2: string
-        sam += appendStringHeap();
-        sam += "STOREOFF 2\n";
-
-        // append second string to memory
-        sam += "PUSHIMM 0\n";
-        sam += "PUSHOFF 2\n";
-        sam += "PUSHOFF -1\n";
-        sam += appendStringHeap();
-        sam += "STOREOFF 2\n";
-
-        // store in the first string pos
-        sam += "PUSHOFF 3\n";
-        sam += "STOREOFF -2\n";
-
-        // clean local vars
-        sam += "ADDSP -2\n";
-        // return
-        sam += "RST\n";
-
-        // Exit method
-        sam += exitFuncLabel.getName() + ":\n";
-
-        return sam;
+        return StringRuntime.concatString();
     }
 
     public static String compareString(char op) throws CompilerException {

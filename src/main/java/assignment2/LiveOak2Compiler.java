@@ -284,23 +284,22 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
      ***/
 
     static String getProgram(SamTokenizer f) throws CompilerException {
-        String pgm = "";
-        pgm += "PUSHIMM 0\n";
-        pgm += "LINK\n";
-        pgm += "JSR main\n";
-        pgm += "UNLINK\n";
-        pgm += "STOP\n";
+        SamBuilder sb = new SamBuilder();
+        sb.append("PUSHIMM 0\n");
+        sb.append("LINK\n");
+        sb.append("JSR main\n");
+        sb.append("UNLINK\n");
+        sb.append("STOP\n");
 
         // LiveOak-2
         while (f.peekAtKind() != TokenType.EOF) {
-            pgm += getMethodDecl(f);
+            sb.append(getMethodDecl(f));
         }
-        return pgm;
+        return sb.toString();
     }
 
     static String getMethodDecl(SamTokenizer f) throws CompilerException {
-        // Generate sam code
-        String sam = "\n";
+        SamBuilder sb = new SamBuilder();
 
         // MethodDecl -> Type ...
         Type returnType = getType(f);
@@ -323,7 +322,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         // Valid method, start generating...
-        sam += methodName + ":\n";
+        sb.append("\n");
+        sb.append(methodName + ":\n");
 
         // MethodDecl -> Type MethodName (...
         if (!CompilerUtils.check(f, '(')) {
@@ -361,7 +361,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         // MethodDecl -> Type MethodName ( Formals? ) { Body ...
-        sam += getBody(f, method);
+        sb.append(getBody(f, method));
 
         // MethodDecl -> Type MethodName ( Formals? ) { Body }
         if (!CompilerUtils.check(f, '}')) {
@@ -382,40 +382,40 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        return sam;
+        return sb.toString();
     }
 
     /*** Recursive operations. Override all
      ***/
     static String getBody(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // while start with "int | bool | String"
         while (f.peekAtKind() == TokenType.WORD) {
             // VarDecl will store variable in Hashmap: identifier -> { type: TokenType, relative_address: int }
-            sam += getVarDecl(f, method);
+            sb.append(getVarDecl(f, method));
         }
 
         // check EOF
         if (f.peekAtKind() == TokenType.EOF) {
-            return sam;
+            return sb.toString();
         }
 
         Label cleanupLabel = new Label(LabelType.RETURN);
         method.pushLabel(cleanupLabel);
 
         // Then, get Block
-        sam += getBlock(f, method);
+        sb.append(getBlock(f, method));
 
         // Cleanup procedure
-        sam += cleanupLabel.getName() + ":\n";
-        sam += "STOREOFF " + method.returnAddress() + "\n";
-        sam += "ADDSP -" + method.numLocalVariables() + "\n";
-        sam += "RST\n";
+        sb.append(cleanupLabel.getName() + ":\n");
+        sb.append("STOREOFF " + method.returnAddress() + "\n");
+        sb.append("ADDSP -" + method.numLocalVariables() + "\n");
+        sb.append("RST\n");
         method.popLabel();
 
-        return sam;
+        return sb.toString();
     }
 
     static String getVarDecl(SamTokenizer f, MethodNode method)
@@ -450,7 +450,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
     static String getBlock(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         if (!CompilerUtils.check(f, '{')) {
             throw new SyntaxErrorException(
@@ -460,19 +460,19 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         while (!CompilerUtils.check(f, '}')) {
-            sam += getStmt(f, method);
+            sb.append(getStmt(f, method));
         }
 
-        return sam;
+        return sb.toString();
     }
 
     static String getStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // Stmt -> ;
         if (CompilerUtils.check(f, ';')) {
-            return sam; // Null statement
+            return sb.toString(); // Null statement
         }
 
         if (f.peekAtKind() != TokenType.WORD) {
@@ -485,28 +485,28 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         // Stmt -> break;
         if (f.test("break")) {
             method.pushStatement(Statement.BREAK);
-            sam += getBreakStmt(f, method);
+            sb.append(getBreakStmt(f, method));
         }
         // Stmt -> return Expr;
         else if (f.test("return")) {
             // TODO: ONLY 1 return STMT at the end, all other return STMT "jump" to that end
             method.pushStatement(Statement.RETURN);
-            sam += getReturnStmt(f, method);
+            sb.append(getReturnStmt(f, method));
             // Stmt -> if (Expr) Block else Block;
         } else if (f.test("if")) {
             method.pushStatement(Statement.CONDITIONAL);
-            sam += getIfStmt(f, method);
+            sb.append(getIfStmt(f, method));
             // Stmt -> while (Expr) Block;
         } else if (f.test("while")) {
             method.pushStatement(Statement.LOOP);
-            sam += getWhileStmt(f, method);
+            sb.append(getWhileStmt(f, method));
             // Stmt -> Var = Expr;
         } else {
             method.pushStatement(Statement.ASSIGN);
-            sam += getVarStmt(f, method);
+            sb.append(getVarStmt(f, method));
         }
 
-        return sam;
+        return sb.toString();
     }
 
     static String getBreakStmt(SamTokenizer f, MethodNode method)
@@ -526,7 +526,9 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        return "JUMP " + breakLabel.getName() + "\n";
+        SamBuilder sb = new SamBuilder();
+        sb.append("JUMP " + breakLabel.getName() + "\n");
+        return sb.toString();
     }
 
     static String getReturnStmt(SamTokenizer f, MethodNode method)
@@ -537,13 +539,12 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 f.lineNo()
             );
         }
-
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         Expression expr = getExpr(f, method);
 
         // write sam code
-        sam += expr.getSamCode();
+        sb.append(expr.getSamCode());
 
         // Type check: returned expression must be compatible with method return type
         if (!method.getType().isCompatibleWith(expr.getType())) {
@@ -561,17 +562,16 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 f.lineNo()
             );
         }
-        sam += "JUMP " + returnLabel.getName() + "\n";
+        sb.append("JUMP " + returnLabel.getName() + "\n");
 
-        return sam;
+        return sb.toString();
     }
 
     static String getIfStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
         CompilerUtils.expect(f, "if", f.lineNo());
 
-        // Generate sam code
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // labels used
         Label stop_stmt = new Label();
@@ -580,16 +580,16 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         // if ( Expr ) ...
         CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += getExpr(f, method).getSamCode();
+        sb.append(getExpr(f, method).getSamCode());
 
         CompilerUtils.expect(f, ')', f.lineNo());
 
-        sam += "ISNIL\n";
-        sam += "JUMPC " + false_block.getName() + "\n";
+        sb.append("ISNIL\n");
+        sb.append("JUMPC " + false_block.getName() + "\n");
 
         // Truth block:  // if ( Expr ) Block ...
-        sam += getBlock(f, method);
-        sam += "JUMP " + stop_stmt.getName() + "\n";
+        sb.append(getBlock(f, method));
+        sb.append("JUMP " + stop_stmt.getName() + "\n");
 
         // Checks 'else'
         if (!CompilerUtils.getWord(f).equals("else")) {
@@ -600,21 +600,20 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         // False block: (...) ? (...) : Expr
-        sam += false_block.getName() + ":\n";
-        sam += getBlock(f, method);
+        sb.append(false_block.getName() + ":\n");
+        sb.append(getBlock(f, method));
 
         // Done if statement
-        sam += stop_stmt.getName() + ":\n";
+        sb.append(stop_stmt.getName() + ":\n");
 
-        return sam;
+        return sb.toString();
     }
 
     static String getWhileStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
         CompilerUtils.expect(f, "while", f.lineNo());
 
-        // Generate sam code
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
 
         // labels used
         Label start_loop = new Label();
@@ -626,30 +625,30 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         // while ( Expr ) ...
         CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += start_loop.getName() + ":\n";
-        sam += getExpr(f, method).getSamCode();
+        sb.append(start_loop.getName() + ":\n");
+        sb.append(getExpr(f, method).getSamCode());
 
         CompilerUtils.expect(f, ')', f.lineNo());
 
-        sam += "ISNIL\n";
-        sam += "JUMPC " + stop_loop.getName() + "\n";
+        sb.append("ISNIL\n");
+        sb.append("JUMPC " + stop_loop.getName() + "\n");
 
         // Continue loop
-        sam += getBlock(f, method);
-        sam += "JUMP " + start_loop.getName() + "\n";
+        sb.append(getBlock(f, method));
+        sb.append("JUMP " + start_loop.getName() + "\n");
 
         // Stop loop
-        sam += stop_loop.getName() + ":\n";
+        sb.append(stop_loop.getName() + ":\n");
 
         // Pop label when done
         method.popLabel();
 
-        return sam;
+        return sb.toString();
     }
 
     static String getVarStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
         Node variable = getVar(f, method);
 
         CompilerUtils.expect(f, '=', f.lineNo());
@@ -657,14 +656,14 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         Expression expr = getExpr(f, method);
 
         // write sam code
-        sam += expr.getSamCode();
+        sb.append(expr.getSamCode());
 
         // Store item on the stack to Node
-        sam += "STOREOFF " + variable.getAddress() + "\n";
+        sb.append("STOREOFF " + variable.getAddress() + "\n");
 
         CompilerUtils.expect(f, ';', f.lineNo());
 
-        return sam;
+        return sb.toString();
     }
 
     static Expression getExpr(SamTokenizer f, MethodNode method)
@@ -848,15 +847,14 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         // Generate sam code
         Label stop_ternary = new Label();
         Label false_expr = new Label();
-
-        StringBuilder sam = new StringBuilder();
-        sam.append("ISNIL\n");
-        sam.append("JUMPC ").append(false_expr.getName()).append("\n");
+        SamBuilder sb = new SamBuilder();
+        sb.append("ISNIL\n");
+        sb.append("JUMPC " + false_expr.getName() + "\n");
 
         // Truth expression:  (...) ? Expr : (..)
         Expression truthExpr = getExpr(f, method);
-        sam.append(truthExpr.getSamCode());
-        sam.append("JUMP ").append(stop_ternary.getName()).append("\n");
+        sb.append(truthExpr.getSamCode());
+        sb.append("JUMP " + stop_ternary.getName() + "\n");
 
         // Checks ':'
         if (!CompilerUtils.check(f, ':')) {
@@ -867,9 +865,9 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         // False expression: (...) ? (...) : Expr
-        sam.append(false_expr.getName()).append(":\n");
+        sb.append(false_expr.getName() + ":\n");
         Expression falseExpr = getExpr(f, method);
-        sam.append(falseExpr.getSamCode());
+        sb.append(falseExpr.getSamCode());
 
         // Type check return
         if (!truthExpr.getType().isCompatibleWith(falseExpr.getType())) {
@@ -882,9 +880,9 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
         // Stop Frame
-        sam.append(stop_ternary.getName()).append(":\n");
+        sb.append(stop_ternary.getName() + ":\n");
 
-        return new Expression(sam.toString(), truthExpr.getType());
+        return new Expression(sb.toString(), truthExpr.getType());
     }
 
     static Expression getMethodCallExpr(
@@ -892,8 +890,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         MethodNode scopeMethod,
         MethodNode callingMethod
     ) throws CompilerException {
-        String sam = "";
-        sam += "PUSHIMM 0\n"; // return value
+        SamBuilder sb = new SamBuilder();
+        sb.append("PUSHIMM 0\n"); // return value
 
         if (!CompilerUtils.check(f, '(')) {
             throw new SyntaxErrorException(
@@ -902,11 +900,11 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        sam += getActuals(f, scopeMethod, callingMethod);
-        sam += "LINK\n";
-        sam += "JSR " + callingMethod.getName() + "\n";
-        sam += "UNLINK\n";
-        sam += "ADDSP -" + callingMethod.numParameters() + "\n";
+        sb.append(getActuals(f, scopeMethod, callingMethod));
+        sb.append("LINK\n");
+        sb.append("JSR " + callingMethod.getName() + "\n");
+        sb.append("UNLINK\n");
+        sb.append("ADDSP -" + callingMethod.numParameters() + "\n");
 
         if (!CompilerUtils.check(f, ')')) {
             throw new SyntaxErrorException(
@@ -915,7 +913,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        return new Expression(sam, callingMethod.getType());
+        return new Expression(sb.toString(), callingMethod.getType());
     }
 
     static String getActuals(
@@ -923,7 +921,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         MethodNode scopeMethod,
         MethodNode callingMethod
     ) throws CompilerException {
-        String sam = "";
+        SamBuilder sb = new SamBuilder();
         int paramCount = callingMethod.numParameters();
         int argCount = 0;
 
@@ -961,7 +959,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             }
 
             // write sam code
-            sam += expr.getSamCode();
+            sb.append(expr.getSamCode());
 
             // value field removed from Expression and VariableNode; nothing to assign here
 
@@ -981,7 +979,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        return sam;
+        return sb.toString();
     }
 
     // getTerminal is now a recursive operation

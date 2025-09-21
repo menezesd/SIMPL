@@ -1,106 +1,106 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment2.LiveOak2CompilerTest" tests="100" skipped="0" failures="0" errors="0" timestamp="2025-09-21T02:42:28" hostname="codespaces-8c7edd" time="1.263">
+<testsuite name="assignment2.LiveOak2CompilerTest" tests="100" skipped="0" failures="0" errors="0" timestamp="2025-09-21T03:18:58" hostname="codespaces-8c7edd" time="1.434">
   <properties/>
-  <testcase name="should fail to compile test_0.lo" classname="assignment2.LiveOak2CompilerTest" time="0.093"/>
+  <testcase name="should fail to compile test_0.lo" classname="assignment2.LiveOak2CompilerTest" time="0.124"/>
   <testcase name="should fail to compile test_1.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should fail to compile test_10.lo" classname="assignment2.LiveOak2CompilerTest" time="0.015"/>
-  <testcase name="should fail to compile test_11.lo" classname="assignment2.LiveOak2CompilerTest" time="0.02"/>
+  <testcase name="should fail to compile test_10.lo" classname="assignment2.LiveOak2CompilerTest" time="0.021"/>
+  <testcase name="should fail to compile test_11.lo" classname="assignment2.LiveOak2CompilerTest" time="0.016"/>
   <testcase name="should fail to compile test_12.lo" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
-  <testcase name="should fail to compile test_13.lo" classname="assignment2.LiveOak2CompilerTest" time="0.013"/>
-  <testcase name="should fail to compile test_14.lo" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
-  <testcase name="should fail to compile test_15.lo" classname="assignment2.LiveOak2CompilerTest" time="0.013"/>
-  <testcase name="should fail to compile test_16.lo" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
-  <testcase name="should fail to compile test_17.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should fail to compile test_18.lo" classname="assignment2.LiveOak2CompilerTest" time="0.001"/>
-  <testcase name="should fail to compile test_19.lo" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should fail to compile test_2.lo" classname="assignment2.LiveOak2CompilerTest" time="0.032"/>
-  <testcase name="should fail to compile test_20.lo" classname="assignment2.LiveOak2CompilerTest" time="0.009"/>
+  <testcase name="should fail to compile test_13.lo" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
+  <testcase name="should fail to compile test_14.lo" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
+  <testcase name="should fail to compile test_15.lo" classname="assignment2.LiveOak2CompilerTest" time="0.024"/>
+  <testcase name="should fail to compile test_16.lo" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should fail to compile test_17.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should fail to compile test_18.lo" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should fail to compile test_19.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
+  <testcase name="should fail to compile test_2.lo" classname="assignment2.LiveOak2CompilerTest" time="0.021"/>
+  <testcase name="should fail to compile test_20.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
   <testcase name="should fail to compile test_21.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should fail to compile test_22.lo" classname="assignment2.LiveOak2CompilerTest" time="0.019"/>
+  <testcase name="should fail to compile test_22.lo" classname="assignment2.LiveOak2CompilerTest" time="0.018"/>
   <testcase name="should fail to compile test_23.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should fail to compile test_24.lo" classname="assignment2.LiveOak2CompilerTest" time="0.012"/>
-  <testcase name="should fail to compile test_25.lo" classname="assignment2.LiveOak2CompilerTest" time="0.001"/>
-  <testcase name="should fail to compile test_26.lo" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
-  <testcase name="should fail to compile test_27.lo" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should fail to compile test_28.lo" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
+  <testcase name="should fail to compile test_24.lo" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should fail to compile test_25.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
+  <testcase name="should fail to compile test_26.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
+  <testcase name="should fail to compile test_27.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should fail to compile test_28.lo" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
   <testcase name="should fail to compile test_29.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
   <testcase name="should fail to compile test_3.lo" classname="assignment2.LiveOak2CompilerTest" time="0.012"/>
   <testcase name="should fail to compile test_4.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
-  <testcase name="should fail to compile test_5.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should fail to compile test_6.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should fail to compile test_5.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should fail to compile test_6.lo" classname="assignment2.LiveOak2CompilerTest" time="0.001"/>
   <testcase name="should fail to compile test_7.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
-  <testcase name="should fail to compile test_8.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should fail to compile test_9.lo" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 120" classname="assignment2.LiveOak2CompilerTest" time="0.025"/>
-  <testcase name="should return 'The rain in Spain falls'" classname="assignment2.LiveOak2CompilerTest" time="0.032"/>
-  <testcase name="should return 1100" classname="assignment2.LiveOak2CompilerTest" time="0.011"/>
+  <testcase name="should fail to compile test_8.lo" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should fail to compile test_9.lo" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should return 120" classname="assignment2.LiveOak2CompilerTest" time="0.031"/>
+  <testcase name="should return 'The rain in Spain falls'" classname="assignment2.LiveOak2CompilerTest" time="0.058"/>
+  <testcase name="should return 1100" classname="assignment2.LiveOak2CompilerTest" time="0.024"/>
   <testcase name="should return 'false'" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
-  <testcase name="should return 'abcabcabcabcabcabcabcabcabc'" classname="assignment2.LiveOak2CompilerTest" time="0.101"/>
-  <testcase name="should return 30" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 266" classname="assignment2.LiveOak2CompilerTest" time="0.01"/>
-  <testcase name="should return 4" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
-  <testcase name="should return 'tset a tsuj si sihTtset a tsuj si sihTright?'" classname="assignment2.LiveOak2CompilerTest" time="0.024"/>
-  <testcase name="should return 238" classname="assignment2.LiveOak2CompilerTest" time="0.019"/>
+  <testcase name="should return 'abcabcabcabcabcabcabcabcabc'" classname="assignment2.LiveOak2CompilerTest" time="0.14"/>
+  <testcase name="should return 30" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should return 266" classname="assignment2.LiveOak2CompilerTest" time="0.012"/>
+  <testcase name="should return 4" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 'tset a tsuj si sihTtset a tsuj si sihTright?'" classname="assignment2.LiveOak2CompilerTest" time="0.017"/>
+  <testcase name="should return 238" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
   <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
-  <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
   <testcase name="should return 26141" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
-  <testcase name="should return 'The rain in Spain fallsThe rain in Spain falls'" classname="assignment2.LiveOak2CompilerTest" time="0.01"/>
-  <testcase name="should return 14" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
-  <testcase name="should return 199704" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
-  <testcase name="should return 40" classname="assignment2.LiveOak2CompilerTest" time="0.014"/>
+  <testcase name="should return 'The rain in Spain fallsThe rain in Spain falls'" classname="assignment2.LiveOak2CompilerTest" time="0.016"/>
+  <testcase name="should return 14" classname="assignment2.LiveOak2CompilerTest" time="0.013"/>
+  <testcase name="should return 199704" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should return 40" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
   <testcase name="should return 15" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 475" classname="assignment2.LiveOak2CompilerTest" time="0.013"/>
-  <testcase name="should return 'do Do Do do Do'" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
-  <testcase name="should return 20" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 25" classname="assignment2.LiveOak2CompilerTest" time="0.02"/>
+  <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 475" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should return 'do Do Do do Do'" classname="assignment2.LiveOak2CompilerTest" time="0.011"/>
+  <testcase name="should return 20" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 25" classname="assignment2.LiveOak2CompilerTest" time="0.029"/>
   <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
-  <testcase name="should return 11110" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
-  <testcase name="should return 'eip sa ysae'" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 'HelloHello'" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
-  <testcase name="should return 'halb!emosewa era sgnirts'" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
-  <testcase name="should return 17" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 11110" classname="assignment2.LiveOak2CompilerTest" time="0.012"/>
+  <testcase name="should return 'eip sa ysae'" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should return 'HelloHello'" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 'halb!emosewa era sgnirts'" classname="assignment2.LiveOak2CompilerTest" time="0.009"/>
+  <testcase name="should return 17" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
   <testcase name="should return 'zZZZsllaf niapS ni niar ehTZZZz'" classname="assignment2.LiveOak2CompilerTest" time="0.016"/>
-  <testcase name="should return 345" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 345" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
   <testcase name="should return 5493" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 30" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 34" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
-  <testcase name="should return 'alternate result'" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
-  <testcase name="should return 123" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 1311" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 24" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
-  <testcase name="should return 5" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should return 30" classname="assignment2.LiveOak2CompilerTest" time="0.001"/>
+  <testcase name="should return 34" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should return 'alternate result'" classname="assignment2.LiveOak2CompilerTest" time="0.009"/>
+  <testcase name="should return 123" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should return 1311" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
+  <testcase name="should return 24" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should return 5" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
   <testcase name="should return 100098" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 12069" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 'azzzzzc'" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 32" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 20" classname="assignment2.LiveOak2CompilerTest" time="0.001"/>
-  <testcase name="should return 147" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 431" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
-  <testcase name="should return 3533" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 0" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 0" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 388" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
-  <testcase name="should return 456" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 0" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return -10" classname="assignment2.LiveOak2CompilerTest" time="0.001"/>
-  <testcase name="should return 'black cat'" classname="assignment2.LiveOak2CompilerTest" time="0.008"/>
-  <testcase name="should return 10111" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
-  <testcase name="should return 14" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 72" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
-  <testcase name="should return 2" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should return 12069" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
+  <testcase name="should return 'azzzzzc'" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
+  <testcase name="should return 32" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
+  <testcase name="should return 20" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 147" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should return 431" classname="assignment2.LiveOak2CompilerTest" time="0.009"/>
+  <testcase name="should return 3533" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
   <testcase name="should return 0" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
-  <testcase name="should return 168" classname="assignment2.LiveOak2CompilerTest" time="0.285"/>
-  <testcase name="should return 12" classname="assignment2.LiveOak2CompilerTest" time="0.031"/>
-  <testcase name="should return 90" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 111" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 481" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
-  <testcase name="should return 1597" classname="assignment2.LiveOak2CompilerTest" time="0.017"/>
-  <testcase name="should return 163" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
-  <testcase name="should return 'abcabcabcabcabcabcabcabcabcabcabc'" classname="assignment2.LiveOak2CompilerTest" time="0.026"/>
-  <testcase name="should return -1" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
-  <testcase name="should return 905" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should return 1" classname="assignment2.LiveOak2CompilerTest" time="0.011"/>
+  <testcase name="should return 0" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should return 388" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should return 456" classname="assignment2.LiveOak2CompilerTest" time="0.006"/>
+  <testcase name="should return 0" classname="assignment2.LiveOak2CompilerTest" time="0.012"/>
+  <testcase name="should return -10" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should return 'black cat'" classname="assignment2.LiveOak2CompilerTest" time="0.011"/>
+  <testcase name="should return 10111" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 14" classname="assignment2.LiveOak2CompilerTest" time="0.002"/>
+  <testcase name="should return 72" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
+  <testcase name="should return 2" classname="assignment2.LiveOak2CompilerTest" time="0.001"/>
+  <testcase name="should return 0" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
+  <testcase name="should return 168" classname="assignment2.LiveOak2CompilerTest" time="0.278"/>
+  <testcase name="should return 12" classname="assignment2.LiveOak2CompilerTest" time="0.037"/>
+  <testcase name="should return 90" classname="assignment2.LiveOak2CompilerTest" time="0.003"/>
+  <testcase name="should return 111" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
+  <testcase name="should return 481" classname="assignment2.LiveOak2CompilerTest" time="0.009"/>
+  <testcase name="should return 1597" classname="assignment2.LiveOak2CompilerTest" time="0.026"/>
+  <testcase name="should return 163" classname="assignment2.LiveOak2CompilerTest" time="0.005"/>
+  <testcase name="should return 'abcabcabcabcabcabcabcabcabcabcabc'" classname="assignment2.LiveOak2CompilerTest" time="0.028"/>
+  <testcase name="should return -1" classname="assignment2.LiveOak2CompilerTest" time="0.004"/>
+  <testcase name="should return 905" classname="assignment2.LiveOak2CompilerTest" time="0.007"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
