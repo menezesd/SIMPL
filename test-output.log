@@ -1,0 +1,566 @@
+Initialized native services in: /home/codespace/.gradle/native
+Found daemon DaemonInfo{pid=3601, address=[88dd75a3-ca6f-48da-ab08-aa1a55e76970 port:33135, addresses:[/127.0.0.1]], state=Idle, lastBusy=1758408374181, context=DefaultDaemonContext[uid=c65cd32f-c495-49fe-8b95-e9e3754778d0,javaHome=/usr/local/sdkman/candidates/java/21.0.7-ms,daemonRegistryDir=/home/codespace/.gradle/daemon,pid=3601,idleTimeout=10800000,priority=NORMAL,daemonOpts=--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.base/java.lang=ALL-UNNAMED,--add-opens,java.base/java.lang.invoke=ALL-UNNAMED,--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.base/java.nio.charset=ALL-UNNAMED,--add-opens,java.base/java.net=ALL-UNNAMED,--add-opens,java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=256m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country,-Duser.language=en,-Duser.variant]} however its context does not match the desired criteria.
+Java home is different.
+Wanted: DefaultDaemonContext[uid=null,javaHome=/opt/java/11.0.14,daemonRegistryDir=/home/codespace/.gradle/daemon,pid=6106,idleTimeout=null,priority=NORMAL,daemonOpts=--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.base/java.lang=ALL-UNNAMED,--add-opens,java.base/java.lang.invoke=ALL-UNNAMED,--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.base/java.nio.charset=ALL-UNNAMED,--add-opens,java.base/java.net=ALL-UNNAMED,--add-opens,java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=256m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country,-Duser.language=en,-Duser.variant]
+Actual: DefaultDaemonContext[uid=c65cd32f-c495-49fe-8b95-e9e3754778d0,javaHome=/usr/local/sdkman/candidates/java/21.0.7-ms,daemonRegistryDir=/home/codespace/.gradle/daemon,pid=3601,idleTimeout=10800000,priority=NORMAL,daemonOpts=--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.base/java.lang=ALL-UNNAMED,--add-opens,java.base/java.lang.invoke=ALL-UNNAMED,--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.base/java.nio.charset=ALL-UNNAMED,--add-opens,java.base/java.net=ALL-UNNAMED,--add-opens,java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=256m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country,-Duser.language=en,-Duser.variant]
+
+  Looking for a different daemon...
+Found daemon DaemonInfo{pid=2277, address=[1cadec19-acab-4b78-a51d-48ea18b287e4 port:45751, addresses:[/127.0.0.1]], state=Idle, lastBusy=1758417696512, context=DefaultDaemonContext[uid=c614a576-905f-4407-88b0-ed61b2311672,javaHome=/home/codespace/.vscode-remote/extensions/redhat.java-1.45.0-linux-x64/jre/21.0.8-linux-x86_64,daemonRegistryDir=/home/codespace/.gradle/daemon,pid=2277,idleTimeout=10800000,priority=NORMAL,daemonOpts=--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.base/java.lang=ALL-UNNAMED,--add-opens,java.base/java.lang.invoke=ALL-UNNAMED,--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.base/java.nio.charset=ALL-UNNAMED,--add-opens,java.base/java.net=ALL-UNNAMED,--add-opens,java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=256m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country,-Duser.language=en,-Duser.variant]} however its context does not match the desired criteria.
+Java home is different.
+Wanted: DefaultDaemonContext[uid=null,javaHome=/opt/java/11.0.14,daemonRegistryDir=/home/codespace/.gradle/daemon,pid=6106,idleTimeout=null,priority=NORMAL,daemonOpts=--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.base/java.lang=ALL-UNNAMED,--add-opens,java.base/java.lang.invoke=ALL-UNNAMED,--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.base/java.nio.charset=ALL-UNNAMED,--add-opens,java.base/java.net=ALL-UNNAMED,--add-opens,java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=256m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country,-Duser.language=en,-Duser.variant]
+Actual: DefaultDaemonContext[uid=c614a576-905f-4407-88b0-ed61b2311672,javaHome=/home/codespace/.vscode-remote/extensions/redhat.java-1.45.0-linux-x64/jre/21.0.8-linux-x86_64,daemonRegistryDir=/home/codespace/.gradle/daemon,pid=2277,idleTimeout=10800000,priority=NORMAL,daemonOpts=--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.base/java.lang=ALL-UNNAMED,--add-opens,java.base/java.lang.invoke=ALL-UNNAMED,--add-opens,java.base/java.util=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens,java.base/java.nio.charset=ALL-UNNAMED,--add-opens,java.base/java.net=ALL-UNNAMED,--add-opens,java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=256m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country,-Duser.language=en,-Duser.variant]
+
+  Looking for a different daemon...
+The client will now receive all logging from the daemon (pid: 3562). The daemon log file: /home/codespace/.gradle/daemon/7.1/daemon-3562.out.log
+Starting 4th build in daemon [uptime: 3 mins 45.532 secs, performance: 99%, non-heap usage: 25% of 256 MiB]
+Using 2 worker leases.
+Now considering [/workspaces/SIMPL] as hierarchies to watch
+Watching the file system is enabled if available
+Starting Build
+Settings evaluated using settings file '/workspaces/SIMPL/settings.gradle'.
+Projects loaded. Root project using build file '/workspaces/SIMPL/build.gradle'.
+Included projects: [root project 'compiler']
+
+> Configure project :
+Evaluating root project 'compiler' using build file '/workspaces/SIMPL/build.gradle'.
+All projects evaluated.
+Selected primary task 'test' from project :
+Tasks to be executed: [task ':compileJava', task ':processResources', task ':classes', task ':compileTestJava', task ':processTestResources', task ':testClasses', task ':test']
+Tasks that were excluded: []
+:compileJava (Thread[Daemon worker Thread 3,5,main]) started.
+
+> Task :compileJava UP-TO-DATE
+Watching 3 directories to track changes
+Watching 5 directories to track changes
+Watching 7 directories to track changes
+Watching 8 directories to track changes
+Watching 9 directories to track changes
+Watching 12 directories to track changes
+Caching disabled for task ':compileJava' because:
+  Build cache is disabled
+Skipping task ':compileJava' as it is up-to-date.
+:compileJava (Thread[Daemon worker Thread 3,5,main]) completed. Took 0.019 secs.
+:processResources (Thread[Execution worker for ':',5,main]) started.
+
+> Task :processResources NO-SOURCE
+file or directory '/workspaces/SIMPL/src/main/resources', not found
+Skipping task ':processResources' as it has no source files and no previous output files.
+:processResources (Thread[Execution worker for ':',5,main]) completed. Took 0.0 secs.
+:classes (Thread[Execution worker for ':',5,main]) started.
+
+> Task :classes UP-TO-DATE
+Skipping task ':classes' as it has no actions.
+:classes (Thread[Execution worker for ':',5,main]) completed. Took 0.0 secs.
+:compileTestJava (Thread[Execution worker for ':',5,main]) started.
+
+> Task :compileTestJava UP-TO-DATE
+Watching 14 directories to track changes
+Watching 15 directories to track changes
+Watching 16 directories to track changes
+Watching 17 directories to track changes
+Watching 18 directories to track changes
+Watching 21 directories to track changes
+Caching disabled for task ':compileTestJava' because:
+  Build cache is disabled
+Skipping task ':compileTestJava' as it is up-to-date.
+:compileTestJava (Thread[Execution worker for ':',5,main]) completed. Took 0.058 secs.
+:processTestResources (Thread[Execution worker for ':',5,main]) started.
+
+> Task :processTestResources UP-TO-DATE
+Watching 25 directories to track changes
+Watching 29 directories to track changes
+Caching disabled for task ':processTestResources' because:
+  Build cache is disabled
+Skipping task ':processTestResources' as it is up-to-date.
+:processTestResources (Thread[Execution worker for ':',5,main]) completed. Took 0.021 secs.
+:testClasses (Thread[Daemon worker Thread 3,5,main]) started.
+
+> Task :testClasses UP-TO-DATE
+Skipping task ':testClasses' as it has no actions.
+:testClasses (Thread[Daemon worker Thread 3,5,main]) completed. Took 0.0 secs.
+:test (Thread[Daemon worker Thread 3,5,main]) started.
+Gradle Test Executor 2 started executing tests.
+
+> Task :test
+Watching 31 directories to track changes
+Watching 37 directories to track changes
+Watching 38 directories to track changes
+Caching disabled for task ':test' because:
+  Build cache is disabled
+Task ':test' is not up-to-date because:
+  Task has failed previously.
+Watching 36 directories to track changes
+Watching 30 directories to track changes
+Watching 29 directories to track changes
+Starting process 'Gradle Test Executor 2'. Working directory: /workspaces/SIMPL Command: /opt/java/11.0.14/bin/java -Dorg.gradle.internal.worker.tmpdir=/workspaces/SIMPL/build/tmp/test/work -Dorg.gradle.native=false @/home/codespace/.gradle/.tmp/gradle-worker-classpath713096621550859897txt -Xmx512m -Dfile.encoding=UTF-8 -Duser.country -Duser.language=en -Duser.variant -ea worker.org.gradle.process.internal.worker.GradleWorkerMain 'Gradle Test Executor 2'
+Successfully started process 'Gradle Test Executor 2'
+
+LiveOak2CompilerTest > should return 'The rain in Spain falls' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_31.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_31(LiveOak2CompilerTest.java:413)
+
+        Caused by:
+        Type error at line 13: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'false' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_33.lo.
+    Error Message: Binop expr type mismatch: int and bool
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_33(LiveOak2CompilerTest.java:429)
+
+        Caused by:
+        Type error at line 8: Binop expr type mismatch: int and bool
+            at assignment2.LiveOak2Compiler.getBinopExpr(LiveOak2Compiler.java:803)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:697)
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:522)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'abcabcabcabcabcabcabcabcabc' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_34.lo.
+    Error Message: getVarStmt type mismatch: String and int
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_34(LiveOak2CompilerTest.java:437)
+
+        Caused by:
+        Type error at line 14: getVarStmt type mismatch: String and int
+            at assignment2.LiveOak2Compiler.getVarStmt(LiveOak2Compiler.java:646)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:485)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getWhileStmt(LiveOak2Compiler.java:618)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:481)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'tset a tsuj si sihTtset a tsuj si sihTright?' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_38.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_38(LiveOak2CompilerTest.java:469)
+
+        Caused by:
+        Type error at line 9: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 1 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_40.lo.
+    Error Message: Return statement type mismatch: bool and int
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_40(LiveOak2CompilerTest.java:485)
+
+        Caused by:
+        Type error at line 8: Return statement type mismatch: bool and int
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 1 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_41.lo.
+    Error Message: Return statement type mismatch: int and bool
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_41(LiveOak2CompilerTest.java:493)
+
+        Caused by:
+        Type error at line 11: Return statement type mismatch: int and bool
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'The rain in Spain fallsThe rain in Spain falls' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_43.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_43(LiveOak2CompilerTest.java:509)
+
+        Caused by:
+        Type error at line 15: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 1 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_48.lo.
+    Error Message: Return statement type mismatch: int and bool
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_48(LiveOak2CompilerTest.java:549)
+
+        Caused by:
+        Type error at line 9: Return statement type mismatch: int and bool
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'do Do Do do Do' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_50.lo.
+    Error Message: Logical operation '|' requires BOOL operands, but got int and int
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_50(LiveOak2CompilerTest.java:565)
+
+        Caused by:
+        Type error at line 33: Logical operation '|' requires BOOL operands, but got int and int
+            at assignment2.LiveOak2Compiler.getBinopExpr(LiveOak2Compiler.java:819)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:697)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:674)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:674)
+            at assignment2.LiveOak2Compiler.getVarStmt(LiveOak2Compiler.java:637)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:485)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getWhileStmt(LiveOak2Compiler.java:618)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:481)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 25 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_52.lo.
+    Error Message: getVarStmt type mismatch: int and bool
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_52(LiveOak2CompilerTest.java:581)
+
+        Caused by:
+        Type error at line 19: getVarStmt type mismatch: int and bool
+            at assignment2.LiveOak2Compiler.getVarStmt(LiveOak2Compiler.java:646)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:485)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getWhileStmt(LiveOak2Compiler.java:618)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:481)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 1 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_53.lo.
+    Error Message: Logical operation '&' requires BOOL operands, but got String and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_53(LiveOak2CompilerTest.java:589)
+
+        Caused by:
+        Type error at line 13: Logical operation '&' requires BOOL operands, but got String and String
+            at assignment2.LiveOak2Compiler.getBinopExpr(LiveOak2Compiler.java:819)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:697)
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:522)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'eip sa ysae' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_55.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_55(LiveOak2CompilerTest.java:605)
+
+        Caused by:
+        Type error at line 17: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'HelloHello' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_56.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_56(LiveOak2CompilerTest.java:613)
+
+        Caused by:
+        Type error at line 24: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'halb!emosewa era sgnirts' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_57.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_57(LiveOak2CompilerTest.java:621)
+
+        Caused by:
+        Type error at line 17: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'zZZZsllaf niapS ni niar ehTZZZz' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_59.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_59(LiveOak2CompilerTest.java:637)
+
+        Caused by:
+        Type error at line 15: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'alternate result' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_64.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_64(LiveOak2CompilerTest.java:677)
+
+        Caused by:
+        Type error at line 9: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'azzzzzc' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_71.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_71(LiveOak2CompilerTest.java:733)
+
+        Caused by:
+        Type error at line 9: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 1 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_78.lo.
+    Error Message: Return statement type mismatch: int and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_78(LiveOak2CompilerTest.java:789)
+
+        Caused by:
+        Type error at line 13: Return statement type mismatch: int and String
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 456 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_81.lo.
+    Error Message: Return statement type mismatch: bool and int
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_81(LiveOak2CompilerTest.java:813)
+
+        Caused by:
+        Type error at line 26: Return statement type mismatch: bool and int
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return -10 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_83.lo.
+    Error Message: Return statement type mismatch: bool and int
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_83(LiveOak2CompilerTest.java:829)
+
+        Caused by:
+        Type error at line 8: Return statement type mismatch: bool and int
+            at assignment2.LiveOak2Compiler.getReturnStmt(LiveOak2Compiler.java:531)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:473)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'black cat' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_84.lo.
+    Error Message: Logical operation '|' requires BOOL operands, but got String and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_84(LiveOak2CompilerTest.java:837)
+
+        Caused by:
+        Type error at line 24: Logical operation '|' requires BOOL operands, but got String and String
+            at assignment2.LiveOak2Compiler.getBinopExpr(LiveOak2Compiler.java:819)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:697)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:674)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:674)
+            at assignment2.LiveOak2Compiler.getIfStmt(LiveOak2Compiler.java:563)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:477)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 2 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_88.lo.
+    Error Message: Binop expr type mismatch: bool and int
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_88(LiveOak2CompilerTest.java:869)
+
+        Caused by:
+        Type error at line 8: Binop expr type mismatch: bool and int
+            at assignment2.LiveOak2Compiler.getBinopExpr(LiveOak2Compiler.java:803)
+            at assignment2.LiveOak2Compiler.getExpr(LiveOak2Compiler.java:697)
+            at assignment2.LiveOak2Compiler.getIfStmt(LiveOak2Compiler.java:563)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:477)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 168 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_90.lo.
+    Error Message: getVarStmt type mismatch: int and bool
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_90(LiveOak2CompilerTest.java:885)
+
+        Caused by:
+        Type error at line 19: getVarStmt type mismatch: int and bool
+            at assignment2.LiveOak2Compiler.getVarStmt(LiveOak2Compiler.java:646)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:485)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getWhileStmt(LiveOak2Compiler.java:618)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:481)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return 'abcabcabcabcabcabcabcabcabcabcabc' FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_97.lo.
+    Error Message: getVarStmt type mismatch: String and int
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_97(LiveOak2CompilerTest.java:941)
+
+        Caused by:
+        Type error at line 14: getVarStmt type mismatch: String and int
+            at assignment2.LiveOak2Compiler.getVarStmt(LiveOak2Compiler.java:646)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:485)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getWhileStmt(LiveOak2Compiler.java:618)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:481)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+LiveOak2CompilerTest > should return -1 FAILED
+    java.lang.Error: Failed to compile src/test/resources/LO-2/ValidPrograms/test_98.lo.
+    Error Message: getVarStmt type mismatch: bool and String
+        at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:57)
+        at assignment2.LiveOak2CompilerTest.testLO2_98(LiveOak2CompilerTest.java:949)
+
+        Caused by:
+        Type error at line 9: getVarStmt type mismatch: bool and String
+            at assignment2.LiveOak2Compiler.getVarStmt(LiveOak2Compiler.java:646)
+            at assignment2.LiveOak2Compiler.getStmt(LiveOak2Compiler.java:485)
+            at assignment2.LiveOak2Compiler.getBlock(LiveOak2Compiler.java:442)
+            at assignment2.LiveOak2Compiler.getBody(LiveOak2Compiler.java:388)
+            at assignment2.LiveOak2Compiler.getMethodDecl(LiveOak2Compiler.java:343)
+            at assignment2.LiveOak2Compiler.getProgram(LiveOak2Compiler.java:275)
+            at assignment2.LiveOak2Compiler.compiler(LiveOak2Compiler.java:46)
+            ... 1 more
+
+Gradle Test Executor 2 finished executing tests.
+
+> Task :test FAILED
+Finished generating test XML results (0.025 secs) into: /workspaces/SIMPL/build/test-results/test
+Generating HTML test report...
+Finished generating test html results (0.02 secs) into: /workspaces/SIMPL/build/reports/tests/test
+Watching 31 directories to track changes
+Watching 37 directories to track changes
+Watching 38 directories to track changes
+:test (Thread[Daemon worker Thread 3,5,main]) completed. Took 2.642 secs.
+4 actionable tasks: 1 executed, 3 up-to-date
+Not watching anything anymore
+Watching 0 directories to track changes
+Some of the file system contents retained in the virtual file system are on file systems that Gradle doesn't support watching. The relevant state was discarded to ensure changes to these locations are properly detected. You can override this by explicitly enabling file system watching.
+Watching 0 directories to track changes
