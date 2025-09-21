@@ -151,8 +151,7 @@ public class LiveOak0Compiler {
             String varName = getIdentifier(f);
 
             // Check if the variable is already defined in the current scope
-            Node existNode = mainMethod.lookupSymbol(varName);
-            if (existNode != null) {
+            if (mainMethod.existSymbol(varName)) {
                 throw new CompilerException(
                     "Variable '" + varName + "' is already defined in this scope",
                     f.lineNo()
@@ -469,17 +468,8 @@ public class LiveOak0Compiler {
 
         String varName = CompilerUtils.getWord(f);
 
-        // Trying to access var that has not been declared
-        Node variable = mainMethod.lookupSymbol(varName);
-        if (variable == null) {
-            throw new SyntaxErrorException(
-                "getVar trying to access variable that has not been declared: Variable " +
-                varName,
-                f.lineNo()
-            );
-        }
-
-        return variable;
+        // Lookup and require variable in current main method scope
+        return CompilerUtils.requireVar(mainMethod, varName, f);
     }
 
     static Type getType(SamTokenizer f) throws CompilerException {
@@ -524,14 +514,7 @@ public class LiveOak0Compiler {
                 }
 
                 // Var -> Identifier
-                Node variable = mainMethod.lookupSymbol(boolOrVar);
-                if (variable == null) {
-                    throw new SyntaxErrorException(
-                        "getVar trying to access variable that has not been declared: Variable " +
-                        boolOrVar,
-                        f.lineNo()
-                    );
-                }
+                Node variable = CompilerUtils.requireVar(mainMethod, boolOrVar, f);
 
                 return new Expression(
                     "PUSHOFF " + variable.getAddress() + "\n",

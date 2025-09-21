@@ -307,19 +307,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         // MethodDecl -> Type MethodName ...
         String methodName = getIdentifier(f);
 
-        // Pull method from global scope
-        MethodNode method = globalNode.lookupSymbol(
-            methodName,
-            MethodNode.class
-        );
-        if (method == null) {
-            throw new CompilerException(
-                "get method cannot find method " +
-                methodName +
-                " in symbol table",
-                f.lineNo()
-            );
-        }
+        // Pull method from global scope (required)
+        MethodNode method = CompilerUtils.requireSymbol(globalNode, methodName, MethodNode.class, f);
 
         // Valid method, start generating...
         sb.append("\n");
@@ -1014,15 +1003,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 }
 
                 // Expr -> MethodName | Var
-                Node node = method.lookupSymbol(name);
-
-                if (node == null) {
-                    throw new CompilerException(
-                        "getTerminal trying to access symbol that has not been declared: Node " +
-                        node,
-                        f.lineNo()
-                    );
-                }
+                Node node = CompilerUtils.requireVar(method, name, f);
 
                 // Expr -> MethodName ( Actuals )
                 if (node instanceof MethodNode) {
@@ -1062,15 +1043,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         String varName = CompilerUtils.getWord(f);
-        Node variable = method.lookupSymbol(varName);
-        if (variable == null) {
-            throw new SyntaxErrorException(
-                "getVar trying to access variable that has not been declared: Variable" +
-                varName,
-                f.lineNo()
-            );
-        }
-        return variable;
+        return CompilerUtils.requireVar(method, varName, f);
     }
     /*** HELPERS. Inherit all the helpers from LiveOak0Compiler
      ***/

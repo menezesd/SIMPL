@@ -127,4 +127,28 @@ public class CompilerUtils {
         }
         System.out.println("\n");
     }
+
+    /**
+     * Lookup a variable (or symbol) in the provided scope and throw a
+     * SyntaxErrorException with the tokenizer line number if it is not found.
+     */
+    public static Node requireVar(Node scope, String name, SamTokenizer f) throws CompilerException {
+        Node n = scope.lookupSymbol(name);
+        if (n == null) {
+            throw new SyntaxErrorException("Undeclared variable: " + name, f.lineNo());
+        }
+        return n;
+    }
+
+    /**
+     * Typed symbol lookup: require a symbol of a specific type from a scope.
+     */
+    public static <T extends Node> T requireSymbol(Node scope, String name, Class<T> type, SamTokenizer f)
+        throws CompilerException {
+        T n = scope.lookupSymbol(name, type);
+        if (n == null) {
+            throw new SyntaxErrorException("Undeclared symbol: " + name, f.lineNo());
+        }
+        return n;
+    }
 }
