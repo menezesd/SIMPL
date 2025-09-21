@@ -74,7 +74,7 @@ public class CodegenStmtVisitor implements StmtVisitor<String> {
 
     @Override
     public String visitBreak(BreakStmt s) throws Exception {
-        if (breakLabel == null) throw new CompilerException("'break' used outside of loop");
+        if (breakLabel == null) throw new CompilerException("'break' used outside of loop", -1);
         return "JUMP " + breakLabel.getName() + "\n";
     }
 
