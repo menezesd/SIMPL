@@ -5,8 +5,20 @@ import assignment2.*;
 public class CodegenStmtVisitor implements StmtVisitor<String> {
     private final CodegenExprVisitor exprGen = new CodegenExprVisitor();
     private final MethodNode scope; // for variable offsets
+    private final Label returnLabel;
+    private final Label breakLabel;
 
-    public CodegenStmtVisitor(MethodNode scope){ this.scope = scope; }
+    // Main constructor for function/method codegen
+    public CodegenStmtVisitor(MethodNode scope) {
+        this(scope, null, new Label(LabelType.RETURN));
+    }
+
+    // Internal constructor for nested codegen (loops, etc.)
+    public CodegenStmtVisitor(MethodNode scope, Label breakLabel, Label returnLabel) {
+        this.scope = scope;
+        this.breakLabel = breakLabel;
+        this.returnLabel = returnLabel;
+    }
 
     @Override
     public String visitBlock(BlockStmt s) throws Exception {
@@ -46,14 +58,33 @@ public class CodegenStmtVisitor implements StmtVisitor<String> {
 
     @Override
     public String visitWhile(WhileStmt s) throws Exception {
-        Label start = new Label(); Label stop = new Label();
+        Label start = new Label();
+        Label stop = new Label(LabelType.BREAK);
         StringBuilder sb = new StringBuilder();
         sb.append(start.getName()).append(":\n");
         sb.append(s.getCondition().accept(exprGen));
         sb.append("ISNIL\nJUMPC ").append(stop.getName()).append("\n");
-        sb.append(s.getBody().accept(this));
+        // Use a new visitor with updated break label
+        CodegenStmtVisitor bodyVisitor = new CodegenStmtVisitor(scope, stop, returnLabel);
+        sb.append(s.getBody().accept(bodyVisitor));
         sb.append("JUMP ").append(start.getName()).append("\n");
         sb.append(stop.getName()).append(":\n");
+        return sb.toString();
+    }
+
+    @Override
+    public String visitBreak(BreakStmt s) throws Exception {
+        if (breakLabel == null) throw new CompilerException("'break' used outside of loop");
+        return "JUMP " + breakLabel.getName() + "\n";
+    }
+
+    @Override
+    public String visitReturn(ReturnStmt s) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        if (s.getValue() != null) {
+            sb.append(s.getValue().accept(exprGen));
+        }
+        sb.append("JUMP ").append(returnLabel.getName()).append("\n");
         return sb.toString();
     }
 }
