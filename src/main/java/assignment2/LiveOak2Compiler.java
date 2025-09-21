@@ -451,27 +451,17 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         throws CompilerException {
         CompilerUtils.expectWord(f, "break", f.lineNo());
 
-        Label breakLabel = method.mostRecent(LabelType.BREAK);
-        if (breakLabel == null) {
-            throw new SyntaxErrorException(
-                "break statement outside of a loop",
-                f.lineNo()
-            );
-        }
-
-        SamBuilder sb = new SamBuilder();
-        sb.append("JUMP " + breakLabel.getName() + "\n");
-        return sb.toString();
+        // Create AST node and generate code using visitor
+        assignment2.ast.BreakStmt breakStmt = new assignment2.ast.BreakStmt();
+        return generateStmt(breakStmt, method);
     }
 
     static String getReturnStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
         CompilerUtils.expectWord(f, "return", f.lineNo());
-        SamBuilder sb = new SamBuilder();
-        // Use new AST-based parser for return expression (migration step)
+        
+        // Use AST-based parser for return expression
         assignment2.ast.Expr astExpr = parseExprAST(f, method);
-        String sam = generateExpr(astExpr);
-        sb.append(sam);
         if (!method.getType().isCompatibleWith(astExpr.getType())) {
             throw new TypeErrorException(
                 "Return statement type mismatch: " + method.getType() + " and " + astExpr.getType(),
@@ -479,17 +469,9 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        // Jump to clean up
-        Label returnLabel = method.mostRecent(LabelType.RETURN);
-        if (returnLabel == null) {
-            throw new CompilerException(
-                "getReturnStmt missing exit label",
-                f.lineNo()
-            );
-        }
-        sb.append("JUMP " + returnLabel.getName() + "\n");
-
-        return sb.toString();
+        // Create AST node and generate code using visitor
+        assignment2.ast.ReturnStmt returnStmt = new assignment2.ast.ReturnStmt(astExpr);
+        return generateStmt(returnStmt, method);
     }
 
     static String getIfStmt(SamTokenizer f, MethodNode method)
@@ -711,6 +693,82 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         } catch (Exception e) {
             throw new CompilerException("AST expression codegen failed: " + e.getMessage(), -1);
         }
+    }
+
+    // AST statement code generation helper
+    private static String generateStmt(assignment2.ast.Stmt astStmt, MethodNode method) throws CompilerException {
+        // Get current break and return labels from the method's label stack
+        Label breakLabel = method.mostRecent(LabelType.BREAK);
+        Label returnLabel = method.mostRecent(LabelType.RETURN);
+        
+        assignment2.ast.CodegenStmtVisitor v = new assignment2.ast.CodegenStmtVisitor(method, breakLabel, returnLabel);
+        try {
+            return astStmt.accept(v);
+        } catch (CompilerException ce) {
+            throw ce;
+        } catch (Exception e) {
+            throw new CompilerException("AST statement codegen failed: " + e.getMessage(), -1);
+        }
+    }
+
+    // ===== New AST-based statement parsing (migration in progress) =====
+    private static assignment2.ast.Stmt parseStmtAST(SamTokenizer f, MethodNode method) throws CompilerException {
+        // Stmt -> ;
+        if (CompilerUtils.check(f, ';')) {
+            return new assignment2.ast.BlockStmt(java.util.Collections.emptyList()); // null statement as empty block
+        }
+
+        if (f.peekAtKind() != TokenType.WORD) {
+            throw new SyntaxErrorException("Statement must begin with identifier/keyword", f.lineNo());
+        }
+
+        // Stmt -> break;
+        if (f.test("break")) {
+            CompilerUtils.expectChar(f, ';', f.lineNo());
+            return new assignment2.ast.BreakStmt();
+        }
+        // Stmt -> return Expr;
+        else if (f.test("return")) {
+            assignment2.ast.Expr value = parseExprAST(f, method);
+            CompilerUtils.expectChar(f, ';', f.lineNo());
+            return new assignment2.ast.ReturnStmt(value);
+        }
+        // Stmt -> if (Expr) Block else Block;
+        else if (f.test("if")) {
+            CompilerUtils.expectChar(f, '(', f.lineNo());
+            assignment2.ast.Expr cond = parseExprAST(f, method);
+            CompilerUtils.expectChar(f, ')', f.lineNo());
+            assignment2.ast.Stmt thenBranch = parseBlockAST(f, method);
+            CompilerUtils.expectWord(f, "else", f.lineNo());
+            assignment2.ast.Stmt elseBranch = parseBlockAST(f, method);
+            return new assignment2.ast.IfStmt(cond, thenBranch, elseBranch);
+        }
+        // Stmt -> while (Expr) Block;
+        else if (f.test("while")) {
+            CompilerUtils.expectChar(f, '(', f.lineNo());
+            assignment2.ast.Expr cond = parseExprAST(f, method);
+            CompilerUtils.expectChar(f, ')', f.lineNo());
+            assignment2.ast.Stmt body = parseBlockAST(f, method);
+            return new assignment2.ast.WhileStmt(cond, body);
+        }
+        // Stmt -> Var = Expr;
+        else {
+            String ident = CompilerUtils.getWord(f);
+            Node var = CompilerUtils.requireVar(method, ident, f);
+            CompilerUtils.expectChar(f, '=', f.lineNo());
+            assignment2.ast.Expr value = parseExprAST(f, method);
+            CompilerUtils.expectChar(f, ';', f.lineNo());
+            return new assignment2.ast.AssignStmt(ident, value);
+        }
+    }
+
+    private static assignment2.ast.BlockStmt parseBlockAST(SamTokenizer f, MethodNode method) throws CompilerException {
+        CompilerUtils.expectChar(f, '{', f.lineNo());
+        java.util.ArrayList<assignment2.ast.Stmt> stmts = new java.util.ArrayList<>();
+        while (!CompilerUtils.check(f, '}')) {
+            stmts.add(parseStmtAST(f, method));
+        }
+        return new assignment2.ast.BlockStmt(stmts);
     }
 
     // Removed legacy getUnopExpr, getBinopExpr, getTernaryExpr: all expression forms now handled by unified AST pipeline.
