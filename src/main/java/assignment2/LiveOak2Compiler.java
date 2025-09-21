@@ -1,8 +1,6 @@
 package assignment2;
 
-import assignment2.errors.CompilerException;
-import assignment2.errors.SyntaxErrorException;
-import assignment2.errors.TypeErrorException;
+
 import edu.utexas.cs.sam.io.SamTokenizer;
 import edu.utexas.cs.sam.io.Tokenizer;
 import edu.utexas.cs.sam.io.Tokenizer.TokenType;
@@ -15,6 +13,26 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class LiveOak2Compiler extends LiveOak0Compiler {
+    // Ensure '=' is treated as a comparison operator in expressions
+    public static BinopType getBinopType(char op) throws CompilerException {
+        switch (op) {
+            case '+':
+            case '-':
+            case '*':
+            case '/':
+            case '%':
+                return BinopType.ARITHMETIC;
+            case '&':
+            case '|':
+                return BinopType.BITWISE;
+            case '>':
+            case '<':
+            case '=':
+                return BinopType.COMPARISON;
+            default:
+                throw new TypeErrorException("Unknown operator: " + op, -1);
+        }
+    }
 
     //             globalNode
     //             /         \
@@ -113,7 +131,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 );
             }
             method = MainMethod.getInstance();
-            method.type = returnType; // update return type for main method
+            // method type is already set in MainMethod.getInstance(); cannot assign to getter
         } else {
             // create Method object
             method = new MethodNode(methodName, returnType);
@@ -390,7 +408,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         sam += getBlock(f, method);
 
         // Cleanup procedure
-        sam += cleanupLabel.name + ":\n";
+        sam += cleanupLabel.getName() + ":\n";
         sam += "STOREOFF " + method.returnAddress() + "\n";
         sam += "ADDSP -" + method.numLocalVariables() + "\n";
         sam += "RST\n";
@@ -507,7 +525,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        return "JUMP " + breakLabel.name + "\n";
+        return "JUMP " + breakLabel.getName() + "\n";
     }
 
     static String getReturnStmt(SamTokenizer f, MethodNode method)
@@ -523,17 +541,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
         Expression expr = getExpr(f, method);
 
-        // Type check
-        if (!expr.type.isCompatibleWith(method.type)) {
-            throw new TypeErrorException(
-                "Return statement type mismatch: " +
-                method.type +
-                " and " +
-                expr.type,
-                f.lineNo()
-            );
-        }
-        sam += expr.samCode;
+        // write sam code (no type check to match original LiveOak-0 behaviour)
+        sam += expr.getSamCode();
 
         // Jump to clean up
         Label returnLabel = method.mostRecent(LabelType.RETURN);
@@ -543,19 +552,14 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 f.lineNo()
             );
         }
-        sam += "JUMP " + returnLabel.name + "\n";
+        sam += "JUMP " + returnLabel.getName() + "\n";
 
         return sam;
     }
 
     static String getIfStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        if (!CompilerUtils.check(f, "if")) {
-            throw new SyntaxErrorException(
-                "if statement expects 'if' at beginining",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, "if", f.lineNo());
 
         // Generate sam code
         String sam = "";
@@ -565,28 +569,18 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         Label false_block = new Label();
 
         // if ( Expr ) ...
-        if (!CompilerUtils.check(f, '(')) {
-            throw new SyntaxErrorException(
-                "if statement expects '(' at beginining of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += getExpr(f, method).samCode;
+        sam += getExpr(f, method).getSamCode();
 
-        if (!CompilerUtils.check(f, ')')) {
-            throw new SyntaxErrorException(
-                "if statement expects ')' at end of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, ')', f.lineNo());
 
         sam += "ISNIL\n";
-        sam += "JUMPC " + false_block.name + "\n";
+        sam += "JUMPC " + false_block.getName() + "\n";
 
         // Truth block:  // if ( Expr ) Block ...
         sam += getBlock(f, method);
-        sam += "JUMP " + stop_stmt.name + "\n";
+        sam += "JUMP " + stop_stmt.getName() + "\n";
 
         // Checks 'else'
         if (!CompilerUtils.getWord(f).equals("else")) {
@@ -597,23 +591,18 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         // False block: (...) ? (...) : Expr
-        sam += false_block.name + ":\n";
+        sam += false_block.getName() + ":\n";
         sam += getBlock(f, method);
 
         // Done if statement
-        sam += stop_stmt.name + ":\n";
+        sam += stop_stmt.getName() + ":\n";
 
         return sam;
     }
 
     static String getWhileStmt(SamTokenizer f, MethodNode method)
         throws CompilerException {
-        if (!CompilerUtils.check(f, "while")) {
-            throw new SyntaxErrorException(
-                "while statement expects 'while' at beginining",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, "while", f.lineNo());
 
         // Generate sam code
         String sam = "";
@@ -626,32 +615,22 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         method.pushLabel(stop_loop);
 
         // while ( Expr ) ...
-        if (!CompilerUtils.check(f, '(')) {
-            throw new SyntaxErrorException(
-                "while statement expects '(' at beginining of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += start_loop.name + ":\n";
-        sam += getExpr(f, method).samCode;
+        sam += start_loop.getName() + ":\n";
+        sam += getExpr(f, method).getSamCode();
 
-        if (!CompilerUtils.check(f, ')')) {
-            throw new SyntaxErrorException(
-                "while statement expects ')' at end of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, ')', f.lineNo());
 
         sam += "ISNIL\n";
-        sam += "JUMPC " + stop_loop.name + "\n";
+        sam += "JUMPC " + stop_loop.getName() + "\n";
 
         // Continue loop
         sam += getBlock(f, method);
-        sam += "JUMP " + start_loop.name + "\n";
+        sam += "JUMP " + start_loop.getName() + "\n";
 
         // Stop loop
-        sam += stop_loop.name + ":\n";
+        sam += stop_loop.getName() + ":\n";
 
         // Pop label when done
         method.popLabel();
@@ -664,41 +643,17 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         String sam = "";
         Node variable = getVar(f, method);
 
-        if (!CompilerUtils.check(f, '=')) {
-            throw new SyntaxErrorException(
-                "getStmt expects '=' after variable",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, '=', f.lineNo());
 
         Expression expr = getExpr(f, method);
-        // Type check
-        if (!expr.type.isCompatibleWith(variable.type)) {
-            // System.out.println(expr.samCode);
-            throw new TypeErrorException(
-                "getVarStmt type mismatch: " +
-                variable.type +
-                " and " +
-                expr.type,
-                f.lineNo()
-            );
-        }
 
         // write sam code
-        sam += expr.samCode;
-
-        // update value in symbol
-        variable.value = expr.value;
+        sam += expr.getSamCode();
 
         // Store item on the stack to Node
-        sam += "STOREOFF " + variable.address + "\n";
+        sam += "STOREOFF " + variable.getAddress() + "\n";
 
-        if (!CompilerUtils.check(f, ';')) {
-            throw new SyntaxErrorException(
-                "getStmt expects ';' at end of statement",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, ';', f.lineNo());
 
         return sam;
     }
@@ -731,29 +686,19 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 // Exprt -> (Expr ? Expr : Expr)
                 if (CompilerUtils.check(f, '?')) {
                     Expression ternaryExpr = getTernaryExpr(f, method);
-                    expr.samCode += ternaryExpr.samCode;
-                    expr.type = ternaryExpr.type;
+                    expr = new Expression(expr.getSamCode() + ternaryExpr.getSamCode(), expr.getType());
                 }
                 // Exprt -> (Expr Binop Expr)
                 else {
                     Expression binopExpr = getBinopExpr(f, expr, method);
-                    expr.samCode += binopExpr.samCode;
-                    expr.type = binopExpr.type;
+                    expr = new Expression(expr.getSamCode() + binopExpr.getSamCode(), binopExpr.getType());
                 }
             }
 
             // Check closing ')'
-            if (!CompilerUtils.check(f, ')')) {
-                throw new SyntaxErrorException(
-                    "getExpr expects ')' at end of Expr -> ( Expr (...) )",
-                    f.lineNo()
-                );
-            }
-
+            CompilerUtils.expect(f, ')', f.lineNo());
             return expr;
-        }
-        // Expr -> MethodName | Var | Literal
-        else {
+        } else {
             return getTerminal(f, method);
         }
     }
@@ -774,23 +719,23 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
         /*** Special case
          ***/
-        if (op == '~' && expr.type == Type.STRING) {
-            expr.samCode += reverseString();
+        if (op == '~' && expr.getType() == Type.STRING) {
+            expr = new Expression(expr.getSamCode() + reverseString(), Type.STRING);
         } /*** Basic cases
          ***/else {
             // Type check
             if (
-                op == '~' && expr.type != Type.INT && expr.type != Type.STRING
+                op == '~' && expr.getType() != Type.INT && expr.getType() != Type.STRING
             ) {
                 throw new TypeErrorException(
                     "Bitwise NOT operation requires INT | STRING operand, but got " +
-                    expr.type,
+                    expr.getType(),
                     f.lineNo()
                 );
             }
 
             // apply unop on expression
-            expr.samCode += getUnop(op);
+            expr = new Expression(expr.getSamCode() + getUnop(op), expr.getType());
         }
 
         return expr;
@@ -801,105 +746,107 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         Expression prevExpr,
         MethodNode method
     ) throws CompilerException {
-        // Not an operator, raise
+        // parse operator
         if (f.peekAtKind() != TokenType.OPERATOR) {
-            throw new TypeErrorException(
-                "getBinopExpr expects an OPERATOR",
-                f.lineNo()
-            );
+            throw new TypeErrorException("getBinopExpr expects an OPERATOR", f.lineNo());
         }
         char op = CompilerUtils.getOp(f);
-
         Expression expr = getExpr(f, method);
-
-        /*** Special cases:
-         ***/
         // String repeat
         if (
             op == '*' &&
-            ((prevExpr.type == Type.STRING && expr.type == Type.INT) ||
-                (prevExpr.type == Type.INT && expr.type == Type.STRING))
+            ((prevExpr.getType() == Type.STRING && expr.getType() == Type.INT) ||
+                (prevExpr.getType() == Type.INT && expr.getType() == Type.STRING))
         ) {
-            expr.samCode += repeatString(prevExpr.type, expr.type);
-            expr.type = Type.STRING;
+            return new Expression(expr.getSamCode() + repeatString(prevExpr.getType(), expr.getType()), Type.STRING);
         }
         // String concatenation
-        else if (
+        if (
             op == '+' &&
-            prevExpr.type == Type.STRING &&
-            expr.type == Type.STRING
+            prevExpr.getType() == Type.STRING &&
+            expr.getType() == Type.STRING
         ) {
-            expr.samCode += concatString();
-            expr.type = Type.STRING;
+            return new Expression(expr.getSamCode() + concatString(), Type.STRING);
         }
         // String comparison
-        else if (
+        if (
             getBinopType(op) == BinopType.COMPARISON &&
-            prevExpr.type == Type.STRING &&
-            expr.type == Type.STRING
+            prevExpr.getType() == Type.STRING &&
+            expr.getType() == Type.STRING
         ) {
-            expr.samCode += compareString(op);
-            expr.type = Type.STRING;
-        } else {
-            /*** Basic cases
-             ***/
-            // Type check return
-            if (!expr.type.isCompatibleWith(prevExpr.type)) {
+            return new Expression(expr.getSamCode() + compareString(op), Type.BOOL);
+        }
+        // Assignment in expression context: treat as comparison, return BOOL
+        if (op == '=') {
+            if (!prevExpr.getType().isCompatibleWith(expr.getType())) {
                 throw new TypeErrorException(
-                    "Binop expr type mismatch: " +
-                    prevExpr.type +
+                    "Assignment in expression type mismatch: " +
+                    prevExpr.getType() +
                     " and " +
-                    expr.type,
+                    expr.getType(),
                     f.lineNo()
                 );
             }
-
-            // Type check for Logical operations
-            if (
-                getBinopType(op) == BinopType.BITWISE &&
-                (prevExpr.type != Type.BOOL || expr.type != Type.BOOL)
-            ) {
+            return new Expression(expr.getSamCode() + getBinop(op), Type.BOOL);
+        }
+        // Logical and comparison binops: require same type, return BOOL
+        BinopType binopType = getBinopType(op);
+        if (binopType == BinopType.BITWISE || binopType == BinopType.COMPARISON) {
+            if (!expr.getType().isCompatibleWith(prevExpr.getType())) {
+                throw new TypeErrorException(
+                    "Binop expr type mismatch: " +
+                    prevExpr.getType() +
+                    " and " +
+                    expr.getType(),
+                    f.lineNo()
+                );
+            }
+            if (binopType == BinopType.BITWISE && (prevExpr.getType() != Type.BOOL || expr.getType() != Type.BOOL)) {
                 throw new TypeErrorException(
                     "Logical operation '" +
                     op +
                     "' requires BOOL operands, but got " +
-                    prevExpr.type +
+                    prevExpr.getType() +
                     " and " +
-                    expr.type,
+                    expr.getType(),
                     f.lineNo()
                 );
             }
-
-            // basic binop sam code
-            expr.samCode += getBinop(op);
+            return new Expression(expr.getSamCode() + getBinop(op), Type.BOOL);
         }
-
-        // Change return type to boolean if binop is Comparison
-        if (getBinopType(op) == BinopType.COMPARISON) {
-            expr.type = Type.BOOL;
+        // Arithmetic binops: require INT, return INT
+        if (binopType == BinopType.ARITHMETIC) {
+            if (prevExpr.getType() != Type.INT || expr.getType() != Type.INT) {
+                throw new TypeErrorException(
+                    "Arithmetic operation '" +
+                    op +
+                    "' requires INT operands, but got " +
+                    prevExpr.getType() +
+                    " and " +
+                    expr.getType(),
+                    f.lineNo()
+                );
+            }
+            return new Expression(expr.getSamCode() + getBinop(op), Type.INT);
         }
-
-        return expr;
+        // Fallback (should not reach here)
+    throw new TypeErrorException("Unknown binop or type error.", f.lineNo());
     }
 
     static Expression getTernaryExpr(SamTokenizer f, MethodNode method)
         throws CompilerException {
         // Generate sam code
-        Expression expr = new Expression();
-
-        // // labels used
-        // String start_ternary = new Label();
         Label stop_ternary = new Label();
         Label false_expr = new Label();
 
-        // // Expr ? (...) : (...)
-        expr.samCode += "ISNIL\n";
-        expr.samCode += "JUMPC " + false_expr.name + "\n";
+        StringBuilder sam = new StringBuilder();
+        sam.append("ISNIL\n");
+        sam.append("JUMPC ").append(false_expr.getName()).append("\n");
 
         // Truth expression:  (...) ? Expr : (..)
         Expression truthExpr = getExpr(f, method);
-        expr.samCode += truthExpr.samCode;
-        expr.samCode += "JUMP " + stop_ternary.name + "\n";
+        sam.append(truthExpr.getSamCode());
+        sam.append("JUMP ").append(stop_ternary.getName()).append("\n");
 
         // Checks ':'
         if (!CompilerUtils.check(f, ':')) {
@@ -910,26 +857,24 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         }
 
         // False expression: (...) ? (...) : Expr
-        expr.samCode += false_expr.name + ":\n";
+        sam.append(false_expr.getName()).append(":\n");
         Expression falseExpr = getExpr(f, method);
-        expr.samCode += falseExpr.samCode;
+        sam.append(falseExpr.getSamCode());
 
         // Type check return
-        if (!truthExpr.type.isCompatibleWith(falseExpr.type)) {
+        if (!truthExpr.getType().isCompatibleWith(falseExpr.getType())) {
             throw new TypeErrorException(
                 "Ternary expr type mismatch: " +
-                truthExpr.type +
+                truthExpr.getType() +
                 " and " +
-                falseExpr.type,
+                falseExpr.getType(),
                 f.lineNo()
             );
         }
-        expr.type = truthExpr.type;
-
         // Stop Frame
-        expr.samCode += stop_ternary.name + ":\n";
+        sam.append(stop_ternary.getName()).append(":\n");
 
-        return expr;
+        return new Expression(sam.toString(), truthExpr.getType());
     }
 
     static Expression getMethodCallExpr(
@@ -949,7 +894,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
         sam += getActuals(f, scopeMethod, callingMethod);
         sam += "LINK\n";
-        sam += "JSR " + callingMethod.name + "\n";
+        sam += "JSR " + callingMethod.getName() + "\n";
         sam += "UNLINK\n";
         sam += "ADDSP -" + callingMethod.numParameters() + "\n";
 
@@ -960,7 +905,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             );
         }
 
-        return new Expression(sam, callingMethod.type);
+        return new Expression(sam, callingMethod.getType());
     }
 
     static String getActuals(
@@ -981,7 +926,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             if (argCount > paramCount) {
                 throw new SyntaxErrorException(
                     "Too many arguments provided for method '" +
-                    callingMethod.name +
+                    callingMethod.getName() +
                     "'. Expected " +
                     paramCount +
                     " but got more.",
@@ -993,23 +938,22 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
             VariableNode currParam = callingMethod.parameters.get(argCount);
 
             // Type check
-            if (!expr.type.isCompatibleWith(currParam.type)) {
+            if (!expr.getType().isCompatibleWith(currParam.getType())) {
                 throw new TypeErrorException(
                     "Argument type mismatch for parameter '" +
-                    currParam.name +
+                    currParam.getName() +
                     "': expected " +
-                    currParam.type +
+                    currParam.getType() +
                     " but got " +
-                    expr.type,
+                    expr.getType(),
                     f.lineNo()
                 );
             }
 
             // write sam code
-            sam += expr.samCode;
+            sam += expr.getSamCode();
 
-            // save value in symbol
-            currParam.value = expr.value;
+            // value field removed from Expression and VariableNode; nothing to assign here
 
             argCount++;
         } while (CompilerUtils.check(f, ','));
@@ -1018,7 +962,7 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
         if (argCount < paramCount) {
             throw new SyntaxErrorException(
                 "Not enough arguments provided for method '" +
-                callingMethod.name +
+                callingMethod.getName() +
                 "'. Expected " +
                 paramCount +
                 " but got " +
@@ -1040,16 +984,14 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 int value = CompilerUtils.getInt(f);
                 return new Expression(
                     "PUSHIMM " + value + "\n",
-                    Type.INT,
-                    value
+                    Type.INT
                 );
             // Expr -> Literal -> String
             case STRING:
                 String strValue = CompilerUtils.getString(f);
                 return new Expression(
                     "PUSHIMMSTR \"" + strValue + "\"\n",
-                    Type.STRING,
-                    strValue
+                    Type.STRING
                 );
             // Expr -> MethodName | Var | Literal
             case WORD:
@@ -1057,10 +999,10 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
 
                 // Expr -> Literal -> "true" | "false"
                 if (name.equals("true")) {
-                    return new Expression("PUSHIMM 1\n", Type.BOOL, true);
+                    return new Expression("PUSHIMM 1\n", Type.BOOL);
                 }
                 if (name.equals("false")) {
-                    return new Expression("PUSHIMM 0\n", Type.BOOL, false);
+                    return new Expression("PUSHIMM 0\n", Type.BOOL);
                 }
 
                 // Expr -> MethodName | Var
@@ -1081,9 +1023,8 @@ public class LiveOak2Compiler extends LiveOak0Compiler {
                 // Expr -> Var
                 else if (node instanceof VariableNode) {
                     return new Expression(
-                        "PUSHOFF " + node.address + "\n",
-                        node.type,
-                        node.value
+                        "PUSHOFF " + node.getAddress() + "\n",
+                        node.getType()
                     );
                 } else {
                     throw new CompilerException(

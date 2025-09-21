@@ -1,8 +1,5 @@
 package assignment2;
 
-import assignment2.errors.CompilerException;
-import assignment2.errors.SyntaxErrorException;
-import assignment2.errors.TypeErrorException;
 import edu.utexas.cs.sam.io.SamTokenizer;
 import edu.utexas.cs.sam.io.Tokenizer;
 import edu.utexas.cs.sam.io.Tokenizer.TokenType;
@@ -231,12 +228,7 @@ public class LiveOak0Compiler {
     }
 
     static String getIfStmt(SamTokenizer f) throws CompilerException {
-        if (!CompilerUtils.check(f, "if")) {
-            throw new SyntaxErrorException(
-                "if statement expects 'if' at beginining",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, "if", f.lineNo());
 
         // Generate sam code
         String sam = "";
@@ -246,28 +238,18 @@ public class LiveOak0Compiler {
         Label false_block = new Label();
 
         // if ( Expr ) ...
-        if (!CompilerUtils.check(f, '(')) {
-            throw new SyntaxErrorException(
-                "if statement expects '(' at beginining of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += getExpr(f).samCode;
+        sam += getExpr(f).getSamCode();
 
-        if (!CompilerUtils.check(f, ')')) {
-            throw new SyntaxErrorException(
-                "if statement expects ')' at end of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, ')', f.lineNo());
 
         sam += "ISNIL\n";
-        sam += "JUMPC " + false_block.name + "\n";
+        sam += "JUMPC " + false_block.getName() + "\n";
 
         // Truth block:  // if ( Expr ) Block ...
         sam += getBlock(f);
-        sam += "JUMP " + stop_stmt.name + "\n";
+        sam += "JUMP " + stop_stmt.getName() + "\n";
 
         // Checks 'else'
         if (!CompilerUtils.getWord(f).equals("else")) {
@@ -288,12 +270,7 @@ public class LiveOak0Compiler {
     }
 
     static String getWhileStmt(SamTokenizer f) throws CompilerException {
-        if (!CompilerUtils.check(f, "while")) {
-            throw new SyntaxErrorException(
-                "while statement expects 'while' at beginining",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, "while", f.lineNo());
 
         // Generate sam code
         String sam = "";
@@ -303,32 +280,22 @@ public class LiveOak0Compiler {
         Label stop_loop = new Label();
 
         // while ( Expr ) ...
-        if (!CompilerUtils.check(f, '(')) {
-            throw new SyntaxErrorException(
-                "while statement expects '(' at beginining of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, '(', f.lineNo());
 
-        sam += start_loop.name + ":\n";
-        sam += getExpr(f).samCode;
+        sam += start_loop.getName() + ":\n";
+        sam += getExpr(f).getSamCode();
 
-        if (!CompilerUtils.check(f, ')')) {
-            throw new SyntaxErrorException(
-                "while statement expects ')' at end of condition",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, ')', f.lineNo());
 
         sam += "ISNIL\n";
-        sam += "JUMPC " + stop_loop.name + "\n";
+        sam += "JUMPC " + stop_loop.getName() + "\n";
 
         // Continue loop
         sam += getBlock(f);
-        sam += "JUMP " + start_loop.name + "\n";
+        sam += "JUMP " + start_loop.getName() + "\n";
 
         // Stop loop
-        sam += stop_loop.name + ":\n";
+        sam += stop_loop.getName() + ":\n";
 
         return sam;
     }
@@ -337,25 +304,15 @@ public class LiveOak0Compiler {
         String sam = "";
         Node variable = getVar(f);
 
-        if (!CompilerUtils.check(f, '=')) {
-            throw new SyntaxErrorException(
-                "getStmt expects '=' after variable",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, '=', f.lineNo());
 
         // getExpr() would return "exactly" one value on the stack
-        sam += getExpr(f).samCode;
+        sam += getExpr(f).getSamCode();
 
         // Store item on the stack to Node
-        sam += "STOREOFF " + variable.address + "\n";
+    sam += "STOREOFF " + variable.getAddress() + "\n";
 
-        if (!CompilerUtils.check(f, ';')) {
-            throw new SyntaxErrorException(
-                "getStmt expects ';' at end of statement",
-                f.lineNo()
-            );
-        }
+        CompilerUtils.expect(f, ';', f.lineNo());
 
         return sam;
     }
@@ -381,25 +338,21 @@ public class LiveOak0Compiler {
                 }
 
                 // Expr -> ( Expr ) , ends early
-                if (!CompilerUtils.check(f, ')')) {
-                    // Exprt -> (Expr ? Expr : Expr)
-                    if (CompilerUtils.check(f, '?')) {
-                        expr.samCode += getTernaryExpr(f).samCode;
-                    }
-                    // Exprt -> (Expr Binop Expr)
-                    else {
-                        expr.samCode += getBinopExpr(f, expr).samCode;
-                    }
-
-                    // Check closing ')'
-                    if (!CompilerUtils.check(f, ')')) {
-                        throw new SyntaxErrorException(
-                            "getExpr expects ')' at end of Expr -> ( Expr (...) )",
-                            f.lineNo()
-                        );
-                    }
+                if (CompilerUtils.check(f, ')')) {
+                    return expr;
                 }
 
+                // Exprt -> (Expr ? Expr : Expr)
+                if (CompilerUtils.check(f, '?')) {
+                    expr = new Expression(expr.getSamCode() + getTernaryExpr(f).getSamCode(), expr.getType());
+                }
+                // Exprt -> (Expr Binop Expr)
+                else {
+                    expr = new Expression(expr.getSamCode() + getBinopExpr(f, expr).getSamCode(), expr.getType());
+                }
+
+                // Check closing ')'
+                CompilerUtils.expect(f, ')', f.lineNo());
                 return expr;
             }
         }
@@ -417,7 +370,7 @@ public class LiveOak0Compiler {
         Expression expr = getExpr(f);
 
         // apply unop on expression
-        expr.samCode += unop_sam;
+        expr = new Expression(expr.getSamCode() + unop_sam, expr.getType());
 
         return expr;
     }
@@ -438,17 +391,17 @@ public class LiveOak0Compiler {
         Expression expr = getExpr(f);
 
         // Type check
-        if (!expr.type.isCompatibleWith(prevExpr.type)) {
+        if (!expr.getType().isCompatibleWith(prevExpr.getType())) {
             throw new TypeErrorException(
                 "Binop expr type mismatch: " +
-                prevExpr.type +
+                prevExpr.getType() +
                 " and " +
-                expr.type,
+                expr.getType(),
                 f.lineNo()
             );
         }
 
-        expr.samCode += binop_sam;
+        expr = new Expression(expr.getSamCode() + binop_sam, expr.getType());
 
         // // Stop Frame
         // sam += "STOREOFF -2\n"; // store result on TOS
@@ -477,12 +430,12 @@ public class LiveOak0Compiler {
         // sam += "LINK\n";
 
         // // Expr ? (...) : (...)
-        expr.samCode += "ISNIL\n";
-        expr.samCode += "JUMPC " + false_expr.name + "\n";
+        expr = new Expression(expr.getSamCode() + "ISNIL\n", expr.getType());
+        expr = new Expression(expr.getSamCode() + "JUMPC " + false_expr.getName() + "\n", expr.getType());
 
         // Truth expression:  (...) ? Expr : (..)
-        expr.samCode += getExpr(f).samCode;
-        expr.samCode += "JUMP " + stop_ternary.name + "\n";
+        expr = new Expression(expr.getSamCode() + getExpr(f).getSamCode(), expr.getType());
+        expr = new Expression(expr.getSamCode() + "JUMP " + stop_ternary.getName() + "\n", expr.getType());
 
         // Checks ':'
         if (!CompilerUtils.check(f, ':')) {
@@ -493,11 +446,11 @@ public class LiveOak0Compiler {
         }
 
         // False expression: (...) ? (...) : Expr
-        expr.samCode += false_expr.name + ":\n";
-        expr.samCode += getExpr(f).samCode;
+        expr = new Expression(expr.getSamCode() + false_expr.getName() + ":\n", expr.getType());
+        expr = new Expression(expr.getSamCode() + getExpr(f).getSamCode(), expr.getType());
 
         // Stop Frame
-        expr.samCode += stop_ternary.name + ":\n";
+        expr = new Expression(expr.getSamCode() + stop_ternary.getName() + ":\n", expr.getType());
 
         // // Save the method in symbol table
         // int address = CompilerUtils.getNextAddress(symbolTable);
@@ -585,8 +538,8 @@ public class LiveOak0Compiler {
                 }
 
                 return new Expression(
-                    "PUSHOFF " + variable.address + "\n",
-                    variable.type
+                    "PUSHOFF " + variable.getAddress() + "\n",
+                    variable.getType()
                 );
             default:
                 throw new TypeErrorException(
@@ -702,13 +655,13 @@ public class LiveOak0Compiler {
 
         // call method
         sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.name + "\n";
+        sam += "JSR " + enterFuncLabel.getName() + "\n";
         sam += "UNLINK\n";
         sam += "ADDSP -1\n"; // free second param, only first param remain with new value
-        sam += "JUMP " + exitFuncLabel.name + "\n";
+        sam += "JUMP " + exitFuncLabel.getName() + "\n";
 
         // method definition
-        sam += enterFuncLabel.name + ":\n";
+        sam += enterFuncLabel.getName() + ":\n";
         sam += "PUSHIMM 0\n"; // local 1: loop counter
         sam += "PUSHIMM 0\n"; // local 2: increment address
         sam += "PUSHIMM 0\n"; // local 3: return address
@@ -716,7 +669,7 @@ public class LiveOak0Compiler {
         // validate param, if n < 0 -> return
         sam += "PUSHOFF -2\n";
         sam += "ISNEG\n";
-        sam += "JUMPC " + invalidParamLabel.name + "\n";
+        sam += "JUMPC " + invalidParamLabel.getName() + "\n";
 
         // allocate memory for new string -> Address
         sam += "PUSHOFF -1\n";
@@ -733,12 +686,12 @@ public class LiveOak0Compiler {
         sam += "STOREOFF 4\n";
 
         // loop...
-        sam += startLoopLabel.name + ":\n";
+        sam += startLoopLabel.getName() + ":\n";
         // check if done
         sam += "PUSHOFF 2\n";
         sam += "PUSHOFF -2\n";
         sam += "EQUAL\n";
-        sam += "JUMPC " + stopLoopLabel.name + "\n";
+        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
 
         // append str to memory
         sam += "PUSHIMM 0\n"; // will return next address
@@ -754,27 +707,27 @@ public class LiveOak0Compiler {
         sam += "STOREOFF 2\n";
 
         // Continue loop
-        sam += "JUMP " + startLoopLabel.name + "\n";
+        sam += "JUMP " + startLoopLabel.getName() + "\n";
 
         // Stop loop
-        sam += stopLoopLabel.name + ":\n";
+        sam += stopLoopLabel.getName() + ":\n";
         sam += "PUSHOFF 4\n";
         sam += "STOREOFF -2\n";
-        sam += "JUMP " + returnLabel.name + "\n";
+        sam += "JUMP " + returnLabel.getName() + "\n";
 
         // Invalid param, return empty string
-        sam += invalidParamLabel.name + ":\n";
+        sam += invalidParamLabel.getName() + ":\n";
         sam += "PUSHIMMSTR \"\"";
         sam += "STOREOFF -2\n";
-        sam += "JUMP " + returnLabel.name + "\n";
+        sam += "JUMP " + returnLabel.getName() + "\n";
 
         // Return func
-        sam += returnLabel.name + ":\n";
+        sam += returnLabel.getName() + ":\n";
         sam += "ADDSP -3\n";
         sam += "RST\n";
 
         // Exit method
-        sam += exitFuncLabel.name + ":\n";
+        sam += exitFuncLabel.getName() + ":\n";
 
         return sam;
     }
@@ -788,21 +741,21 @@ public class LiveOak0Compiler {
         sam += "DUP\n";
 
         // START
-        sam += startCountLabel.name + ":\n";
+        sam += startCountLabel.getName() + ":\n";
         sam += "DUP\n";
         sam += "PUSHIND\n";
 
         // check end of string
         sam += "ISNIL\n";
-        sam += "JUMPC " + stopCountLabel.name + "\n";
+        sam += "JUMPC " + stopCountLabel.getName() + "\n";
 
         // increament count and continue loop
         sam += "PUSHIMM 1\n";
         sam += "ADD\n";
-        sam += "JUMP " + startCountLabel.name + "\n";
+        sam += "JUMP " + startCountLabel.getName() + "\n";
 
         // STOP
-        sam += stopCountLabel.name + ":\n";
+        sam += stopCountLabel.getName() + ":\n";
         sam += "SWAP\n";
         sam += "SUB\n";
 
@@ -820,22 +773,22 @@ public class LiveOak0Compiler {
 
         // call method
         sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.name + "\n";
+        sam += "JSR " + enterFuncLabel.getName() + "\n";
         sam += "UNLINK\n";
         sam += "ADDSP -2\n";
-        sam += "JUMP " + exitFuncLabel.name + "\n";
+        sam += "JUMP " + exitFuncLabel.getName() + "\n";
 
-        sam += enterFuncLabel.name + ":\n";
+        sam += enterFuncLabel.getName() + ":\n";
         sam += "PUSHOFF -2\n";
         sam += "PUSHOFF -1\n";
 
-        sam += startLoopLabel.name + ":\n";
+        sam += startLoopLabel.getName() + ":\n";
         // put char in TOS
         // end loop if nil
         sam += "PUSHOFF 3\n";
         sam += "PUSHIND\n";
         sam += "ISNIL\n";
-        sam += "JUMPC " + stopLoopLabel.name + "\n";
+        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
 
         // Save to allocated memory
         sam += "PUSHOFF 2\n";
@@ -855,9 +808,9 @@ public class LiveOak0Compiler {
         sam += "ADD\n";
         sam += "STOREOFF 2\n";
 
-        sam += "JUMP " + startLoopLabel.name + "\n";
+        sam += "JUMP " + startLoopLabel.getName() + "\n";
 
-        sam += stopLoopLabel.name + ":\n";
+        sam += stopLoopLabel.getName() + ":\n";
         sam += "PUSHOFF 2\n";
         sam += "PUSHIMMCH '\\0'" + "\n";
         sam += "STOREIND\n";
@@ -867,7 +820,7 @@ public class LiveOak0Compiler {
         sam += "RST\n";
 
         // Exit method
-        sam += exitFuncLabel.name + ":\n";
+        sam += exitFuncLabel.getName() + ":\n";
 
         return sam;
     }
@@ -881,13 +834,13 @@ public class LiveOak0Compiler {
 
         // call method
         sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.name + "\n";
+        sam += "JSR " + enterFuncLabel.getName() + "\n";
         sam += "UNLINK\n";
         sam += "ADDSP -1\n"; // free second param, only first param remain with new value
-        sam += "JUMP " + exitFuncLabel.name + "\n";
+        sam += "JUMP " + exitFuncLabel.getName() + "\n";
 
         // method definition
-        sam += enterFuncLabel.name + ":\n";
+        sam += enterFuncLabel.getName() + ":\n";
         sam += "PUSHIMM 0\n"; // local 2: increment address
         sam += "PUSHIMM 0\n"; // local 3: return address
 
@@ -930,7 +883,7 @@ public class LiveOak0Compiler {
         sam += "RST\n";
 
         // Exit method
-        sam += exitFuncLabel.name + ":\n";
+        sam += exitFuncLabel.getName() + ":\n";
 
         return sam;
     }
@@ -953,18 +906,18 @@ public class LiveOak0Compiler {
 
         // call method
         sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.name + "\n";
+        sam += "JSR " + enterFuncLabel.getName() + "\n";
         sam += "UNLINK\n";
         sam += "ADDSP -1\n"; // free second param, only first param remain with new value
-        sam += "JUMP " + exitFuncLabel.name + "\n";
+        sam += "JUMP " + exitFuncLabel.getName() + "\n";
 
         // method definition
-        sam += enterFuncLabel.name + ":\n";
+        sam += enterFuncLabel.getName() + ":\n";
         sam += "PUSHIMM 0\n"; // local 2: counter
         sam += "PUSHIMM 0\n"; // local 3: result
 
         // loop...
-        sam += startLoopLabel.name + ":\n";
+        sam += startLoopLabel.getName() + ":\n";
         // reach end of string 1?
         sam += "PUSHOFF -2\n";
         sam += "PUSHOFF 2\n";
@@ -981,7 +934,7 @@ public class LiveOak0Compiler {
 
         // reach end of both string, is equal
         sam += "AND\n";
-        sam += "JUMPC " + stopLoopLabel.name + "\n";
+        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
 
         // not end, comparing char by char
         // get char of string 1
@@ -1002,24 +955,24 @@ public class LiveOak0Compiler {
 
         // check if done
         sam += "PUSHOFF 3\n";
-        sam += "JUMPC " + stopLoopLabel.name + "\n";
+        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
 
         // not done, continue to next char
         sam += "PUSHOFF 2\n";
         sam += "PUSHIMM 1\n";
         sam += "ADD\n";
         sam += "STOREOFF 2\n";
-        sam += "JUMP " + startLoopLabel.name + "\n";
+        sam += "JUMP " + startLoopLabel.getName() + "\n";
 
         // Stop loop
-        sam += stopLoopLabel.name + ":\n";
+        sam += stopLoopLabel.getName() + ":\n";
         sam += "PUSHOFF 3\n";
         sam += "STOREOFF -2\n";
         sam += "ADDSP -2\n";
         sam += "RST\n";
 
         // Exit method
-        sam += exitFuncLabel.name + ":\n";
+        sam += exitFuncLabel.getName() + ":\n";
 
         if (op == '<') {
             sam += "PUSHIMM 1\n";
@@ -1044,12 +997,12 @@ public class LiveOak0Compiler {
 
         // call method
         sam += "LINK\n";
-        sam += "JSR " + enterFuncLabel.name + "\n";
+        sam += "JSR " + enterFuncLabel.getName() + "\n";
         sam += "UNLINK\n";
-        sam += "JUMP " + exitFuncLabel.name + "\n";
+        sam += "JUMP " + exitFuncLabel.getName() + "\n";
 
         // method definition
-        sam += enterFuncLabel.name + ":\n";
+        sam += enterFuncLabel.getName() + ":\n";
         sam += "PUSHIMM 0\n"; // local 2: counter
         sam += "PUSHIMM 0\n"; // local 3: increment address
         sam += "PUSHIMM 0\n"; // local 4: result
@@ -1078,12 +1031,12 @@ public class LiveOak0Compiler {
         sam += "STOREIND\n";
 
         // loop (backward)...
-        sam += startLoopLabel.name + ":\n";
+        sam += startLoopLabel.getName() + ":\n";
 
         // end loop if counter == 0
         sam += "PUSHOFF 2\n";
         sam += "ISNIL\n";
-        sam += "JUMPC " + stopLoopLabel.name + "\n";
+        sam += "JUMPC " + stopLoopLabel.getName() + "\n";
 
         // get current address
         sam += "PUSHOFF 3\n";
@@ -1112,17 +1065,17 @@ public class LiveOak0Compiler {
         sam += "STOREOFF 2\n";
 
         // Continue loop
-        sam += "JUMP " + startLoopLabel.name + "\n";
+        sam += "JUMP " + startLoopLabel.getName() + "\n";
 
         // Stop loop
-        sam += stopLoopLabel.name + ":\n";
+        sam += stopLoopLabel.getName() + ":\n";
         sam += "PUSHOFF 4\n";
         sam += "STOREOFF -1\n";
         sam += "ADDSP -3\n";
         sam += "RST\n";
 
         // Exit method
-        sam += exitFuncLabel.name + ":\n";
+        sam += exitFuncLabel.getName() + ":\n";
 
         return sam;
     }

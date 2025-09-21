@@ -7,33 +7,20 @@ import java.util.Map;
 import java.util.Objects;
 
 public class Node {
+    private Node parent;
+    private List<Node> children;
+    private Map<String, Node> symbols = new HashMap<>();
+    private String name;
+    private Type type;
+    private int address;
 
-    Node parent;
-    List<Node> children;
-    Map<String, Node> symbols = new HashMap<>();
-
-    String name;
-    Type type;
-    int address;
-    Object value;
-
-    /** Constructors
-     **/
-    public Node(
-        Node parent,
-        List<Node> children,
-        String name,
-        Type type,
-        int address,
-        Object value
-    ) {
+    /** Constructors **/
+    public Node(Node parent, List<Node> children, String name, Type type, int address) {
         this.parent = parent;
         this.children = children;
         this.name = name;
         this.type = type;
         this.address = address;
-        this.value = value;
-
         // Populate symbols with children that have names
         for (Node child : this.children) {
             if (child.name != null && !child.name.isEmpty()) {
@@ -42,12 +29,19 @@ public class Node {
         }
     }
 
-    public Node(String name, Type type, int address) {
-        this(null, new ArrayList<>(), name, type, address, null);
+    public Node() {
+        this(null, new ArrayList<>(), "", Type.INT, 0);
     }
 
-    public Node() {
-        this(null, new ArrayList<>(), "", Type.INT, 0, null);
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public Type getType() { return type; }
+    public void setType(Type type) { this.type = type; }
+    public int getAddress() { return address; }
+    public void setAddress(int address) { this.address = address; }
+
+    public Node(String name, Type type, int address) {
+        this(null, new ArrayList<>(), name, type, address);
     }
 
     public void addChild(Node child) {
@@ -91,7 +85,6 @@ public class Node {
         this.name = "";
         this.type = Type.INT; // Assuming INT is the default type
         this.address = 0;
-        this.value = null;
     }
 
     public void resetRecursive() {

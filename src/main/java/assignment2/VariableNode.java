@@ -4,30 +4,24 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 public class VariableNode extends Node {
+    private final boolean isParameter;
 
-    boolean isParameter;
-
-    public VariableNode(
-        Node parent,
-        String name,
-        Type type,
-        int address,
-        Object value,
-        boolean isParameter
-    ) {
-        super(parent, new ArrayList<>(), name, type, address, value);
+    public VariableNode(Node parent, String name, Type type, int address, boolean isParameter) {
+        super(parent, new ArrayList<>(), name, type, address);
         this.isParameter = isParameter;
     }
 
     public VariableNode(String name, Type type, boolean isParameter) {
-        this(null, name, type, 0, null, isParameter);
+        this(null, name, type, 0, isParameter);
+    }
+
+    public boolean isParameter() {
+        return isParameter;
     }
 
     @Override
     public void addChild(Node child) {
-        throw new UnsupportedOperationException(
-            "VariableNode cannot have children"
-        );
+        throw new UnsupportedOperationException("VariableNode cannot have children");
     }
 
     @Override

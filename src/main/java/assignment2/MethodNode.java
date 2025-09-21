@@ -21,7 +21,7 @@ public class MethodNode extends Node {
         Type returnType,
         int address
     ) {
-        super(parent, children, name, returnType, address, null);
+        super(parent, children, name, returnType, address);
         this.parameters = new ArrayList<>();
         this.localVariables = new ArrayList<>();
         this.labels = new ArrayDeque<>();
@@ -47,16 +47,16 @@ public class MethodNode extends Node {
     // update child's address and categorize them
     public void udpateParamsAndLocals(Node child) {
         VariableNode castChild = (VariableNode) child;
-        if (castChild.isParameter) {
-            castChild.address = -1;
+        if (castChild.isParameter()) {
+            castChild.setAddress(-1);
             parameters.add(castChild);
 
             // correct address of other params
             for (int i = parameters.size() - 2; i >= 0; i--) {
-                parameters.get(i).address -= 1;
+                parameters.get(i).setAddress(parameters.get(i).getAddress() - 1);
             }
         } else {
-            castChild.address = getNextLocalAddress();
+            castChild.setAddress(getNextLocalAddress());
             localVariables.add(castChild);
         }
     }
@@ -117,7 +117,7 @@ public class MethodNode extends Node {
         Iterator<Label> descendingIterator = labels.descendingIterator();
         while (descendingIterator.hasNext()) {
             Label label = descendingIterator.next();
-            if (label.type == labelType) {
+            if (label.getType() == labelType) {
                 return label;
             }
         }

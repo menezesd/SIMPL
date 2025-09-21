@@ -8,6 +8,61 @@ import java.util.Map;
 import java.util.UUID;
 
 public class CompilerUtils {
+    /**
+     * Expects the next token to be the specified character. Throws SyntaxErrorException if not.
+     */
+    public static void expect(SamTokenizer f, char expected, int line) throws SyntaxErrorException {
+        if (!f.check(expected)) {
+            throw new SyntaxErrorException("Expected '" + expected + "'", line);
+        }
+        processedTokens.add(String.valueOf(expected));
+    }
+
+    /**
+     * Expects the next token to be the specified string. Throws SyntaxErrorException if not.
+     */
+    public static void expect(SamTokenizer f, String expected, int line) throws SyntaxErrorException {
+        if (!f.check(expected)) {
+            throw new SyntaxErrorException("Expected '" + expected + "'", line);
+        }
+        processedTokens.add(expected);
+    }
+
+    /**
+     * Expects the next token to be a word (identifier). Throws SyntaxErrorException if not.
+     */
+    public static String expectIdentifier(SamTokenizer f, int line) throws SyntaxErrorException {
+        if (f.peekAtKind() != TokenType.WORD) {
+            throw new SyntaxErrorException("Expected identifier", line);
+        }
+        String word = f.getWord();
+        processedTokens.add(word);
+        return word;
+    }
+
+    /**
+     * Expects the next token to be an integer. Throws SyntaxErrorException if not.
+     */
+    public static int expectInt(SamTokenizer f, int line) throws SyntaxErrorException {
+        if (f.peekAtKind() != TokenType.INTEGER) {
+            throw new SyntaxErrorException("Expected integer", line);
+        }
+        int value = f.getInt();
+        processedTokens.add(String.valueOf(value));
+        return value;
+    }
+
+    /**
+     * Expects the next token to be a string literal. Throws SyntaxErrorException if not.
+     */
+    public static String expectString(SamTokenizer f, int line) throws SyntaxErrorException {
+        if (f.peekAtKind() != TokenType.STRING) {
+            throw new SyntaxErrorException("Expected string literal", line);
+        }
+        String str = f.getString();
+        processedTokens.add('"' + str + '"');
+        return str;
+    }
 
     /** General utils
      **/
