@@ -21,14 +21,14 @@ object IdiomaticTypeUtils:
     case Binary(_, _, _, rt, _) => rt.getOrElse(Type.INT)
     case Ternary(_, t, _, rt, _) => rt.getOrElse(typeOf(t, method, programSymbols))
     case This(_) => Type.INT
-    case FieldAccess(_, _, fi, _) => if fi != null && fi.valueType != null && fi.valueType.isPrimitive then fi.valueType.getPrimitive else Type.INT
+    case FieldAccess(_, _, fi, _) => fi.flatMap(f => Option(f.valueType)).filter(_.isPrimitive).map(_.getPrimitive).getOrElse(Type.INT)
     case Call(m, _, _) => m.getReturnType
     case InstanceCall(_, m, _, _) => m.getReturnType
     case NewObject(_, _, _) => Type.INT
 
   def classNameOf(e: Expr, method: assignment3.ast.MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): String = e match
     case NewObject(cn, _, _) => cn
-    case FieldAccess(_, _, fi, _) => if fi != null && fi.valueType != null && fi.valueType.isObject then fi.valueType.getObject.getClassName else null
+    case FieldAccess(_, _, fi, _) => fi.flatMap(f => Option(f.valueType)).filter(_.isObject).map(_.getObject.getClassName).orNull
     case InstanceCall(_, m, _, _) =>
       m match
         case sm: assignment3.ast.ScalaCallableMethod =>

@@ -33,7 +33,7 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
         val fSym = cs.getField(fieldName); if (fSym == null) return null
         val vt = fSym.getValueType
         val fi = new assignment3.symbol.ClassSymbol.FieldInfo(off, vt, fSym)
-        FieldAccess(This(), fieldName, fi)
+        FieldAccess(This(), fieldName, Option(fi))
       case _ => null
 
   private def resolveFieldInfo(target: Expr, fieldName: String): assignment3.symbol.ClassSymbol.FieldInfo =
@@ -96,13 +96,13 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
       dotCount += 1
       val fld = CompilerUtils.getIdentifier(tokenizer)
       val fi = resolveFieldInfo(lhsBase, fld)
-      lhsBase = FieldAccess(lhsBase, fld, fi)
+      lhsBase = FieldAccess(lhsBase, fld, Option(fi))
     CompilerUtils.expectChar(tokenizer, '=', tokenizer.lineNo())
     val rhs = parseExprInternal()
     CompilerUtils.expectChar(tokenizer, ';', tokenizer.lineNo())
     lhsBase match
       case Var(name, _) => Assign(name, rhs)
-      case FieldAccess(t, f, fi, _) => FieldAssign(t, f, if fi != null then fi.offset else -1, rhs)
+      case FieldAccess(t, f, fi, _) => FieldAssign(t, f, fi.map(_.offset).getOrElse(-1), rhs)
       case _ => throw new SyntaxErrorException("Unsupported LHS in assignment", tokenizer.lineNo())
 
   private def parseBlockInternal(): Block =
@@ -168,7 +168,7 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
         base = InstanceCall(base, callable, args.toList)
       else
         val fi = if programSymbols != null then resolveFieldInfo(base, ident) else null
-        base = FieldAccess(base, ident, fi)
+        base = FieldAccess(base, ident, Option(fi))
     base
 
   private def parseTerminal(): Expr =
@@ -192,24 +192,24 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
               CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
             return NewObject(cls, args.toList)
           case _ =>
-        var sym = method.lookup(w)
-        if sym == null then sym = method.lookupMethodGlobal(w)
-        if sym == null then
-          val implicitF = tryImplicitThisField(w)
-          if implicitF != null then return implicitF
-          throw new SyntaxErrorException("Undeclared symbol: " + w, tokenizer.lineNo())
-        sym match
-          case ms: MethodSymbol =>
-            CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
-            val args = ListBuffer.empty[Expr]
-            if !CompilerUtils.check(tokenizer, ')') then
-              args += parseExprInternal()
-              while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
-              CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-            Call(new assignment3.ast.SymbolCallableMethod(ms), args.toList)
-          case vs: VarSymbol if method.isInstanceOf[NewMethodContext] =>
-            Var(vs.getName)
-          case other => throw new SyntaxErrorException("Unsupported symbol type for variable expression: " + other.getClass.getSimpleName, tokenizer.lineNo())
+            var sym = method.lookup(w)
+            if sym == null then sym = method.lookupMethodGlobal(w)
+            if sym == null then
+              val implicitF = tryImplicitThisField(w)
+              if implicitF != null then return implicitF
+              throw new SyntaxErrorException("Undeclared symbol: " + w, tokenizer.lineNo())
+            sym match
+              case ms: MethodSymbol =>
+                CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
+                val args = ListBuffer.empty[Expr]
+                if !CompilerUtils.check(tokenizer, ')') then
+                  args += parseExprInternal()
+                  while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
+                  CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
+                Call(new assignment3.ast.SymbolCallableMethod(ms), args.toList)
+              case vs: VarSymbol if method.isInstanceOf[NewMethodContext] =>
+                Var(vs.getName)
+              case other => throw new SyntaxErrorException("Unsupported symbol type for variable expression: " + other.getClass.getSimpleName, tokenizer.lineNo())
       case _ => throw new SyntaxErrorException("Unexpected token in expression", tokenizer.lineNo())
 
   private def buildBinary(left: Expr, op: Char, right: Expr): Expr =

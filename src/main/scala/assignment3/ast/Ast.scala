@@ -24,7 +24,7 @@ final case class Call(method: CallableMethod, args: List[Expr], pos: Int = 0) ex
 final case class This(pos: Int = 0) extends Expr
 final case class NewObject(className: String, args: List[Expr], pos: Int = 0) extends Expr
 final case class InstanceCall(target: Expr, method: CallableMethod, args: List[Expr], pos: Int = 0) extends Expr
-final case class FieldAccess(target: Expr, field: String, fieldInfo: ClassSymbol.FieldInfo | Null = null, pos: Int = 0) extends Expr
+final case class FieldAccess(target: Expr, field: String, fieldInfo: Option[ClassSymbol.FieldInfo] = None, pos: Int = 0) extends Expr
 
 // Statements
 sealed trait Stmt:

@@ -37,7 +37,7 @@ object IdiomaticCodegen:
         s"PUSHOFF ${vb.getAddress}\n"
       else "PUSHOFF 0\n" // best-effort fallback
     case id.FieldAccess(target, _field, fieldInfo, _) =>
-      val off = if fieldInfo != null then fieldInfo.offset else -1
+      val off = fieldInfo.map(_.offset).getOrElse(-1)
       if off < 0 then throw new CompilerException("Unknown field offset for field: " + _field, -1)
       val sam = new StringBuilder
       sam.append(emitExpr(target, ctx))
