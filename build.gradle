@@ -1,0 +1,50 @@
+plugins {
+    id 'scala'
+}
+
+repositories {
+    mavenCentral()
+    flatDir {
+        dirs "."
+    }
+}
+
+configurations {
+    bundledDeps
+}
+
+dependencies {
+    bundledDeps 'edu.utexas.cs:SaM:2.6.3'
+    implementation 'org.scala-lang:scala3-library_3:3.5.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.2'
+    configurations.implementation.extendsFrom(configurations.bundledDeps)
+}
+
+// Ensure Scala sources are recognized (default src/main/scala already picked up by scala plugin)
+// Default source layout is already src/main/scala and src/test/scala; no java sources.
+
+// Joint compilation (Scala + Java) handled automatically by scala plugin; no manual dependsOn to avoid cycles
+
+test {
+    useJUnitPlatform()
+}
+
+// Limit tests to assignment3 (LO-3)
+test {
+    useJUnitPlatform()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'assignment3.LiveOak3Compiler'
+    }
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+    from { configurations.bundledDeps.collect { it.isDirectory() ? it : zipTree(it) } }
+}
