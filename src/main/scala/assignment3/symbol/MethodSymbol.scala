@@ -26,7 +26,7 @@ final class MethodSymbol(val name: String, ret: ValueType) {
       else ValueType.ofPrimitive(returnType))
 
   def getName: String = name // temporary compatibility; prefer name
-  def getReturnValueType: ValueType = returnValueTypeOpt0.orNull
+  def getReturnValueType: ValueType = returnValueTypeOpt0.getOrElse(null)
   def returnValueTypeOpt: Option[ValueType] = returnValueTypeOpt0
 
   def getReturnSig: ReturnSig = returnValueTypeOpt0 match {
@@ -36,7 +36,7 @@ final class MethodSymbol(val name: String, ret: ValueType) {
   }
 
   // Safer construction from Option types
-  def this(name: String, retOpt: Option[ValueType]) = this(name, retOpt.orNull)
+  def this(name: String, retOpt: Option[ValueType]) = this(name, retOpt.getOrElse(null))
 
   def parameters: List[VarSymbol] = parametersBuf.toList
   def locals: List[VarSymbol] = localsBuf.toList

@@ -25,7 +25,7 @@ object LiveOak3Compiler {
       val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
       val stb   = new SymbolTableBuilder()
       val symbols = stb.buildD(pass1) match {
-        case Left(diag)  => throw new Exception(diag.message)
+        case Left(diag)  => throw new Exception(s"${diag.message} at ${diag.line}:${diag.column}")
         case Right(symb) => symb
       }
       symbols.freeze()
@@ -33,7 +33,7 @@ object LiveOak3Compiler {
       if (Debug.enabled("symbols")) dumpSymbols(symbols)
       validateEntrypoint(symbols)
       val program = ProgramParser.parseD(fileName, symbols) match {
-        case Left(diag) => throw new Exception(diag.message)
+        case Left(diag) => throw new Exception(s"${diag.message} at ${diag.line}:${diag.column}")
         case Right(p)   => p
       }
   if (Debug.enabled("tokens")) dumpRecordedTokens(ctx)
@@ -71,7 +71,7 @@ object LiveOak3Compiler {
     }
   }
 
-  private def normalizePathUnix(path: String): String = Option(path).map(_.replace('\\', '/')).orNull
+  private def normalizePathUnix(path: String): String = Option(path).map(_.replace('\\', '/')).getOrElse(null)
 
   private def dumpSymbols(symbols: ProgramSymbols): Unit = {
     System.err.println("[DEBUG] Program symbols:")

@@ -9,5 +9,5 @@ private[ast] object AstTypeUtils {
     tOpt.map(ValueType.ofObject).getOrElse(ValueType.ofPrimitive(IdiomaticTypeUtils.typeOf(e, method, programSymbols)))
   }
   def classNameOf(e: Expr, method: MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): String =
-    IdiomaticTypeUtils.classNameOf(e, method, programSymbols).orNull
+  IdiomaticTypeUtils.classNameOf(e, method, programSymbols).getOrElse(null)
 }

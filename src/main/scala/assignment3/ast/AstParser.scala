@@ -13,11 +13,49 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
   def this(tokenizer: SamTokenizer, method: MethodContext, programSymbols: assignment3.symbol.ProgramSymbols) =
     this(tokenizer, method, programSymbols, true)
 
-  // Public API
-  def parseExpr(): Expr = parseExprInternal()
-  def parseStmt(): Stmt = parseStmtInternal()
-  def parseBlock(): Block = parseBlockInternal()
-  def parseVarDecls(): List[VarDecl] = parseVarDeclsInternal()
+  // Public API (diagnostic-first)
+
+  // Result helpers
+  import assignment3.ast.{Result, SyntaxDiag, TypeDiag, ResolveDiag}
+  private inline def ok[A](a: A): Result[A] = Right(a)
+  private inline def err[A](d: Diag): Result[A] = Left(d)
+  private inline def syntax[A](msg: String): Result[A] = Left(SyntaxDiag(msg, tokenizer.lineNo(), CompilerUtils.column(tokenizer)))
+  private inline def typeE[A](msg: String): Result[A] = Left(TypeDiag(msg, tokenizer.lineNo(), CompilerUtils.column(tokenizer)))
+
+  // Safe wrappers around throwing CompilerUtils for gradual migration
+  private def expectCharR(ch: Char): Result[Unit] =
+    try { CompilerUtils.expectChar(tokenizer, ch, tokenizer.lineNo()); ok(()) }
+    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+
+  private def expectWordR(word: String): Result[Unit] =
+    try { CompilerUtils.expectWord(tokenizer, word, tokenizer.lineNo()); ok(()) }
+    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+
+  private def getIdentifierR(): Result[String] =
+    try ok(CompilerUtils.getIdentifier(tokenizer))
+    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+
+  private def getWordR(): Result[String] =
+    try ok(CompilerUtils.getWord(tokenizer))
+    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+
+  private def getIntR(): Result[Int] =
+    try ok(CompilerUtils.getInt(tokenizer))
+    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+
+  private def getStringR(): Result[String] =
+    try ok(CompilerUtils.getString(tokenizer))
+    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+
+  private def getOpR(): Result[Char] =
+    try ok(CompilerUtils.getOp(tokenizer))
+    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+
+  // Diagnostic-first, no-throw variants
+  def parseExprD(): Result[Expr] = parseExprR()
+  def parseStmtD(): Result[Stmt] = parseStmtR()
+  def parseBlockD(): Result[Block] = parseBlockR()
+  def parseVarDeclsD(): Result[List[VarDecl]] = parseVarDeclsR()
 
   private def tryImplicitThisField(fieldName: String): Option[FieldAccess] =
     for {
@@ -27,7 +65,7 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
       thisSym = ms.parameters.head
       if thisSym.isObject
       cs <- programSymbols.getClass(thisSym.getClassTypeName)
-  fSym <- cs.field(fieldName)
+      fSym <- cs.field(fieldName)
       off = cs.fieldOffset(fieldName)
       vt = fSym.getValueType
       fi = new assignment3.symbol.ClassSymbol.FieldInfo(off, vt, fSym)
@@ -40,189 +78,271 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
       fi <- cs.getFieldInfo(fieldName)
     yield fi
 
-  private def parseVarDeclsInternal(): List[VarDecl] =
-    if !declarationsEnabled then return Nil
-    val decls = ListBuffer.empty[VarDecl]
-    while tokenizer.peekAtKind() == TokenType.WORD do
-      val rawType = CompilerUtils.getWord(tokenizer)
-      var varTypeOpt: Option[Type] = None
-      var valueTypeOpt: Option[assignment3.ValueType] = None
-      try
-        val vt = Type.parse(rawType, tokenizer.lineNo()); varTypeOpt = Some(vt); valueTypeOpt = Some(assignment3.ValueType.ofPrimitive(vt))
-      catch
-        case _: TypeErrorException => varTypeOpt = Some(Type.INT); valueTypeOpt = Some(assignment3.ValueType.ofObject(rawType))
-      var more = true
-      while more do
-        if tokenizer.peekAtKind() != TokenType.WORD then throw new SyntaxErrorException("Expected variable name after type", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-        val name = CompilerUtils.getIdentifier(tokenizer)
-        decls += VarDecl(name, varTypeOpt, valueTypeOpt, None)
-        if CompilerUtils.check(tokenizer, ',') then ()
-        else if CompilerUtils.check(tokenizer, ';') then more = false
-        else throw new SyntaxErrorException("Expected ',' or ';' in variable declaration", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-    decls.toList
+  private def parseVarDeclsR(): Result[List[VarDecl]] =
+    if !declarationsEnabled then ok(Nil)
+    else
+      val decls = ListBuffer.empty[VarDecl]
+      def parseOneGroup(): Result[Unit] =
+        for
+          rawType <- getWordR()
+          tuple <-
+            try
+              val vt = Type.parse(rawType, tokenizer.lineNo())
+              ok((Some(vt), Some(assignment3.ValueType.ofPrimitive(vt))))
+            catch
+              case _: TypeErrorException => ok((Some(Type.INT), Some(assignment3.ValueType.ofObject(rawType))))
+          (varTypeOpt, valueTypeOpt) = tuple
+          _ <-
+            if tokenizer.peekAtKind() != TokenType.WORD then syntax("Expected variable name after type")
+            else ok(())
+          name <- getIdentifierR()
+          _ = decls += VarDecl(name, varTypeOpt, valueTypeOpt, None)
+          _ <-
+            def loop(): Result[Unit] =
+              if CompilerUtils.check(tokenizer, ',') then
+                if tokenizer.peekAtKind() != TokenType.WORD then syntax("Expected variable name after type")
+                else
+                  getIdentifierR().map { nm => decls += VarDecl(nm, varTypeOpt, valueTypeOpt, None) } match
+                    case Left(d) => Left(d)
+                    case Right(_) => loop()
+              else if CompilerUtils.check(tokenizer, ';') then ok(())
+              else syntax("Expected ',' or ';' in variable declaration")
+            loop()
+        yield ()
+      def outer(): Result[Unit] =
+        if tokenizer.peekAtKind() == TokenType.WORD then parseOneGroup().flatMap(_ => outer()) else ok(())
+      outer().map(_ => decls.toList)
 
-  private def parseStmtInternal(): Stmt =
+  private def parseStmtR(): Result[Stmt] =
     if CompilerUtils.check(tokenizer, '{') then
       val stmts = ListBuffer.empty[Stmt]
-      while !CompilerUtils.check(tokenizer, '}') do stmts += parseStmtInternal()
-      return Block(stmts.toList)
-    if CompilerUtils.check(tokenizer, ';') then return Block(Nil)
-    if tokenizer.peekAtKind() != TokenType.WORD then throw new SyntaxErrorException("Expected statement", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-    if tokenizer.test("break") then { CompilerUtils.expectWord(tokenizer, "break", tokenizer.lineNo()); CompilerUtils.expectChar(tokenizer, ';', tokenizer.lineNo()); return Break() }
-    if tokenizer.test("return") then { CompilerUtils.expectWord(tokenizer, "return", tokenizer.lineNo()); val value = parseExprInternal(); CompilerUtils.expectChar(tokenizer, ';', tokenizer.lineNo()); return Return(Option(value)) }
-    if tokenizer.test("if") then
-      CompilerUtils.expectWord(tokenizer, "if", tokenizer.lineNo()); CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
-      val cond = parseExprInternal(); CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-      val thenB = parseBlockInternal(); CompilerUtils.expectWord(tokenizer, "else", tokenizer.lineNo()); val elseB = parseBlockInternal()
-      return If(cond, thenB, elseB)
-    if tokenizer.test("while") then
-      CompilerUtils.expectWord(tokenizer, "while", tokenizer.lineNo()); CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
-      val cond = parseExprInternal(); CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo()); val body = parseBlockInternal()
-      return While(cond, body)
-    val firstIdent = CompilerUtils.getIdentifier(tokenizer)
-    var lhsBase: Expr =
-      method.lookupVar(firstIdent) match
-        case Some(_: VarSymbol) if method.isInstanceOf[NewMethodContext] => Var(firstIdent)
-        case _ if method.isInstanceOf[NewMethodContext] =>
-          tryImplicitThisField(firstIdent).getOrElse(throw new SyntaxErrorException("Undeclared variable: " + firstIdent, tokenizer.lineNo(), CompilerUtils.column(tokenizer)))
-        case _ => throw new SyntaxErrorException("Undeclared variable: " + firstIdent, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-    var dotCount = 0
-    while CompilerUtils.check(tokenizer, '.') do
-      AstEither.checkSingleChainLevelD(dotCount, tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
-        case Left(diag) => throw new SyntaxErrorException(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-        case Right(())  => ()
-      dotCount += 1
-      val fld = CompilerUtils.getIdentifier(tokenizer)
-      val fiOpt = resolveFieldInfo(lhsBase, fld)
-      lhsBase = FieldAccess(lhsBase, fld, fiOpt)
-    CompilerUtils.expectChar(tokenizer, '=', tokenizer.lineNo())
-    val rhs = parseExprInternal()
-    CompilerUtils.expectChar(tokenizer, ';', tokenizer.lineNo())
-    lhsBase match
-      case Var(name, _) => Assign(name, rhs)
-      case FieldAccess(t, f, fi, _) => FieldAssign(t, f, fi.map(_.offset).getOrElse(-1), rhs)
-      case _ => throw new SyntaxErrorException("Unsupported LHS in assignment", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+      def loop(): Result[Unit] =
+        if CompilerUtils.check(tokenizer, '}') then ok(()) else parseStmtR().flatMap(s => { stmts += s; loop() })
+      loop().map(_ => Block(stmts.toList))
+    else if CompilerUtils.check(tokenizer, ';') then ok(Block(Nil))
+    else if tokenizer.peekAtKind() != TokenType.WORD then syntax("Expected statement")
+    else if tokenizer.test("break") then
+      for { _ <- expectWordR("break"); _ <- expectCharR(';') } yield Break()
+    else if tokenizer.test("return") then
+      for { _ <- expectWordR("return"); value <- parseExprR(); _ <- expectCharR(';') } yield Return(Some(value))
+    else if tokenizer.test("if") then
+      for
+        _ <- expectWordR("if")
+        _ <- expectCharR('(')
+        cond <- parseExprR()
+        _ <- expectCharR(')')
+        thenB <- parseBlockR()
+        _ <- expectWordR("else")
+        elseB <- parseBlockR()
+      yield If(cond, thenB, elseB)
+    else if tokenizer.test("while") then
+      for
+        _ <- expectWordR("while")
+        _ <- expectCharR('(')
+        cond <- parseExprR()
+        _ <- expectCharR(')')
+        body <- parseBlockR()
+      yield While(cond, body)
+    else
+      for
+        firstIdent <- getIdentifierR()
+        lhsBase <-
+          method.lookupVar(firstIdent) match
+            case Some(_: VarSymbol) if method.isInstanceOf[NewMethodContext] => ok(Var(firstIdent))
+            case _ if method.isInstanceOf[NewMethodContext] =>
+              tryImplicitThisField(firstIdent).map(ok(_)).getOrElse(syntax(s"Undeclared variable: $firstIdent"))
+            case _ => syntax(s"Undeclared variable: $firstIdent")
+        lhsFinal <-
+          def loop(base: Expr, dotCount: Int): Result[Expr] =
+            if CompilerUtils.check(tokenizer, '.') then
+              AstEither.checkSingleChainLevelD(dotCount, tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
+                case Left(diag) => Left(SyntaxDiag(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer)))
+                case Right(())  =>
+                  getIdentifierR().flatMap { fld =>
+                    val fiOpt = resolveFieldInfo(base, fld)
+                    loop(FieldAccess(base, fld, fiOpt), dotCount + 1)
+                  }
+            else ok(base)
+          loop(lhsBase, 0)
+        _ <- expectCharR('=')
+        rhs <- parseExprR()
+        _ <- expectCharR(';')
+        stmtRes <- lhsFinal match
+          case Var(name, _) => ok(Assign(name, rhs))
+          case FieldAccess(t, f, fi, _) => ok(FieldAssign(t, f, fi.map(_.offset).getOrElse(-1), rhs))
+          case _ => syntax("Unsupported LHS in assignment")
+      yield stmtRes
 
-  private def parseBlockInternal(): Block =
-    CompilerUtils.expectChar(tokenizer, '{', tokenizer.lineNo())
-    val stmts = ListBuffer.empty[Stmt]
-    while !CompilerUtils.check(tokenizer, '}') do stmts += parseStmtInternal()
-    Block(stmts.toList)
+  private def parseBlockR(): Result[Block] =
+    for
+      _ <- expectCharR('{')
+      stmts <-
+        val buf = ListBuffer.empty[Stmt]
+        def loop(): Result[List[Stmt]] =
+          if CompilerUtils.check(tokenizer, '}') then ok(buf.toList)
+          else parseStmtR().flatMap(s => { buf += s; loop() })
+        loop()
+    yield Block(stmts)
 
-  private def parseExprInternal(): Expr =
+  private def parseExprR(): Result[Expr] =
+    def isBinaryOpAhead(): Boolean =
+      tokenizer.test('+') || tokenizer.test('-') || tokenizer.test('*') || tokenizer.test('/') ||
+      tokenizer.test('%') || tokenizer.test('&') || tokenizer.test('|') || tokenizer.test('>') ||
+      tokenizer.test('<') || tokenizer.test('=')
     if CompilerUtils.check(tokenizer, '(') then
+      // unary paren expr
       if tokenizer.test('~') || tokenizer.test('!') then
-        val op = CompilerUtils.getOp(tokenizer)
-        val inner = parseExprInternal()
-        CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-        AstEither.buildUnaryD(op, inner, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
-          case Right(u) => return u
-          case Left(diag) => throw new TypeErrorException(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-      val first = parseExprInternal()
-      if tokenizer.peekAtKind() != edu.utexas.cs.sam.io.Tokenizer.TokenType.OPERATOR then
-        throw new SyntaxErrorException("Expected operator/?/) after expression", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-      if CompilerUtils.check(tokenizer, ')') then return first
-      if CompilerUtils.check(tokenizer, '?') then
-        val thenE = parseExprInternal()
-        CompilerUtils.expectChar(tokenizer, ':', tokenizer.lineNo())
-        val elseE = parseExprInternal()
-        AstEither.buildTernaryD(first, thenE, elseE, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
-          case Right(te) =>
-            CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-            return te
-          case Left(diag) =>
-            throw new TypeErrorException(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-      val op = CompilerUtils.getOp(tokenizer)
-      val second = parseExprInternal()
-      CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-      return buildBinary(first, op, second)
-    var base = parseTerminal()
-    var dotCount = 0
-    while CompilerUtils.check(tokenizer, '.') do
-      AstEither.checkSingleChainLevelD(dotCount, tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
-        case Left(diag) => throw new SyntaxErrorException(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-        case Right(())  => ()
-      dotCount += 1
-      val ident = CompilerUtils.getIdentifier(tokenizer)
-      if CompilerUtils.check(tokenizer, '(') then
-        // Explicit method calls on 'this' are not allowed in LO-3 tests
-        base match
-          case This(_) =>
-            AstEither.methodCallOnThisForbiddenD(tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
-              case Left(diag) => throw new SyntaxErrorException(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-              case Right(_) => ()
-          case _ => ()
-        val args = ListBuffer.empty[Expr]
-        if !CompilerUtils.check(tokenizer, ')') then
-          args += parseExprInternal()
-          while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
-          CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-        val msEither = AstEither.resolveMethodOnExprD(base, ident, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-        val classNameOpt = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
-        val labelName = classNameOpt.map(cn => s"${cn}_${ident}").getOrElse(ident)
-        val retVtOpt: Option[assignment3.ValueType] = msEither.toOption.map(_.getReturnSig).map {
-          case assignment3.ast.high.ReturnSig.Void => null
-          case assignment3.ast.high.ReturnSig.Obj(cn) => assignment3.ValueType.ofObject(cn)
-          case assignment3.ast.high.ReturnSig.Prim(t) => assignment3.ValueType.ofPrimitive(t)
-        }
-        val callable: assignment3.ast.CallableMethod = msEither match
-          case Right(ms) =>
-            val cn = classNameOpt.getOrElse {
-              throw new TypeErrorException("Cannot determine target class for instance call", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-            }
-            new assignment3.ast.ScalaInstanceCallable(cn, ms)
-          case Left(_) => new assignment3.ast.ScalaInstanceCallableFallback(
-            labelName,
-            retVtOpt.orNull,
-            args.size + 1
-          )
-        base = InstanceCall(base, callable, args.toList)
+        for
+          op <- getOpR()
+          inner <- parseExprR()
+          _ <- expectCharR(')')
+          u <- AstEither.buildUnaryD(op, inner, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+        yield u
       else
-        val fiOpt = AstEither.resolveFieldInfoD(base, ident, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer)).toOption
-        base = FieldAccess(base, ident, fiOpt)
-    base
+        for
+          first <- parseExprR()
+          res <-
+            if CompilerUtils.check(tokenizer, '?') then
+              for
+                thenE <- parseExprR()
+                _ <- expectCharR(':')
+                elseE <- parseExprR()
+                te <- AstEither.buildTernaryD(first, thenE, elseE, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+                _ <- expectCharR(')')
+              yield te
+            else if isBinaryOpAhead() then
+              for
+                op <- getOpR()
+                second <- parseExprR()
+                be <- buildBinaryR(first, op, second)
+                _ <- expectCharR(')')
+              yield be
+            else
+              for
+                _ <- expectCharR(')')
+              yield first
+        yield res
+    else
+      for
+        base0 <- parseTerminalR()
+        result <-
+          def parseArgsR(): Result[List[Expr]] =
+            if CompilerUtils.check(tokenizer, ')') then ok(Nil)
+            else
+              for
+                first <- parseExprR()
+                args <-
+                  def loop(acc: List[Expr]): Result[List[Expr]] =
+                    if CompilerUtils.check(tokenizer, ',') then
+                      parseExprR().flatMap(e => loop(acc :+ e))
+                    else expectCharR(')').map(_ => acc)
+                  loop(List(first))
+              yield args
+          def loop(base: Expr, dotCount: Int): Result[Expr] =
+            if CompilerUtils.check(tokenizer, '.') then
+              AstEither.checkSingleChainLevelD(dotCount, tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
+                case Left(diag) => Left(SyntaxDiag(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer)))
+                case Right(())  =>
+                  getIdentifierR().flatMap { ident =>
+                    if CompilerUtils.check(tokenizer, '(') then
+                      // method call
+                      for
+                        // forbid calling methods on 'this'
+                        _ <- (base match
+                          case This(_) => AstEither.methodCallOnThisForbiddenD(tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+                          case _       => ok(())
+                        )
+                        args <- parseArgsR()
+                        msEither = AstEither.resolveMethodOnExprD(base, ident, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+                        classNameOpt = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
+                        labelName = classNameOpt.map(cn => s"${cn}_${ident}").getOrElse(ident)
+                        retVtOpt = msEither.toOption.map(_.getReturnSig).map {
+                          case assignment3.ast.high.ReturnSig.Void => null
+                          case assignment3.ast.high.ReturnSig.Obj(cn) => assignment3.ValueType.ofObject(cn)
+                          case assignment3.ast.high.ReturnSig.Prim(t) => assignment3.ValueType.ofPrimitive(t)
+                        }
+                        callable <- (msEither match
+                          case Right(ms) =>
+                            classNameOpt match
+                              case Some(cn) => ok(new assignment3.ast.ScalaInstanceCallable(cn, ms))
+                              case None     => err(TypeDiag("Cannot determine target class for instance call", tokenizer.lineNo(), CompilerUtils.column(tokenizer)))
+                          case Left(_) => ok(new assignment3.ast.ScalaInstanceCallableFallback(
+                              labelName,
+                              retVtOpt.getOrElse(null),
+                              args.size + 1
+                            ))
+                        )
+                        next = InstanceCall(base, callable, args)
+                        res <- loop(next, dotCount + 1)
+                      yield res
+                    else
+                      val fiOpt = AstEither.resolveFieldInfoD(base, ident, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer)).toOption
+                      loop(FieldAccess(base, ident, fiOpt), dotCount + 1)
+                  }
+            else ok(base)
+          loop(base0, 0)
+      yield result
 
-  private def parseTerminal(): Expr =
+  private def parseTerminalR(): Result[Expr] =
     tokenizer.peekAtKind() match
-      case TokenType.INTEGER => IntLit(CompilerUtils.getInt(tokenizer))
-      case TokenType.STRING  => StrLit(CompilerUtils.getString(tokenizer))
+      case TokenType.INTEGER => getIntR().map(IntLit(_))
+      case TokenType.STRING  => getStringR().map(StrLit(_))
       case TokenType.WORD =>
-        val w = CompilerUtils.getWord(tokenizer)
-        w match
-          case "true"  => return BoolLit(true)
-          case "false" => return BoolLit(false)
-          case "null"  => return NullLit()
-          case "this"  => return This()
-          case "new" =>
-            val cls = CompilerUtils.getIdentifier(tokenizer)
-            CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
-            val args = ListBuffer.empty[Expr]
-            if !CompilerUtils.check(tokenizer, ')') then
-              args += parseExprInternal()
-              while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
-              CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-            return NewObject(cls, args.toList)
-          case _ =>
-            method.lookupVar(w) match
-              case Some(vs: VarSymbol) if method.isInstanceOf[NewMethodContext] =>
-                Var(vs.getName)
-              case _ =>
-                method.lookupMethodGlobal(w) match
-                  case Some(ms: MethodSymbol) =>
-                    CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
-                    val args = ListBuffer.empty[Expr]
-                    if !CompilerUtils.check(tokenizer, ')') then
-                      args += parseExprInternal()
-                      while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
-                      CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-                    Call(new assignment3.ast.SymbolCallableMethod(ms), args.toList)
-                  case None =>
-                    tryImplicitThisField(w) match
-                      case Some(implicitF) => return implicitF
-                      case None => throw new SyntaxErrorException("Undeclared symbol: " + w, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
-      case _ => throw new SyntaxErrorException("Unexpected token in expression", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+        getWordR().flatMap { w =>
+          w match
+            case "true"  => ok(BoolLit(true))
+            case "false" => ok(BoolLit(false))
+            case "null"  => ok(NullLit())
+            case "this"  => ok(This())
+            case "new" =>
+              def parseArgsAfterOpenParenR(): Result[List[Expr]] =
+                if CompilerUtils.check(tokenizer, ')') then ok(Nil)
+                else
+                  for
+                    first <- parseExprR()
+                    args <-
+                      def loop(acc: List[Expr]): Result[List[Expr]] =
+                        if CompilerUtils.check(tokenizer, ',') then
+                          parseExprR().flatMap(e => loop(acc :+ e))
+                        else expectCharR(')').map(_ => acc)
+                      loop(List(first))
+                  yield args
+              for
+                cls <- getIdentifierR()
+                _ <- expectCharR('(')
+                args <- parseArgsAfterOpenParenR()
+              yield NewObject(cls, args)
+            case _ =>
+              method.lookupVar(w) match
+                case Some(vs: assignment3.symbol.VarSymbol) if method.isInstanceOf[NewMethodContext] => ok(Var(vs.getName))
+                case _ =>
+                  method.lookupMethodGlobal(w) match
+                    case Some(ms: assignment3.symbol.MethodSymbol) =>
+                      def parseArgsAfterOpenParenR(): Result[List[Expr]] =
+                        if CompilerUtils.check(tokenizer, ')') then ok(Nil)
+                        else
+                          for
+                            first <- parseExprR()
+                            args <-
+                              def loop(acc: List[Expr]): Result[List[Expr]] =
+                                if CompilerUtils.check(tokenizer, ',') then
+                                  parseExprR().flatMap(e => loop(acc :+ e))
+                                else expectCharR(')').map(_ => acc)
+                              loop(List(first))
+                          yield args
+                      for
+                        _ <- expectCharR('(')
+                        args <- parseArgsAfterOpenParenR()
+                      yield Call(new assignment3.ast.SymbolCallableMethod(ms), args)
+                    case None =>
+                      tryImplicitThisField(w) match
+                        case Some(implicitF) => ok(implicitF)
+                        case None => syntax(s"Undeclared symbol: $w")
+        }
+      case _ => syntax("Unexpected token in expression")
 
-  private def buildBinary(left: Expr, op: Char, right: Expr): Expr =
-    AstEither.buildBinaryD(left, op, right, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer)) match
-      case Right(expr) => expr
-      case Left(diag)  => throw new TypeErrorException(diag.message, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+  private def buildBinaryR(left: Expr, op: Char, right: Expr): Result[Expr] =
+    AstEither.buildBinaryD(left, op, right, method, programSymbols, tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+
+  // Removed legacy throwing parseTerminal; parseTerminalR is the canonical one
+  
