@@ -137,22 +137,21 @@ object IdiomaticSemantic:
     case Assign(varName, value, _) =>
       for {
         _ <- checkExprE(value, currentMethod, defaultLine, programSymbols)
-        res <-
-          if currentMethod != null then
-            currentMethod.lookup(varName) match
-              case Some(vs) =>
-                val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
-                checkAssignable(
-                  vs.getValueType,
-                  value,
-                  ctx,
-                  programSymbols,
-                  defaultLine,
-                  objMismatchMsg = "Object assignment type mismatch for variable '" + varName + "'",
-                  primMismatchMsg = "Type mismatch in assignment to '" + varName + "'"
-                )
-              case None => Right(())
-          else Right(())
+        res <- Option(currentMethod).fold[Either[Diag, Unit]](Right(())) { cm =>
+          cm.lookup(varName) match
+            case Some(vs) =>
+              val ctx = new assignment3.ast.NewMethodContext(cm, programSymbols)
+              checkAssignable(
+                vs.getValueType,
+                value,
+                ctx,
+                programSymbols,
+                defaultLine,
+                objMismatchMsg = "Object assignment type mismatch for variable '" + varName + "'",
+                primMismatchMsg = "Type mismatch in assignment to '" + varName + "'"
+              )
+            case None => Right(())
+        }
       } yield ()
     case FieldAssign(target, fieldName, _offset, value, _) =>
       for {

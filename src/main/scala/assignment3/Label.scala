@@ -13,11 +13,11 @@ case class Label(name: String) {
 object Label {
   def apply(): Label = Label(generateUUID())
   private[assignment3] def generateUUID(): String = {
-    var uuid = UUID.randomUUID().toString.substring(0, 8)
-    if (!uuid.head.isLetter) {
+    val base = UUID.randomUUID().toString.substring(0, 8)
+    if (base.head.isLetter) base
+    else {
       val randomLetter = (('a' + util.Random.nextInt('z' - 'a' + 1)).toChar)
-      uuid = s"$randomLetter${uuid.substring(1)}"
+      s"$randomLetter${base.substring(1)}"
     }
-    uuid
   }
 }

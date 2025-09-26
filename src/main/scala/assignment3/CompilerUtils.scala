@@ -16,7 +16,7 @@ object CompilerUtils {
   def setRecorder(r: TokenRecorder): Unit = recorder = Some(r)
   def clearRecorder(): Unit = recorder = None
   def clearTokens(): Unit = recorder.foreach(_.clear())
-  private def rec(t: String): Unit = if (t != null) recorder.foreach(_.record(t))
+  private def rec(t: String): Unit = Option(t).foreach(s => recorder.foreach(_.record(s)))
 
   def expect(f: SamTokenizer, expected: Char, line: Int): Unit =
     if (!f.check(expected)) throw SyntaxErrorException(s"Expected '$expected'", line, column(f)) else rec(expected.toString)
@@ -73,9 +73,7 @@ object CompilerUtils {
     if (excludeStmtStarters && StatementStarters.exists(tz.test)) return false
     if (tz.test("int") || tz.test("bool") || tz.test("String")) return true
     if (Option(currentClassName).exists(tz.test)) return true
-    if (symbols != null) {
-      for (cls <- symbols.allClasses) if (tz.test(cls.getName)) return true
-    }
+    Option(symbols).foreach { sym => for (cls <- sym.allClasses) if (tz.test(cls.getName)) return true }
     allowUnknownNames
   }
   def parseTypeOrObjectName(raw: String, line: Int): ValueType = try ValueType.ofPrimitive(Type.parse(raw, line)) catch { case _: TypeErrorException => ValueType.ofObject(raw) }

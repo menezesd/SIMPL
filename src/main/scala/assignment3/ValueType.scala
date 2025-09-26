@@ -7,12 +7,13 @@ final class ValueType private (val primitive: Type, val objectRef: ObjectType) {
   def getPrimitive: Type = primitive
   def getObject: ObjectType = objectRef
 
-  def isCompatibleWith(other: ValueType): Boolean = {
-    if (other == null) return false
-    if (this.isPrimitive && other.isPrimitive) this.primitive == other.primitive
-    else if (this.isObject && other.isObject) this.objectRef.isCompatibleWith(other.objectRef)
-    else false
-  }
+  def isCompatibleWith(other: ValueType): Boolean =
+    Option(other) match
+      case None => false
+      case Some(o) =>
+        if (this.isPrimitive && o.isPrimitive) this.primitive == o.primitive
+        else if (this.isObject && o.isObject) this.objectRef.isCompatibleWith(o.objectRef)
+        else false
   override def toString: String =
     if (isPrimitive) primitive.toString
     else if (isObject) s"obj:${objectRef.getClassName}"
