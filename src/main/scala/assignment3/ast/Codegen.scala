@@ -27,11 +27,9 @@ object IdiomaticCodegen:
         case smf: SymbolMethodFrame => IdiomaticTypeUtils.typeOf(e, new NewMethodContext(smf.getSymbol, ictx.programSymbolsOpt.get), ictx.programSymbolsOpt.get)
         case _ => Type.INT
 
-  // Non-diagnostic codegen delegates to diagnostic versions and converts Diag -> Exception
-  private def emitExprCore(e: id.Expr, ctx: Ctx): Code =
-    emitExprD(e, ctx) match
-      case Right(c) => c
-      case Left(d)  => throw new Exception(d.message)
+  // Core adapter: return Either so callers can use diagnostic flow.
+  private def emitExprCoreE(e: id.Expr, ctx: Ctx): Either[Diag, Code] =
+    emitExprD(e, ctx)
 
   private def emitCallC(label: String, paramCount: Int, hasReturn: Boolean): Code =
     val sb = new SamBuilder()
@@ -64,34 +62,24 @@ object IdiomaticCodegen:
     Code.from(sb)
 
   // Helper: string binary operations
-  private def emitStringBinaryC(op: BinaryOp, lt: Type, rt: Type, leftCode: Code, rightCode: Code): Code =
-    op match
-      case BinaryOp.Mul if (lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING) =>
-        leftCode + rightCode + Code.fromString(StringRuntime.repeatString(lt, rt))
-      case BinaryOp.Add =>
-        if (lt == Type.STRING && rt == Type.STRING) then leftCode + rightCode + Code.fromString(StringRuntime.concatString())
-        else throw new Exception("'+' only defined for String+String or numeric addition")
-      case BinaryOp.Lt | BinaryOp.Gt | BinaryOp.Eq =>
-        if (lt == Type.STRING && rt == Type.STRING) then
-          val ch = op match
-            case BinaryOp.Lt => '<'
-            case BinaryOp.Gt => '>'
-            case _           => '='
-          leftCode + rightCode + Code.fromString(StringRuntime.compareString(ch))
-        else throw new Exception("String comparison requires both operands String")
-      case _ => throw new Exception("Unsupported operator for String operands")
+  // (Removed an unused helper that previously threw Exceptions for unsupported
+  // string operators. The diagnostic-first functions below return Eithers and
+  // should be used for error handling.)
 
-  // Non-diagnostic statement codegen delegates to diagnostic version and converts Diag -> Exception
-  private def emitStmtCore(s: id.Stmt, ctx: Ctx): Code =
-    emitStmtD(s, ctx) match
-      case Right(c) => c
-      case Left(d)  => throw new Exception(d.message)
+  // Core adapter: return Either so callers can use diagnostic flow.
+  private def emitStmtCoreE(s: id.Stmt, ctx: Ctx): Either[Diag, Code] =
+    emitStmtD(s, ctx)
 
   // Public APIs: Code-returning preferred; String-returning wrappers for compatibility
-  def emitExprC(e: id.Expr, ctx: Ctx): Code = emitExprCore(e, ctx)
-  def emitStmtC(s: id.Stmt, ctx: Ctx): Code = emitStmtCore(s, ctx)
-  def emitExpr(e: id.Expr, ctx: Ctx): String = emitExprCore(e, ctx).toString
-  def emitStmt(s: id.Stmt, ctx: Ctx): String = emitStmtCore(s, ctx).toString
+  // Non-diagnostic (compat) wrappers: convert Left(diag) -> Error for callers that expect exceptions.
+  def emitExprC(e: id.Expr, ctx: Ctx): Code = emitExprCoreE(e, ctx) match
+    case Right(c) => c
+    case Left(d)  => throw new Error(d.message)
+  def emitStmtC(s: id.Stmt, ctx: Ctx): Code = emitStmtCoreE(s, ctx) match
+    case Right(c) => c
+    case Left(d)  => throw new Error(d.message)
+  def emitExpr(e: id.Expr, ctx: Ctx): String = emitExprC(e, ctx).toString
+  def emitStmt(s: id.Stmt, ctx: Ctx): String = emitStmtC(s, ctx).toString
 
   // Diagnostic-first APIs (Either[Diag, Code]) for safer composition
   def emitExprD(e: id.Expr, ctx: Ctx): Either[Diag, Code] =
@@ -321,4 +309,5 @@ object IdiomaticCodegen:
               sb.jump(ret)
               Code.from(sb)
             }
-      case _ => Right(Code.from(new SamBuilder()))
+  // No default case: rely on exhaustiveness of `Stmt` variants. If a null
+  // is ever passed (shouldn't happen), let it fail loudly.

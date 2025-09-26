@@ -8,19 +8,7 @@ import assignment3.ast.SymbolMethodFrame
 
 /** Emits SAM code from a ProgramNode using existing lower-level codegen utilities (Scala port, idiomatic). */
 private object ProgramCodegen {
-  def emit(program: ProgramNode, ctx: CompilerContext): String = {
-    emitD(program, ctx) match
-      case Right(code) => code.toString
-      case Left(diag) => throw new Exception(diag.message)
-  }
-
-  // Optional: Code-returning API for safer composition
-  def emitC(program: ProgramNode, ctx: CompilerContext): Code =
-    emitD(program, ctx) match
-      case Right(code) => code
-      case Left(diag)  => throw new Exception(diag.message)
-
-  // Diagnostic-first API: returns Either[Diag, Code]
+  // Diagnostic-first API: emitD is the canonical public API and returns Either[Diag, Code].
   def emitD(program: ProgramNode, ctx: CompilerContext): Either[Diag, Code] =
     ctx.symbols match
       case Some(symbols) => new ProgramCodegen(symbols, ctx).generateD(program)
@@ -43,83 +31,66 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
   private def generateD(program: ProgramNode): Either[Diag, Code] = {
     val localBuilder = new SamBuilder()
     appendProgramPreamble(localBuilder, ctx)
-    for {
-      cls <- program.classes
-      m <- cls.methods
-    } {
-      emitMethodD(localBuilder, m) match
-        case Left(diag) => return Left(diag)
-        case Right(_) => ()
+    // Fold over classes and methods, short-circuiting on the first Left(diag)
+    val res: Either[Diag, Unit] = program.classes.foldLeft[Either[Diag, Unit]](Right(())) { (accCls, cls) =>
+      accCls.flatMap { _ =>
+        cls.methods.foldLeft[Either[Diag, Unit]](Right(())) { (accM, m) =>
+          accM.flatMap(_ => emitMethodD(localBuilder, m))
+        }
+      }
     }
-    localBuilder.append(StringRuntime.emitAllStringFunctionsC())
-    Right(Code.from(localBuilder))
+    res.map { _ =>
+      localBuilder.append(StringRuntime.emitAllStringFunctionsC())
+      Code.from(localBuilder)
+    }
   }
 
   private def emitMethod(m: MethodNode): Unit = {
-    val ms = symbols.getMethod(m.className, m.name)
-      .getOrElse(throw new Exception(s"Method symbol missing for '${m.className}.${m.name}'"))
-  val label = ctx.labeler.methodLabel(m.className, m.name)
-  sb.append("\n").label(label)
-    val localCount = ms.numLocals()
-    val frame = new SymbolMethodFrame(ms)
-    val cleanup = MethodEmit.begin(sb, frame, localCount)
-    try {
-      m.body match {
-        case b: id.Block =>
-          // Use idiomatic codegen directly for method bodies (Code-returning API)
-          val ctx2 = id.IdiomaticCodegen.Ctx(Some(frame), Some(symbols), returnLabelOpt = Some(frame.getReturnLabel))
-          sb.append(id.IdiomaticCodegen.emitStmtC(b, ctx2))
-          import assignment3.ast.high.ReturnSig
-          if (m.returnSig == ReturnSig.Void) {
-            val stmts = b.statements
-            if (stmts.isEmpty || !stmts.last.isInstanceOf[id.Return]) sb.pushImm(0)
-          }
-        case other => throw new Exception(s"Unknown method body type: ${other.getClass.getName}")
-      }
-    } catch {
-      case e: Exception => throw new Exception(s"Body codegen failed: ${e.getMessage}")
-    }
-    MethodEmit.end(sb, frame, cleanup)
+    // Delegate to the diagnostic emitMethodD which returns Either[Diag, Unit].
+    // Keep the original behavior for callers that expect an exception on failure.
+    emitMethodD(sb, m) match
+      case Right(_) => ()
+      case Left(diag) => throw new Error(diag.message)
   }
 
   private def emitMethodD(local: SamBuilder, m: MethodNode): Either[Diag, Unit] = {
     val msOpt = symbols.getMethod(m.className, m.name)
-    val ms = msOpt.getOrElse(return Left(ResolveDiag(s"Method symbol missing for '${m.className}.${m.name}'", -1)))
-    val label = ctx.labeler.methodLabel(m.className, m.name)
-    local.append("\n").label(label)
-    val localCount = ms.numLocals()
-    val frame = new SymbolMethodFrame(ms)
-    val cleanup = MethodEmit.begin(local, frame, localCount)
-    try {
-      m.body match
-        case b: id.Block =>
-          val ctx2 = id.IdiomaticCodegen.Ctx(Some(frame), Some(symbols), returnLabelOpt = Some(frame.getReturnLabel))
-          id.IdiomaticCodegen.emitStmtD(b, ctx2) match
-            case Left(diag) => return Left(diag)
-            case Right(code) => local.append(code)
-          import assignment3.ast.high.ReturnSig
-          if (m.returnSig == ReturnSig.Void) {
-            val stmts = b.statements
-            if (stmts.isEmpty || !stmts.last.isInstanceOf[id.Return]) local.pushImm(0)
-          }
-        case other => return Left(SyntaxDiag(s"Unknown method body type: ${other.getClass.getName}", -1))
-    } catch {
-      case e: Exception => return Left(SyntaxDiag(s"Body codegen failed: ${e.getMessage}", -1))
-    } finally {
-      MethodEmit.end(local, frame, cleanup)
-    }
-    Right(())
+    msOpt match
+      case None => Left(ResolveDiag(s"Method symbol missing for '${m.className}.${m.name}'", -1))
+      case Some(ms) =>
+        val label = ctx.labeler.methodLabel(m.className, m.name)
+        local.append("\n").label(label)
+        val localCount = ms.numLocals()
+        val frame = new SymbolMethodFrame(ms)
+        val cleanup = MethodEmit.begin(local, frame, localCount)
+        try
+          m.body match
+            case b: id.Block =>
+              val ctx2 = id.IdiomaticCodegen.Ctx(Some(frame), Some(symbols), returnLabelOpt = Some(frame.getReturnLabel))
+              id.IdiomaticCodegen.emitStmtD(b, ctx2) match
+                case Left(diag) => Left(diag)
+                case Right(code) =>
+                  local.append(code)
+                  import assignment3.ast.high.ReturnSig
+                  if (m.returnSig == ReturnSig.Void) then
+                    val stmts = b.statements
+                    if (stmts.isEmpty || !stmts.last.isInstanceOf[id.Return]) local.pushImm(0)
+                  Right(())
+            case other => Left(SyntaxDiag(s"Unknown method body type: ${other.getClass.getName}", -1))
+        catch
+          case e: Exception => Left(SyntaxDiag(s"Body codegen failed: ${e.getMessage}", -1))
+        finally MethodEmit.end(local, frame, cleanup)
   }
 
   private def appendProgramPreamble(sb: SamBuilder, ctx: CompilerContext): Unit = {
     val mainFields = mainFieldsCount(ctx)
-  sb.pushImmInt(mainFields)
-  sb.malloc()
+    sb.pushImmInt(mainFields)
+    sb.malloc()
     // Prepare return slot and 'this' for Main.main
-  sb.pushImmInt(0) // return slot
-  sb.swap()       // place 'this' below return slot
-  sb.call(ctx.labeler.methodLabel(LiveOak3Compiler.ENTRY_CLASS, LiveOak3Compiler.ENTRY_METHOD), 1, returns = false)
-  sb.stop()
+    sb.pushImmInt(0) // return slot
+    sb.swap()       // place 'this' below return slot
+    sb.call(ctx.labeler.methodLabel(LiveOak3Compiler.ENTRY_CLASS, LiveOak3Compiler.ENTRY_METHOD), 1, returns = false)
+    sb.stop()
   }
 
   private def mainFieldsCount(ctx: CompilerContext): Int = {

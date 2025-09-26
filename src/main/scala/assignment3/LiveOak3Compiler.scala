@@ -17,12 +17,8 @@ object LiveOak3Compiler {
 
   @static def reset(): Unit = CompilerUtils.clearTokens()
 
-  @static @throws[Exception]
-  def compile(fileName: String): String = {
-    compileD(fileName) match
-      case Right(s) => s
-      case Left(diag) => throw new Exception(s"${diag.message} at ${diag.line}:${diag.column}")
-  }
+  // NOTE: compileD is the canonical public API (diagnostic-first). Remove the
+  // legacy throwing adapter to discourage exception-based flow.
 
   // Diagnostic-first API: returns Either[Diag, String]
   def compileD(fileName: String): Either[Diag, String] = {
@@ -54,7 +50,8 @@ object LiveOak3Compiler {
 
   private def cleanup(): Unit = { CompilerUtils.clearTokens(); CompilerUtils.clearRecorder() }
 
-  private def validateEntrypoint(symbols: ProgramSymbols): Unit = validateEntrypointD(symbols) match { case Left(d) => throw new Exception(d.message); case Right(_) => () }
+  // legacy throwing variant removed; use validateEntrypointD instead when you
+  // need a diagnostic result.
 
   private def validateEntrypointD(symbols: ProgramSymbols): Either[Diag, Unit] = {
     symbols.getEntrypoint() match
@@ -69,8 +66,18 @@ object LiveOak3Compiler {
   private def entrypointErrorLine(ms: MethodSymbol): Int = { val ln = ms.getBodyStartLine(); if (ln > 0) ln else -1 }
 
   @static def compiler(fileName: String): String = {
-    try compile(fileName) catch {
-      case t: Throwable =>
+    try {
+      compileD(fileName) match
+        case Right(code) => code
+        case Left(diag) =>
+          // Preserve test/legacy behavior: print failure message and throw Error
+          System.err.println("Failed to compile " + normalizePathUnix(fileName))
+          cleanup()
+          throw new Error(diag.message + " at " + diag.line + ":" + diag.column)
+    } catch {
+      // Only handle unexpected non-Error Throwables here; if we intentionally
+      // threw an Error above, let it propagate so we don't double-print.
+      case t: Throwable if !t.isInstanceOf[Error] =>
         System.err.println("Failed to compile " + normalizePathUnix(fileName))
         cleanup()
         throw new Error(t)
@@ -114,16 +121,14 @@ object LiveOak3Compiler {
     }
     val inFile = args(0)
     val outFile = args(1)
-    try {
-      val samCode = compile(inFile)
-      Using.resource(new BufferedWriter(new FileWriter(outFile))) { w =>
-        w.write(samCode)
-      }
-    } catch {
-      case e: Exception =>
-        System.err.println("Failed to compile " + normalizePathUnix(inFile))
+    compileD(inFile) match
+      case Right(samCode) =>
+        Using.resource(new BufferedWriter(new FileWriter(outFile))) { w =>
+          w.write(samCode)
+        }
+      case Left(diag) =>
+        System.err.println(s"${diag.message} at ${diag.line}:${diag.column}")
         cleanup()
-        throw new Error(e)
-    }
+        System.exit(1)
   }
 }
