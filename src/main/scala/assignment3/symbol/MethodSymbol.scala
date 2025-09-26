@@ -9,7 +9,7 @@ import assignment3.ast.high.ReturnSig
 final class MethodSymbol(val name: String, ret: ValueType) {
   private var parametersBuf: Vector[VarSymbol] = Vector.empty
   private var localsBuf: Vector[VarSymbol] = Vector.empty
-  private val byName = scala.collection.mutable.LinkedHashMap.empty[String, VarSymbol]
+  private var byName: Map[String, VarSymbol] = Map.empty
   private var bodyStartLine: Int = -1
   private var returnTypeLine: Int = -1
   private var returnTypeColumn: Int = -1
@@ -49,23 +49,23 @@ final class MethodSymbol(val name: String, ret: ValueType) {
   def addParameter(paramName: String, t: Type): Unit = addParameter(paramName, t, -1, -1)
   def addParameter(paramName: String, t: Type, line: Int, column: Int): Unit = {
   ensureMutable(); val sym = new VarSymbol(paramName, t, true, parametersBuf.size, line, column)
-  parametersBuf = parametersBuf :+ sym; byName += paramName -> sym
+  parametersBuf = parametersBuf :+ sym; byName = byName + (paramName -> sym)
   }
   def addParameterObject(paramName: String, classTypeName: String): Unit = addParameterObject(paramName, classTypeName, -1, -1)
   def addParameterObject(paramName: String, classTypeName: String, line: Int, column: Int): Unit = {
   ensureMutable(); val sym = new VarSymbol(paramName, classTypeName, true, parametersBuf.size, line, column)
-  parametersBuf = parametersBuf :+ sym; byName += paramName -> sym
+  parametersBuf = parametersBuf :+ sym; byName = byName + (paramName -> sym)
   }
 
   def addLocal(localName: String, t: Type): Unit = addLocal(localName, t, -1, -1)
   def addLocal(localName: String, t: Type, line: Int, column: Int): Unit = {
   ensureMutable(); val sym = new VarSymbol(localName, t, false, localsBuf.size, line, column)
-  localsBuf = localsBuf :+ sym; byName += localName -> sym
+  localsBuf = localsBuf :+ sym; byName = byName + (localName -> sym)
   }
   def addLocalObject(localName: String, classTypeName: String): Unit = addLocalObject(localName, classTypeName, -1, -1)
   def addLocalObject(localName: String, classTypeName: String, line: Int, column: Int): Unit = {
   ensureMutable(); val sym = new VarSymbol(localName, classTypeName, false, localsBuf.size, line, column)
-  localsBuf = localsBuf :+ sym; byName += localName -> sym
+  localsBuf = localsBuf :+ sym; byName = byName + (localName -> sym)
   }
 
   def numParameters(): Int = parametersBuf.size
