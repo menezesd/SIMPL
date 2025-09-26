@@ -117,9 +117,7 @@ object IdiomaticCodegen:
       sb.toString
     case id.Call(m, args, _) =>
       val sb = new SamBuilder()
-      val hasReturn = m match
-        case sm: ScalaCallableMethod => sm.getReturnSig != ReturnSig.Void
-        case _ => m.getReturnType != null // fallback for non-scala callables
+      val hasReturn = hasReturnValue(m)
       // Always push a return slot; callee always stores into it. Drop it later if void.
       sb.append("PUSHIMM 0\n")
       args.foreach(a => sb.append(emitExpr(a, ctx)))
@@ -157,9 +155,7 @@ object IdiomaticCodegen:
       sb.toString
     case id.InstanceCall(target, m, args, _) =>
       val sb = new SamBuilder()
-      val hasReturn = m match
-        case sm: ScalaCallableMethod => sm.getReturnSig != ReturnSig.Void
-        case _ => m.getReturnType != null
+      val hasReturn = hasReturnValue(m)
       // Always push a return slot; drop after if void.
       sb.append("PUSHIMM 0\n")
       sb.append(emitExpr(target, ctx))
@@ -177,6 +173,11 @@ object IdiomaticCodegen:
     // Drop return slot for void calls; keep it for non-void as the expression result
     if !hasReturn then sb.append("ADDSP -1\n")
     sb.toString
+
+  // Centralized helper: does this callable produce a return value to keep on TOS?
+  private def hasReturnValue(m: id.CallableMethod): Boolean = m match
+    case sm: ScalaCallableMethod => sm.getReturnSig != ReturnSig.Void
+    case _ => m.getReturnType != null
 
   def emitStmt(s: id.Stmt, ctx: Ctx): String = s match
     case id.Block(statements, _) =>

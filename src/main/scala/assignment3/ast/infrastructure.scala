@@ -1,8 +1,6 @@
 package assignment3.ast
 
 import assignment3.{Type, ValueType, Label}
-import assignment3.symbol.MethodSymbol
-
 // Method context & frame abstractions used throughout Scala code
 import assignment3.symbol.{MethodSymbol, VarSymbol}
 
