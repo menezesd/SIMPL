@@ -4,6 +4,7 @@ import scala.jdk.CollectionConverters._
 
 import assignment3.{Type, ValueType}
 import scala.collection.mutable.ListBuffer
+import assignment3.ast.high.ReturnSig
 
 final class MethodSymbol(val name: String, val returnValueType: ValueType) {
   private val parametersBuf = ListBuffer.empty[VarSymbol]
@@ -25,16 +26,17 @@ final class MethodSymbol(val name: String, val returnValueType: ValueType) {
 
   def getName: String = name
   def getReturnValueType: ValueType = returnValueType
-  def getReturnType: Type = if (returnValueType == null || returnValueType.isObject) null else returnValueType.getPrimitive
-  def getClassReturnTypeName: String = if (returnValueType != null && returnValueType.isObject) returnValueType.getObject.getClassName else null
-  def returnsObject: Boolean = returnValueType != null && returnValueType.isObject
-  def isVoidReturn: Boolean = returnValueType == null
+
+  def getReturnSig: ReturnSig =
+    if (returnValueType == null) ReturnSig.Void
+    else if (returnValueType.isObject) ReturnSig.Obj(returnValueType.getObject.getClassName)
+    else ReturnSig.Prim(returnValueType.getPrimitive)
 
   def getParameters: java.util.List[VarSymbol] = java.util.Collections.unmodifiableList(parametersBuf.asJava)
   def getLocals: java.util.List[VarSymbol] = java.util.Collections.unmodifiableList(localsBuf.asJava)
 
   import scala.jdk.CollectionConverters._
-  def lookup(ident: String): VarSymbol = byName.getOrElse(ident, null)
+  def lookup(ident: String): Option[VarSymbol] = byName.get(ident)
 
   private def ensureMutable(): Unit = if (frozen) throw new IllegalStateException(s"MethodSymbol '$name' is frozen; cannot modify")
 
@@ -74,7 +76,11 @@ final class MethodSymbol(val name: String, val returnValueType: ValueType) {
   def freeze(): Unit = frozen = true
 
   override def toString: String = {
-    val ret = if (isVoidReturn) "void" else if (returnsObject) s"obj:${getClassReturnTypeName}" else String.valueOf(getReturnType)
+    val ret = getReturnSig match {
+      case ReturnSig.Void => "void"
+      case ReturnSig.Obj(cn) => s"obj:${cn}"
+      case ReturnSig.Prim(t) => String.valueOf(t)
+    }
     s"MethodSymbol{$name, return=$ret, params=${parametersBuf.toList}, locals=${localsBuf.toList}}"
   }
 }

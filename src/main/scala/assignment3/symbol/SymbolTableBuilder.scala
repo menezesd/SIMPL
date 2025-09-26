@@ -30,7 +30,7 @@ final class SymbolTableBuilder {
   private def parseClass(tz: SamTokenizer): Unit = {
     CompilerUtils.expectWord(tz, "class", tz.lineNo())
     val className = CompilerUtils.getIdentifier(tz)
-    val classSym = new ClassSymbol(className)
+  val classSym = new ClassSymbol(className)
     if (CompilerUtils.check(tz, '(')) {
       if (!CompilerUtils.check(tz, ')')) {
         var done = false
@@ -41,17 +41,21 @@ final class SymbolTableBuilder {
           } else {
             val rawType = CompilerUtils.getWord(tz)
             val vt = CompilerUtils.parseTypeOrObjectName(rawType, tz.lineNo())
-            val varType = if (vt.isPrimitive) vt.getPrimitive else null
-            val classRef = if (vt.isObject) vt.getObject.getClassName else null
+            val varTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
+            val classRefOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
             val name = CompilerUtils.getIdentifier(tz)
             val line = tz.lineNo(); val col = CompilerUtils.column(tz)
-            if (classRef != null) classSym.addField(new VarSymbol(name, classRef, false, -1, line, col))
-            else classSym.addField(new VarSymbol(name, varType, false, -1, line, col))
+            classRefOpt match {
+              case Some(classRef) => classSym.addField(new VarSymbol(name, classRef, false, -1, line, col))
+              case None => classSym.addField(new VarSymbol(name, varTypeOpt.orNull, false, -1, line, col))
+            }
             while (CompilerUtils.check(tz, ',')) {
               val n2 = CompilerUtils.getIdentifier(tz)
               val line2 = tz.lineNo(); val col2 = CompilerUtils.column(tz)
-              if (classRef != null) classSym.addField(new VarSymbol(n2, classRef, false, -1, line2, col2))
-              else classSym.addField(new VarSymbol(n2, varType, false, -1, line2, col2))
+              classRefOpt match {
+                case Some(classRef) => classSym.addField(new VarSymbol(n2, classRef, false, -1, line2, col2))
+                case None => classSym.addField(new VarSymbol(n2, varTypeOpt.orNull, false, -1, line2, col2))
+              }
             }
             if (!CompilerUtils.check(tz, ';')) throw new SyntaxErrorException("Expected ';' in field declaration", tz.lineNo())
             if (CompilerUtils.check(tz, ')')) done = true
@@ -66,20 +70,22 @@ final class SymbolTableBuilder {
 
   private def parseMethod(tz: SamTokenizer, classSym: ClassSymbol): Unit = {
     val typeWord = CompilerUtils.getWord(tz)
-    var returnType: Type = null
-    var classReturnTypeName: String = null
+    var returnTypeOpt: Option[Type] = None
+    var classReturnTypeNameOpt: Option[String] = None
     val rtLine = tz.lineNo(); val rtCol = CompilerUtils.column(tz)
-    if (typeWord == "void") returnType = null
+    if (typeWord == "void") returnTypeOpt = None
     else {
-      try returnType = Type.parse(typeWord, tz.lineNo())
-      catch { case _: TypeErrorException => returnType = Type.INT; classReturnTypeName = typeWord }
+      try returnTypeOpt = Some(Type.parse(typeWord, tz.lineNo()))
+      catch { case _: TypeErrorException => returnTypeOpt = Some(Type.INT); classReturnTypeNameOpt = Some(typeWord) }
     }
     val name = CompilerUtils.getIdentifier(tz)
     val method =
-      if (returnType == null && classReturnTypeName == null) new MethodSymbol(name, null: ValueType)
-      else if (classReturnTypeName != null) new MethodSymbol(name, classReturnTypeName)
-      else new MethodSymbol(name, returnType)
-    if (classSym.getMethod(name) != null)
+      (returnTypeOpt, classReturnTypeNameOpt) match {
+        case (None, None) => new MethodSymbol(name, null: ValueType)
+        case (_, Some(className)) => new MethodSymbol(name, className)
+        case (Some(rt), None) => new MethodSymbol(name, rt)
+      }
+    if (classSym.getMethod(name).isDefined)
       throw new CompilerException(s"Method '$name' already defined in class '${classSym.getName}'", tz.lineNo())
     CompilerUtils.expectChar(tz, '(', tz.lineNo())
     method.setReturnTypePosition(rtLine, rtCol)
@@ -142,8 +148,12 @@ final class SymbolTableBuilder {
       val mIt = cls.allMethods.iterator()
       while (mIt.hasNext) {
         val m = mIt.next()
-        if (m.returnsObject && !program.existsClass(m.getClassReturnTypeName))
-          throw new TypeErrorException(s"Unknown return type '${m.getClassReturnTypeName}' in method '${cls.getName}.${m.getName}'", m.getReturnTypeLine(), m.getReturnTypeColumn())
+        m.getReturnSig match {
+          case assignment3.ast.high.ReturnSig.Obj(cn) =>
+            if (!program.existsClass(cn))
+              throw new TypeErrorException(s"Unknown return type '${cn}' in method '${cls.getName}.${m.getName}'", m.getReturnTypeLine(), m.getReturnTypeColumn())
+          case _ => ()
+        }
         val pIt = m.getParameters.iterator()
         while (pIt.hasNext) {
           val p = pIt.next()

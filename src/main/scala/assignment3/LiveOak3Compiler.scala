@@ -41,8 +41,7 @@ object LiveOak3Compiler {
   private def cleanup(): Unit = { CompilerUtils.clearTokens(); CompilerUtils.clearRecorder() }
 
   private def validateEntrypoint(symbols: ProgramSymbols): Unit = {
-    val ms = symbols.getEntrypoint()
-    if (ms == null) throw new CompilerException(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point", -1)
+    val ms = symbols.getEntrypoint().getOrElse(throw new CompilerException(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point", -1))
     if (ms.expectedUserArgs() != 0)
       throw new CompilerException(s"$ENTRY_CLASS.$ENTRY_METHOD must not declare parameters", entrypointErrorLine(ms))
     if (ms.getParameters.isEmpty || !ms.getParameters.get(0).isObject || ms.getParameters.get(0).getClassTypeName != ENTRY_CLASS)
@@ -67,7 +66,11 @@ object LiveOak3Compiler {
     for (cs <- symbols.allClasses().asScala) {
       System.err.println(s"  class ${cs.getName} (fields=${cs.numFields()})")
       for (ms <- cs.allMethods.asScala) {
-        val ret = if (ms.isVoidReturn) "void" else if (ms.returnsObject) ms.getClassReturnTypeName else String.valueOf(ms.getReturnType)
+        val ret = ms.getReturnSig match {
+          case assignment3.ast.high.ReturnSig.Void => "void"
+          case assignment3.ast.high.ReturnSig.Obj(cn) => cn
+          case assignment3.ast.high.ReturnSig.Prim(t) => String.valueOf(t)
+        }
         System.err.println(s"    method ${ms.getName} -> $ret params=${ms.numParameters()} locals=${ms.numLocals()}")
       }
     }

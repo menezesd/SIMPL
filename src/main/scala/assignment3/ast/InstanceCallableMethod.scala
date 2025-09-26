@@ -2,11 +2,13 @@ package assignment3.ast
 
 import assignment3.{Type, ValueType}
 import assignment3.symbol.MethodSymbol
+import assignment3.ast.high.ReturnSig
 
 /** Callable wrapper for instance methods (Scala port). */
 final class InstanceCallableMethod(className: String, symbol: MethodSymbol) extends ScalaCallableMethod {
   override def getName: String = s"${className}_${symbol.getName}"
   override def getReturnValueType: ValueType = symbol.getReturnValueType
+  override def getReturnSig: ReturnSig = symbol.getReturnSig
   // Lower object/void returns to INT for codegen Expr type
   override def getReturnType: Type = {
     val rv = symbol.getReturnValueType

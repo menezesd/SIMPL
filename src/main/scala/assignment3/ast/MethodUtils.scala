@@ -17,5 +17,9 @@ object MethodUtils {
   def userParamCount(ms: MethodSymbol): Int = expectedUserArgs(ms)
   def returnValueType(ms: MethodSymbol): ValueType = ms.getReturnValueType
   def codegenLabel(className: String, ms: MethodSymbol): String = s"${className}_${ms.getName}"
-  def primitiveReturnType(ms: MethodSymbol): Type = ms.getReturnType
+  // ReturnSig helpers
+  def primitiveReturnType(ms: MethodSymbol): Type = ms.getReturnSig match {
+    case assignment3.ast.high.ReturnSig.Prim(t) => t
+    case _ => Type.INT
+  }
 }

@@ -25,8 +25,7 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
   }
 
   private def emitMethod(m: MethodNode): Unit = {
-    val ms = symbols.getMethod(m.className, m.name)
-    if (ms == null) throw new CompilerException(s"Method symbol missing for '${m.className}.${m.name}'", -1)
+  val ms = symbols.getMethod(m.className, m.name).getOrElse(throw new CompilerException(s"Method symbol missing for '${m.className}.${m.name}'", -1))
     val label = ctx.getLabeler.methodLabel(m.className, m.name)
     sb.append("\n").append(label).append(":\n")
     val localCount = ms.numLocals()
@@ -36,9 +35,10 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
       m.body match {
         case b: id.Block =>
           // Use idiomatic codegen directly for method bodies
-          val ctx = id.IdiomaticCodegen.Ctx(frame, symbols, returnLabel = frame.getReturnLabel)
+          val ctx = id.IdiomaticCodegen.Ctx(Some(frame), Some(symbols), returnLabelOpt = Some(frame.getReturnLabel))
           sb.append(id.IdiomaticCodegen.emitStmt(b, ctx))
-          if (m.isVoid) {
+          import assignment3.ast.high.ReturnSig
+          if (m.returnSig == ReturnSig.Void) {
             val stmts = b.statements
             if (stmts.isEmpty || !stmts.last.isInstanceOf[id.Return]) {
               sb.append("PUSHIMM 0\n")
@@ -65,7 +65,7 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
   }
 
   private def mainFieldsCount(ctx: CompilerContext): Int = {
-    val mainCls = if (ctx != null && ctx.getSymbols != null) ctx.getSymbols.getClass(LiveOak3Compiler.ENTRY_CLASS) else null
-    if (mainCls != null) mainCls.numFields() else 0
+    val mainClsOpt = Option(ctx).flatMap(c => Option(c.getSymbols)).flatMap(_.getClass(LiveOak3Compiler.ENTRY_CLASS))
+    mainClsOpt.map(_.numFields()).getOrElse(0)
   }
 }

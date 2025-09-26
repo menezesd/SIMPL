@@ -26,8 +26,8 @@ final class ClassSymbol(val name: String) {
     methods += m.getName -> m
   }
 
-  def getField(n: String): VarSymbol = fields.getOrElse(n, null)
-  def getMethod(n: String): MethodSymbol = methods.getOrElse(n, null)
+  def getField(n: String): Option[VarSymbol] = fields.get(n)
+  def getMethod(n: String): Option[MethodSymbol] = methods.get(n)
   def allFields: java.lang.Iterable[VarSymbol] = java.util.Collections.unmodifiableCollection(fields.values.toList.asJava)
   def allMethods: java.lang.Iterable[MethodSymbol] = java.util.Collections.unmodifiableCollection(methods.values.toList.asJava)
 
@@ -37,12 +37,12 @@ final class ClassSymbol(val name: String) {
 
   def freeze(): Unit = if (!frozen) { frozen = true; methods.values.foreach(_.freeze()) }
 
-  def getFieldInfo(fieldName: String): ClassSymbol.FieldInfo = {
-    val vs = fields.getOrElse(fieldName, null)
-    if (vs == null) return null
-    val off = fieldOrder.indexOf(fieldName)
-    val vt = if (vs.isObject) ValueType.ofObject(vs.getObjectType) else ValueType.ofPrimitive(vs.getType)
-    ClassSymbol.FieldInfo(off, vt, vs)
+  def getFieldInfo(fieldName: String): Option[ClassSymbol.FieldInfo] = {
+    fields.get(fieldName).map { vs =>
+      val off = fieldOrder.indexOf(fieldName)
+      val vt = if (vs.isObject) ValueType.ofObject(vs.getObjectType) else ValueType.ofPrimitive(vs.getType)
+      ClassSymbol.FieldInfo(off, vt, vs)
+    }
   }
 
   override def toString: String = s"ClassSymbol{$name, fields=${fields.keySet}, methods=${methods.keySet}}"
@@ -50,6 +50,6 @@ final class ClassSymbol(val name: String) {
 
 object ClassSymbol {
   final case class FieldInfo(offset: Int, valueType: ValueType, symbol: VarSymbol) {
-    def objectType() = if (valueType.isObject) valueType.getObject else null
+    def objectType(): Option[assignment3.ObjectType] = if (valueType.isObject) Some(valueType.getObject) else None
   }
 }

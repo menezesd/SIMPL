@@ -15,11 +15,14 @@ final class SymbolMethodFrame(val symbol: MethodSymbol) extends MethodFrame {
   symbol.getLocals.iterator().asScala.foreach(l => vars += l.getName -> new SymbolVarBinding(l, symbol))
 
   def getName: String = symbol.getName
-  def getReturnType: Type = symbol.getReturnType
+  def getReturnType: Type = symbol.getReturnSig match {
+    case assignment3.ast.high.ReturnSig.Prim(t) => t
+    case _ => Type.INT
+  }
   def numParameters(): Int = symbol.numParameters()
   def numLocals(): Int = symbol.numLocals()
   def returnAddressOffset(): Int = symbol.returnAddressOffset()
-  def lookupVar(name: String): VarBinding = vars.getOrElse(name, null)
+  def lookupVar(name: String): Option[VarBinding] = vars.get(name)
   def setReturnLabel(label: Label): Unit = { returnLabel = label }
   def getReturnLabel: Label = returnLabel
   def getSymbol: MethodSymbol = symbol

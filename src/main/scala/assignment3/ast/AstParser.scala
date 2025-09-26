@@ -19,45 +19,43 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
   def parseBlock(): Block = parseBlockInternal()
   def parseVarDecls(): List[VarDecl] = parseVarDeclsInternal()
 
-  private def tryImplicitThisField(fieldName: String): FieldAccess =
-    method match
-      case nmc: NewMethodContext =>
-        val ms = nmc.getSymbol
-        if (ms.numParameters() == 0 || ms.getParameters.get(0).getName != "this") return null
-        val thisSym = ms.getParameters.get(0)
-        val thisType = thisSym.getObjectType
-        if (thisType == null) return null
-        val ps = programSymbols; if (ps == null) return null
-        val cs = ps.getClass(thisType.getClassName); if (cs == null) return null
-        val off = cs.fieldOffset(fieldName)
-        val fSym = cs.getField(fieldName); if (fSym == null) return null
-        val vt = fSym.getValueType
-        val fi = new assignment3.symbol.ClassSymbol.FieldInfo(off, vt, fSym)
-        FieldAccess(This(), fieldName, Option(fi))
-      case _ => null
+  private def tryImplicitThisField(fieldName: String): Option[FieldAccess] =
+    for {
+      nmc <- method match { case n: NewMethodContext => Some(n); case _ => None }
+      ms = nmc.getSymbol
+      if ms.numParameters() > 0 && ms.getParameters.get(0).getName == "this"
+      thisSym = ms.getParameters.get(0)
+      if thisSym.isObject
+      cs <- programSymbols.getClass(thisSym.getClassTypeName)
+      fSym <- cs.getField(fieldName)
+      off = cs.fieldOffset(fieldName)
+      vt = fSym.getValueType
+      fi = new assignment3.symbol.ClassSymbol.FieldInfo(off, vt, fSym)
+    } yield FieldAccess(This(), fieldName, Some(fi))
 
-  private def resolveFieldInfo(target: Expr, fieldName: String): assignment3.symbol.ClassSymbol.FieldInfo =
-    val ps = programSymbols; if ps == null then return null
-    val className = IdiomaticTypeUtils.classNameOf(target, method, programSymbols); if className == null then return null
-    val cs = ps.getClass(className); if cs == null then return null
-    cs.getFieldInfo(fieldName)
+  private def resolveFieldInfo(target: Expr, fieldName: String): Option[assignment3.symbol.ClassSymbol.FieldInfo] =
+    for
+      cn <- IdiomaticTypeUtils.classNameOf(target, method, programSymbols)
+      cs <- programSymbols.getClass(cn)
+      fi <- cs.getFieldInfo(fieldName)
+    yield fi
 
   private def parseVarDeclsInternal(): List[VarDecl] =
     if !declarationsEnabled then return Nil
     val decls = ListBuffer.empty[VarDecl]
     while tokenizer.peekAtKind() == TokenType.WORD do
       val rawType = CompilerUtils.getWord(tokenizer)
-      var varType: Type = null
-      var valueType: assignment3.ValueType = null
+      var varTypeOpt: Option[Type] = None
+      var valueTypeOpt: Option[assignment3.ValueType] = None
       try
-        varType = Type.parse(rawType, tokenizer.lineNo()); valueType = assignment3.ValueType.ofPrimitive(varType)
+        val vt = Type.parse(rawType, tokenizer.lineNo()); varTypeOpt = Some(vt); valueTypeOpt = Some(assignment3.ValueType.ofPrimitive(vt))
       catch
-        case _: TypeErrorException => varType = Type.INT; valueType = assignment3.ValueType.ofObject(rawType)
+        case _: TypeErrorException => varTypeOpt = Some(Type.INT); valueTypeOpt = Some(assignment3.ValueType.ofObject(rawType))
       var more = true
       while more do
         if tokenizer.peekAtKind() != TokenType.WORD then throw new SyntaxErrorException("Expected variable name after type", tokenizer.lineNo())
         val name = CompilerUtils.getIdentifier(tokenizer)
-        decls += VarDecl(name, Option(varType), Option(valueType), None)
+        decls += VarDecl(name, varTypeOpt, valueTypeOpt, None)
         if CompilerUtils.check(tokenizer, ',') then ()
         else if CompilerUtils.check(tokenizer, ';') then more = false
         else throw new SyntaxErrorException("Expected ',' or ';' in variable declaration", tokenizer.lineNo())
@@ -82,21 +80,19 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
       val cond = parseExprInternal(); CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo()); val body = parseBlockInternal()
       return While(cond, body)
     val firstIdent = CompilerUtils.getIdentifier(tokenizer)
-    var lhsBase: Expr = null
-    method.lookup(firstIdent) match
-      case vs: VarSymbol if method.isInstanceOf[NewMethodContext] =>
-        lhsBase = Var(firstIdent)
-      case _ if method.isInstanceOf[NewMethodContext] =>
-        lhsBase = tryImplicitThisField(firstIdent)
-        if lhsBase == null then throw new SyntaxErrorException("Undeclared variable: " + firstIdent, tokenizer.lineNo())
-      case _ => throw new SyntaxErrorException("Undeclared variable: " + firstIdent, tokenizer.lineNo())
+    var lhsBase: Expr =
+      method.lookupVar(firstIdent) match
+        case Some(_: VarSymbol) if method.isInstanceOf[NewMethodContext] => Var(firstIdent)
+        case _ if method.isInstanceOf[NewMethodContext] =>
+          tryImplicitThisField(firstIdent).getOrElse(throw new SyntaxErrorException("Undeclared variable: " + firstIdent, tokenizer.lineNo()))
+        case _ => throw new SyntaxErrorException("Undeclared variable: " + firstIdent, tokenizer.lineNo())
     var dotCount = 0
     while CompilerUtils.check(tokenizer, '.') do
       if dotCount > 0 then throw new SyntaxErrorException("Inappropriate method/field chaining", tokenizer.lineNo())
       dotCount += 1
       val fld = CompilerUtils.getIdentifier(tokenizer)
-      val fi = resolveFieldInfo(lhsBase, fld)
-      lhsBase = FieldAccess(lhsBase, fld, Option(fi))
+      val fiOpt = resolveFieldInfo(lhsBase, fld)
+      lhsBase = FieldAccess(lhsBase, fld, fiOpt)
     CompilerUtils.expectChar(tokenizer, '=', tokenizer.lineNo())
     val rhs = parseExprInternal()
     CompilerUtils.expectChar(tokenizer, ';', tokenizer.lineNo())
@@ -117,22 +113,20 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
         val op = CompilerUtils.getOp(tokenizer)
         val inner = parseExprInternal()
         CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-        val t = IdiomaticTypeUtils.typeOf(inner, method, programSymbols)
-        if op == '~' then
-          if t != Type.INT && t != Type.STRING then throw new TypeErrorException("'~' requires INT or STRING", tokenizer.lineNo())
-          return Unary(if t == Type.STRING then UnaryOp.Neg else UnaryOp.Neg, inner, Some(if t == Type.STRING then Type.STRING else Type.INT))
-        else
-          if t != Type.BOOL then throw new TypeErrorException("'!' requires BOOL", tokenizer.lineNo())
-          return Unary(UnaryOp.Not, inner, Some(Type.BOOL))
+        AstEither.buildUnaryD(op, inner, method, programSymbols, tokenizer.lineNo()) match
+          case Right(u) => return u
+          case Left(diag) => throw new TypeErrorException(diag.message, tokenizer.lineNo())
       val first = parseExprInternal()
       if tokenizer.peekAtKind() != edu.utexas.cs.sam.io.Tokenizer.TokenType.OPERATOR then throw new SyntaxErrorException("Expected operator/?/) after expression", tokenizer.lineNo())
       if CompilerUtils.check(tokenizer, ')') then return first
       if CompilerUtils.check(tokenizer, '?') then
         val thenE = parseExprInternal(); CompilerUtils.expectChar(tokenizer, ':', tokenizer.lineNo()); val elseE = parseExprInternal()
-        val tt = IdiomaticTypeUtils.typeOf(thenE, method, programSymbols); val et = IdiomaticTypeUtils.typeOf(elseE, method, programSymbols)
-        if !tt.isCompatibleWith(et) then throw new TypeErrorException("Ternary branch type mismatch", tokenizer.lineNo())
-        CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-        return Ternary(first, thenE, elseE, Some(tt))
+        AstEither.buildTernaryD(first, thenE, elseE, method, programSymbols, tokenizer.lineNo()) match
+          case Right(te) =>
+            CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
+            return te
+          case Left(diag) => throw new TypeErrorException(diag.message, tokenizer.lineNo())
+        
       val op = CompilerUtils.getOp(tokenizer); val second = parseExprInternal(); CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
       return buildBinary(first, op, second)
     var base = parseTerminal()
@@ -151,24 +145,25 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
           args += parseExprInternal()
           while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
           CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-        var ms: MethodSymbol = null
-        val className = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
-        if className != null && programSymbols != null then
-          val cs = programSymbols.getClass(className)
-          if cs != null then ms = cs.getMethod(ident)
-        val labelName = if className != null then s"${className}_${ident}" else ident
-        val retType = if ms != null then ms.getReturnType else Type.INT
-        val callable: assignment3.ast.CallableMethod =
-          if ms != null then new assignment3.ast.ScalaInstanceCallable(className, ms)
-          else new assignment3.ast.ScalaInstanceCallableFallback(
+        val msEither = AstEither.resolveMethodOnExprD(base, ident, method, programSymbols, tokenizer.lineNo())
+        val classNameOpt = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
+        val labelName = classNameOpt.map(cn => s"${cn}_${ident}").getOrElse(ident)
+        val retVtOpt: Option[assignment3.ValueType] = msEither.toOption.map(_.getReturnSig).map {
+          case assignment3.ast.high.ReturnSig.Void => null
+          case assignment3.ast.high.ReturnSig.Obj(cn) => assignment3.ValueType.ofObject(cn)
+          case assignment3.ast.high.ReturnSig.Prim(t) => assignment3.ValueType.ofPrimitive(t)
+        }
+        val callable: assignment3.ast.CallableMethod = msEither match
+          case Right(ms) => new assignment3.ast.ScalaInstanceCallable(classNameOpt.orNull, ms)
+          case Left(_) => new assignment3.ast.ScalaInstanceCallableFallback(
             labelName,
-            if retType == null then null else assignment3.ValueType.ofPrimitive(retType),
+            retVtOpt.orNull,
             args.size + 1
           )
         base = InstanceCall(base, callable, args.toList)
       else
-        val fi = if programSymbols != null then resolveFieldInfo(base, ident) else null
-        base = FieldAccess(base, ident, Option(fi))
+        val fiOpt = AstEither.resolveFieldInfoD(base, ident, method, programSymbols, tokenizer.lineNo()).toOption
+        base = FieldAccess(base, ident, fiOpt)
     base
 
   private def parseTerminal(): Expr =
@@ -192,50 +187,26 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
               CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
             return NewObject(cls, args.toList)
           case _ =>
-            var sym = method.lookup(w)
-            if sym == null then sym = method.lookupMethodGlobal(w)
-            if sym == null then
-              val implicitF = tryImplicitThisField(w)
-              if implicitF != null then return implicitF
-              throw new SyntaxErrorException("Undeclared symbol: " + w, tokenizer.lineNo())
-            sym match
-              case ms: MethodSymbol =>
-                CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
-                val args = ListBuffer.empty[Expr]
-                if !CompilerUtils.check(tokenizer, ')') then
-                  args += parseExprInternal()
-                  while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
-                  CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
-                Call(new assignment3.ast.SymbolCallableMethod(ms), args.toList)
-              case vs: VarSymbol if method.isInstanceOf[NewMethodContext] =>
+            method.lookupVar(w) match
+              case Some(vs: VarSymbol) if method.isInstanceOf[NewMethodContext] =>
                 Var(vs.getName)
-              case other => throw new SyntaxErrorException("Unsupported symbol type for variable expression: " + other.getClass.getSimpleName, tokenizer.lineNo())
+              case _ =>
+                method.lookupMethodGlobal(w) match
+                  case Some(ms: MethodSymbol) =>
+                    CompilerUtils.expectChar(tokenizer, '(', tokenizer.lineNo())
+                    val args = ListBuffer.empty[Expr]
+                    if !CompilerUtils.check(tokenizer, ')') then
+                      args += parseExprInternal()
+                      while CompilerUtils.check(tokenizer, ',') do args += parseExprInternal()
+                      CompilerUtils.expectChar(tokenizer, ')', tokenizer.lineNo())
+                    Call(new assignment3.ast.SymbolCallableMethod(ms), args.toList)
+                  case None =>
+                    tryImplicitThisField(w) match
+                      case Some(implicitF) => return implicitF
+                      case None => throw new SyntaxErrorException("Undeclared symbol: " + w, tokenizer.lineNo())
       case _ => throw new SyntaxErrorException("Unexpected token in expression", tokenizer.lineNo())
 
   private def buildBinary(left: Expr, op: Char, right: Expr): Expr =
-    val lt = IdiomaticTypeUtils.typeOf(left, method, programSymbols); val rt = IdiomaticTypeUtils.typeOf(right, method, programSymbols)
-    if op == '*' && ((lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING)) then return Binary(BinaryOp.Mul, left, right, Some(Type.STRING))
-    if op == '+' && lt == Type.STRING && rt == Type.STRING then return Binary(BinaryOp.Add, left, right, Some(Type.STRING))
-    if (op == '<' || op == '>' || op == '=') && lt == Type.STRING && rt == Type.STRING then return Binary(op match
-      case '<' => BinaryOp.Lt
-      case '>' => BinaryOp.Gt
-      case '=' => BinaryOp.Eq
-    , left, right, Some(Type.BOOL))
-    if op == '=' && lt.isCompatibleWith(rt) then return Binary(BinaryOp.Eq, left, right, Some(Type.BOOL))
-    if op == '&' || op == '|' then
-      if lt != Type.BOOL || rt != Type.BOOL then throw new TypeErrorException("Logical op requires BOOL operands", tokenizer.lineNo())
-      return Binary(if op == '&' then BinaryOp.And else BinaryOp.Or, left, right, Some(Type.BOOL))
-    if op == '+' || op == '-' || op == '*' || op == '/' || op == '%' then
-      if lt != Type.INT || rt != Type.INT then throw new TypeErrorException("Arithmetic op requires INT operands", tokenizer.lineNo())
-      val bop = op match
-        case '+' => BinaryOp.Add
-        case '-' => BinaryOp.Sub
-        case '*' => BinaryOp.Mul
-        case '/' => BinaryOp.Div
-        case '%' => BinaryOp.Mod
-      return Binary(bop, left, right, Some(Type.INT))
-    if op == '<' || op == '>' || op == '=' then
-      if !lt.isCompatibleWith(rt) then throw new TypeErrorException("Comparison requires matching types", tokenizer.lineNo())
-      val bop = if op == '<' then BinaryOp.Lt else if op == '>' then BinaryOp.Gt else BinaryOp.Eq
-      return Binary(bop, left, right, Some(Type.BOOL))
-    throw new TypeErrorException("Unsupported operator: " + op, tokenizer.lineNo())
+    AstEither.buildBinaryD(left, op, right, method, programSymbols, tokenizer.lineNo()) match
+      case Right(expr) => expr
+      case Left(diag)  => throw new TypeErrorException(diag.message, tokenizer.lineNo())

@@ -19,8 +19,8 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
   private def parseClass(): ClassNode = {
     CompilerUtils.expectWord(tz, "class", tz.lineNo())
     val className = CompilerUtils.getIdentifier(tz)
-    val cs = symbols.getClass(className)
-    if (cs == null) throw new CompilerException(s"Class symbol missing for '$className'", tz.lineNo())
+    val csOpt = symbols.getClass(className)
+    val cs = csOpt.getOrElse(throw new CompilerException(s"Class symbol missing for '$className'", tz.lineNo()))
     if (CompilerUtils.check(tz, '(')) {
       if (!CompilerUtils.check(tz, ')')) {
         while (CompilerUtils.isTypeWord(tz, symbols, className, false, true)) {
@@ -43,20 +43,23 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
   }
 
   private def parseMethod(className: String): MethodNode = {
-    var returnPrim: assignment3.Type = null
-    var returnObj: String = null
-    var isVoid = false
-    if (tz.test("void")) { CompilerUtils.expectWord(tz, "void", tz.lineNo()); isVoid = true }
+    var returnSig: assignment3.ast.high.ReturnSig = assignment3.ast.high.ReturnSig.Void
+    var returnPrimOpt: Option[assignment3.Type] = None
+    var returnObjOpt: Option[String] = None
+    if (tz.test("void")) { CompilerUtils.expectWord(tz, "void", tz.lineNo()); returnSig = assignment3.ast.high.ReturnSig.Void }
     else if (tz.peekAtKind() == TokenType.WORD) {
       val rt = CompilerUtils.getWord(tz)
       val vt = CompilerUtils.parseTypeOrObjectName(rt, tz.lineNo())
-      returnPrim = if (vt.isPrimitive) vt.getPrimitive else null
-      returnObj = if (vt.isObject) vt.getObject.getClassName else null
+      returnPrimOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
+      returnObjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
+      returnSig = returnObjOpt.map(assignment3.ast.high.ReturnSig.Obj.apply)
+        .orElse(returnPrimOpt.map(assignment3.ast.high.ReturnSig.Prim.apply))
+        .getOrElse(assignment3.ast.high.ReturnSig.Void)
     } else throw new SyntaxErrorException("Expected return type", tz.lineNo())
 
     val methodName = CompilerUtils.getIdentifier(tz)
-    val ms = symbols.getMethod(className, methodName)
-    if (ms == null) throw new CompilerException(s"Method symbol missing for '$className.$methodName'", tz.lineNo())
+    val msOpt = symbols.getMethod(className, methodName)
+    val ms = msOpt.getOrElse(throw new CompilerException(s"Method symbol missing for '$className.$methodName'", tz.lineNo()))
 
     CompilerUtils.expectChar(tz, '(', tz.lineNo())
     val expectedUserParams = assignment3.ast.MethodUtils.expectedUserArgs(ms)
@@ -65,23 +68,23 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
     while (tz.peekAtKind() == TokenType.WORD) {
       val pr = CompilerUtils.getWord(tz)
       val vt = CompilerUtils.parseTypeOrObjectName(pr, tz.lineNo())
-      val pType = if (vt.isPrimitive) vt.getPrimitive else null
-      val pobj = if (vt.isObject) vt.getObject.getClassName else null
+      val pTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
+      val pobjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
       val pName = CompilerUtils.getIdentifier(tz)
       if (paramIndex >= expectedUserParams) {
         val atLeast = paramIndex + 1
         throw new SyntaxErrorException(s"Too many parameters in '$methodName': expected $expectedUserParams, got at least $atLeast", tz.lineNo())
       }
       val formal = assignment3.ast.MethodUtils.userParamAt(ms, paramIndex)
-      val typeOk = if (formal.isObject) (pobj != null && pobj == formal.getClassTypeName) else (formal.getType == pType)
+      val typeOk = if (formal.isObject) pobjOpt.contains(formal.getClassTypeName) else pTypeOpt.contains(formal.getType)
       if (!typeOk || formal.getName != pName) {
         val position = paramIndex + 1
         val expectedType = if (formal.isObject) formal.getClassTypeName else String.valueOf(formal.getType)
-        val actualType = if (pobj != null) pobj else if (pType != null) pType.toString else "void"
+        val actualType = pobjOpt.getOrElse(pTypeOpt.map(_.toString).getOrElse("void"))
         val msg = s"Parameter mismatch in '$methodName' at position $position: expected $expectedType ${formal.getName}, but found $actualType $pName"
         throw new SyntaxErrorException(msg, tz.lineNo())
       }
-      params += ParamNode(pName, pobj, pType)
+      params += ParamNode(pName, pobjOpt.orNull, pTypeOpt.orNull)
       paramIndex += 1
       if (!CompilerUtils.check(tz, ',')) { /* stop */ } else ()
     }
@@ -96,20 +99,23 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
     while (!CompilerUtils.check(tz, '}')) {
       val parsed: assignment3.ast.Stmt = stmtParser.parseStmt()
       val s: assignment3.ast.Stmt = folder.foldStmt(parsed)
-      try assignment3.ast.IdiomaticSemantic.checkStmt(s, ms, tz.lineNo(), symbols) catch { case se: Exception => throw new CompilerException("Semantic error: " + se.getMessage, tz.lineNo()) }
+      assignment3.ast.IdiomaticSemantic.checkStmtE(s, ms, tz.lineNo(), symbols) match {
+        case Left(diag)  => throw new CompilerException("Semantic error: " + diag.message, tz.lineNo())
+        case Right(()) => ()
+      }
       stmts += s
     }
-    val missingReturn = !isVoid && (stmts.isEmpty || !endsWithReturn(stmts.last))
+    val missingReturn = (returnSig != assignment3.ast.high.ReturnSig.Void) && (stmts.isEmpty || !endsWithReturn(stmts.last))
     if (missingReturn) throw new SyntaxErrorException("Method missing final return", tz.lineNo())
     val body = assignment3.ast.Block(stmts.toList)
-    MethodNode(className, methodName, params.toList, returnObj, returnPrim, isVoid, body)
+    MethodNode(className, methodName, params.toList, returnSig, body)
   }
 
   private def endsWithReturn(s: assignment3.ast.Stmt): Boolean = s match {
     case _: assignment3.ast.Return => true
     case b: assignment3.ast.Block =>
       val inner = b.statements
-      inner != null && inner.nonEmpty && endsWithReturn(inner.last)
+      inner.nonEmpty && endsWithReturn(inner.last)
     case _ => false
   }
 

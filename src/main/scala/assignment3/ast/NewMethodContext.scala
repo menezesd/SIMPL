@@ -1,25 +1,29 @@
 package assignment3.ast
 
 import assignment3._
-import assignment3.symbol.{MethodSymbol, ProgramSymbols}
+import assignment3.symbol.{MethodSymbol, ProgramSymbols, VarSymbol}
 
 /** MethodContext backed by MethodSymbol (Scala port). */
 final class NewMethodContext(val symbol: MethodSymbol, programSymbols: ProgramSymbols) extends MethodContext {
   override def getName: String = symbol.getName
-  override def getReturnType: Type = symbol.getReturnType
+  override def getReturnType: Type = symbol.getReturnSig match {
+    case assignment3.ast.high.ReturnSig.Prim(t) => t
+    case _ => Type.INT
+  }
   override def numParameters(): Int = symbol.numParameters()
   override def numLocals(): Int = symbol.numLocals()
   override def returnAddressOffset(): Int = symbol.returnAddressOffset()
-  override def lookup(name: String): AnyRef = symbol.lookup(name)
-  override def lookupMethodGlobal(name: String): AnyRef = {
-    if (programSymbols == null) return null
+  override def lookupVar(name: String): Option[VarSymbol] = symbol.lookup(name)
+  override def lookupMethodGlobal(name: String): Option[MethodSymbol] = {
     val it = programSymbols.allClasses().iterator()
     while (it.hasNext) {
       val cs = it.next()
-      val ms = cs.getMethod(name)
-      if (ms != null) return ms
+      cs.getMethod(name) match {
+        case Some(ms) => return Some(ms)
+        case None => ()
+      }
     }
-    null
+    None
   }
   def getSymbol: MethodSymbol = symbol
 }

@@ -2,6 +2,7 @@ package assignment3.ast
 
 import assignment3.{Type, ValueType}
 import assignment3.symbol.MethodSymbol
+import assignment3.ast.high.ReturnSig
 
 /** Unified callable for instance method invocation (Scala port). */
 final class InstanceCallable(classNameOrLabel: String, methodSymbol: MethodSymbol, labelOnlyReturn: ValueType, labelOnlyParamCount: Int) extends ScalaCallableMethod {
@@ -16,6 +17,11 @@ final class InstanceCallable(classNameOrLabel: String, methodSymbol: MethodSymbo
 
   override def getName: String = label
   override def getReturnValueType: ValueType = rvType
+  override def getReturnSig: ReturnSig =
+    if (symbol != null) symbol.getReturnSig
+    else if (rvType == null) ReturnSig.Void
+    else if (rvType.isObject) ReturnSig.Obj(rvType.getObject.getClassName)
+    else ReturnSig.Prim(rvType.getPrimitive)
   // Lower object/void returns to INT for Expr type used in codegen
   override def getReturnType: Type = if (rvType == null || rvType.isObject) Type.INT else rvType.getPrimitive
   override def getParamCount: Int = pCount

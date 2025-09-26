@@ -12,8 +12,7 @@ object IdiomaticTypeUtils:
     case Var(name, _)  =>
       method match
         case nmc: NewMethodContext =>
-          val vs = nmc.getSymbol.lookup(name)
-          if (vs != null) vs.getType else Type.INT
+          nmc.lookupVar(name).map(_.getType).getOrElse(Type.INT)
         case _ => Type.INT
     case Unary(UnaryOp.Not, _, _, _) => Type.BOOL
     case Unary(UnaryOp.Neg, inner, _, _) =>
@@ -21,30 +20,43 @@ object IdiomaticTypeUtils:
     case Binary(_, _, _, rt, _) => rt.getOrElse(Type.INT)
     case Ternary(_, t, _, rt, _) => rt.getOrElse(typeOf(t, method, programSymbols))
     case This(_) => Type.INT
-    case FieldAccess(_, _, fi, _) => fi.flatMap(f => Option(f.valueType)).filter(_.isPrimitive).map(_.getPrimitive).getOrElse(Type.INT)
-    case Call(m, _, _) => m.getReturnType
-    case InstanceCall(_, m, _, _) => m.getReturnType
-    case NewObject(_, _, _) => Type.INT
-
-  def classNameOf(e: Expr, method: assignment3.ast.MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): String = e match
-    case NewObject(cn, _, _) => cn
-    case FieldAccess(_, _, fi, _) => fi.flatMap(f => Option(f.valueType)).filter(_.isObject).map(_.getObject.getClassName).orNull
-    case InstanceCall(_, m, _, _) =>
-      m match
-        case sm: assignment3.ast.ScalaCallableMethod =>
-          val rv = sm.getReturnValueType
-          if rv != null && rv.isObject then rv.getObject.getClassName else null
-        case _ => null
+    case FieldAccess(_, _, fi, _) => fi.filter(_.valueType.isPrimitive).map(_.valueType.getPrimitive).getOrElse(Type.INT)
     case Call(m, _, _) =>
       m match
         case sm: assignment3.ast.ScalaCallableMethod =>
-          val rv = sm.getReturnValueType
-          if rv != null && rv.isObject then rv.getObject.getClassName else null
-        case _ => null
+          sm.getReturnSig match
+            case assignment3.ast.high.ReturnSig.Prim(t) => t
+            case _ => Type.INT
+        case _ => m.getReturnType
+    case InstanceCall(_, m, _, _) =>
+      m match
+        case sm: assignment3.ast.ScalaCallableMethod =>
+          sm.getReturnSig match
+            case assignment3.ast.high.ReturnSig.Prim(t) => t
+            case _ => Type.INT
+        case _ => m.getReturnType
+    case NewObject(_, _, _) => Type.INT
+
+  def classNameOf(e: Expr, method: assignment3.ast.MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): Option[String] = e match
+    case NewObject(cn, _, _) => Some(cn)
+    case FieldAccess(_, _, fi, _) => fi.filter(_.valueType.isObject).map(_.valueType.getObject.getClassName)
+    case InstanceCall(_, m, _, _) =>
+      m match
+        case sm: assignment3.ast.ScalaCallableMethod =>
+          sm.getReturnSig match
+            case assignment3.ast.high.ReturnSig.Obj(cn) => Some(cn)
+            case _ => None
+        case _ => None
+    case Call(m, _, _) =>
+      m match
+        case sm: assignment3.ast.ScalaCallableMethod =>
+          sm.getReturnSig match
+            case assignment3.ast.high.ReturnSig.Obj(cn) => Some(cn)
+            case _ => None
+        case _ => None
     case Var(name, _) =>
       method match
         case nmc: NewMethodContext =>
-          val vs = nmc.getSymbol.lookup(name)
-          if (vs != null && vs.isObject) vs.getClassTypeName else null
-        case _ => null
-    case _ => null
+          nmc.lookupVar(name).filter(_.isObject).map(_.getClassTypeName)
+        case _ => None
+    case _ => None
