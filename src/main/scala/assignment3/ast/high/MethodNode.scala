@@ -1,6 +1,7 @@
 package assignment3.ast.high
 
 import assignment3.Type
+import assignment3.ast.Stmt
 
 sealed trait ReturnSig
 object ReturnSig {
@@ -14,6 +15,6 @@ final case class MethodNode(
   name: String,
   params: List[ParamNode],            // user params only (excludes implicit this)
   returnSig: ReturnSig,               // unified return signature
-  // Method body may be either legacy BlockStmt or idiomatic Block during migration
-  body: AnyRef
+  // Method body (idiomatic AST)
+  body: Stmt
 )

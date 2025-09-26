@@ -1,6 +1,4 @@
 package assignment3.symbol
-
-import assignment3.CompilerException
 import scala.collection.mutable
 
 final class ProgramSymbols {
@@ -8,8 +6,8 @@ final class ProgramSymbols {
   private var frozen = false
 
   def addClass(c: ClassSymbol): Unit = {
-    if (frozen) throw new CompilerException(s"ProgramSymbols is frozen; cannot add class '${c.getName}'", -1)
-    if (classes.contains(c.getName)) throw new CompilerException(s"Duplicate class '${c.getName}'", -1)
+    if (frozen) throw new IllegalStateException(s"ProgramSymbols is frozen; cannot add class '${c.getName}'")
+    if (classes.contains(c.getName)) throw new IllegalStateException(s"Duplicate class '${c.getName}'")
     classes += c.getName -> c
   }
 

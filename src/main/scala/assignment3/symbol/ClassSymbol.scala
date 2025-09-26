@@ -2,7 +2,7 @@ package assignment3.symbol
 
 import scala.jdk.CollectionConverters._
 
-import assignment3.{CompilerException, ValueType}
+import assignment3.ValueType
 import scala.collection.mutable
 
 final class ClassSymbol(val name: String) {
@@ -14,15 +14,15 @@ final class ClassSymbol(val name: String) {
   def getName: String = name // temporary for external references; TODO remove
 
   def addField(v: VarSymbol): Unit = {
-    if (frozen) throw new CompilerException(s"ClassSymbol '$name' is frozen; cannot add field", -1)
-    if (fields.contains(v.getName)) throw new CompilerException(s"Duplicate field '${v.getName}' in class '$name'", -1)
+  if (frozen) throw new IllegalStateException(s"ClassSymbol '$name' is frozen; cannot add field")
+  if (fields.contains(v.getName)) throw new IllegalStateException(s"Duplicate field '${v.getName}' in class '$name'")
     fields += v.getName -> v
     fieldOrder += v.getName
   }
 
   def addMethod(m: MethodSymbol): Unit = {
-    if (frozen) throw new CompilerException(s"ClassSymbol '$name' is frozen; cannot add method", -1)
-    if (methods.contains(m.getName)) throw new CompilerException(s"Duplicate method '${m.getName}' in class '$name'", -1)
+  if (frozen) throw new IllegalStateException(s"ClassSymbol '$name' is frozen; cannot add method")
+  if (methods.contains(m.getName)) throw new IllegalStateException(s"Duplicate method '${m.getName}' in class '$name'")
     methods += m.getName -> m
   }
 
@@ -40,7 +40,7 @@ final class ClassSymbol(val name: String) {
   def getFieldInfo(fieldName: String): Option[ClassSymbol.FieldInfo] = {
     fields.get(fieldName).map { vs =>
       val off = fieldOrder.indexOf(fieldName)
-      val vt = if (vs.isObject) ValueType.ofObject(vs.getObjectType) else ValueType.ofPrimitive(vs.getType)
+      val vt = vs.getValueType
       ClassSymbol.FieldInfo(off, vt, vs)
     }
   }

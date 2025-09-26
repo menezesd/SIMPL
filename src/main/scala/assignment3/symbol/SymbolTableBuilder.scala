@@ -1,6 +1,7 @@
 package assignment3.symbol
 
 import assignment3._
+import assignment3.ast.{Diag, SyntaxDiag, TypeDiag, ResolveDiag}
 import edu.utexas.cs.sam.io.{SamTokenizer, Tokenizer}
 import Tokenizer.TokenType
 import scala.collection.mutable
@@ -26,6 +27,17 @@ final class SymbolTableBuilder {
     validateTypes()
     program
   }
+
+  /** Diagnostic-first variant: never throws; returns Either[Diag, ProgramSymbols]. */
+  def buildD(tokenizer: SamTokenizer): Either[Diag, ProgramSymbols] =
+    try
+      val res = build(tokenizer)
+      Right(res)
+    catch
+      case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+      case te: TypeErrorException   => Left(TypeDiag(te.getMessage, te.line, te.column))
+      case ce: CompilerException    => Left(ResolveDiag(ce.getMessage, ce.line, ce.column))
+      case t: Throwable             => Left(ResolveDiag(Option(t.getMessage).getOrElse("Unknown error"), -1))
 
   private def parseClass(tz: SamTokenizer): Unit = {
     CompilerUtils.expectWord(tz, "class", tz.lineNo())
@@ -63,7 +75,7 @@ final class SymbolTableBuilder {
         }
       }
     }
-    if (!CompilerUtils.check(tz, '{')) throw new CompilerException(s"Expected '{' after class header for class '$className'", tz.lineNo())
+  if (!CompilerUtils.check(tz, '{')) throw new SyntaxErrorException(s"Expected '{' after class header for class '$className'", tz.lineNo())
     while (!CompilerUtils.check(tz, '}')) { parseMethod(tz, classSym) }
     program.addClass(classSym)
   }
@@ -79,19 +91,19 @@ final class SymbolTableBuilder {
       catch { case _: TypeErrorException => returnTypeOpt = Some(Type.INT); classReturnTypeNameOpt = Some(typeWord) }
     }
     val name = CompilerUtils.getIdentifier(tz)
-    val method =
-      (returnTypeOpt, classReturnTypeNameOpt) match {
-        case (None, None) => new MethodSymbol(name, null: ValueType)
-        case (_, Some(className)) => new MethodSymbol(name, className)
-        case (Some(rt), None) => new MethodSymbol(name, rt)
-      }
+      val method = 
+        (returnTypeOpt, classReturnTypeNameOpt) match {
+          case (None, None) => new MethodSymbol(name, None)
+          case (_, Some(className)) => new MethodSymbol(name, Some(ValueType.ofObject(className)))
+          case (Some(rt), None) => new MethodSymbol(name, Some(ValueType.ofPrimitive(rt)))
+        }
     if (classSym.method(name).isDefined)
-      throw new CompilerException(s"Method '$name' already defined in class '${classSym.getName}'", tz.lineNo())
+      throw new SyntaxErrorException(s"Method '$name' already defined in class '${classSym.getName}'", tz.lineNo())
     CompilerUtils.expectChar(tz, '(', tz.lineNo())
     method.setReturnTypePosition(rtLine, rtCol)
     method.addParameterObject("this", classSym.getName)
     if (classSym.getName == "Main" && name == "main" && tz.peekAtKind() == TokenType.WORD)
-      throw new CompilerException("Main.main method must not have parameters", tz.lineNo())
+      throw new SyntaxErrorException("Main.main method must not have parameters", tz.lineNo())
     // Parameters
     var parsingParams = true
     while (parsingParams && isTypeToken(tz, classSym)) {
@@ -138,8 +150,11 @@ final class SymbolTableBuilder {
   private def validateTypes(): Unit = {
     for (cls <- program.allClasses) {
       for (f <- cls.allFields) {
-        if (f.isObject && !program.existsClass(f.getClassTypeName))
-          throw new TypeErrorException(s"Unknown type '${f.getClassTypeName}' for field '${f.getName}' in class '${cls.getName}'", f.getLine, f.getColumn)
+        if (f.isObject) {
+          val cn = f.classTypeNameOpt.getOrElse(f.getClassTypeName)
+          if (!program.existsClass(cn))
+            throw new TypeErrorException(s"Unknown type '${cn}' for field '${f.getName}' in class '${cls.getName}'", f.getLine, f.getColumn)
+        }
       }
       for (m <- cls.allMethods) {
         m.getReturnSig match {
@@ -149,12 +164,18 @@ final class SymbolTableBuilder {
           case _ => ()
         }
         for (p <- m.parameters) {
-          if (p.isObject && !program.existsClass(p.getClassTypeName))
-            throw new TypeErrorException(s"Unknown parameter type '${p.getClassTypeName}' for parameter '${p.getName}' in method '${cls.getName}.${m.getName}'", p.getLine, p.getColumn)
+          if (p.isObject) {
+            val cn = p.classTypeNameOpt.getOrElse(p.getClassTypeName)
+            if (!program.existsClass(cn))
+              throw new TypeErrorException(s"Unknown parameter type '${cn}' for parameter '${p.getName}' in method '${cls.getName}.${m.getName}'", p.getLine, p.getColumn)
+          }
         }
         for (v <- m.locals) {
-          if (v.isObject && !program.existsClass(v.getClassTypeName))
-            throw new TypeErrorException(s"Unknown local type '${v.getClassTypeName}' for variable '${v.getName}' in method '${cls.getName}.${m.getName}'", v.getLine, v.getColumn)
+          if (v.isObject) {
+            val cn = v.classTypeNameOpt.getOrElse(v.getClassTypeName)
+            if (!program.existsClass(cn))
+              throw new TypeErrorException(s"Unknown local type '${cn}' for variable '${v.getName}' in method '${cls.getName}.${m.getName}'", v.getLine, v.getColumn)
+          }
         }
       }
     }

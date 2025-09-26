@@ -2,7 +2,9 @@ package assignment3
 
 import assignment3.symbol._
 import edu.utexas.cs.sam.io.SamTokenizer
+import assignment3.ast.Diag
 import java.io.{BufferedWriter, FileWriter, IOException}
+import scala.util.Using
 import scala.jdk.CollectionConverters._
 import scala.annotation.static
 
@@ -19,33 +21,43 @@ object LiveOak3Compiler {
     reset()
     val ctx = new CompilerContext()
     CompilerUtils.setRecorder(ctx.recorder)
-    try {
+  try {
       val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
       val stb   = new SymbolTableBuilder()
-      val symbols = stb.build(pass1)
+      val symbols = stb.buildD(pass1) match {
+        case Left(diag)  => throw new Exception(diag.message)
+        case Right(symb) => symb
+      }
       symbols.freeze()
   ctx.symbols = symbols
       if (Debug.enabled("symbols")) dumpSymbols(symbols)
       validateEntrypoint(symbols)
-      val program = ProgramParser.parse(fileName, symbols)
+      val program = ProgramParser.parseD(fileName, symbols) match {
+        case Left(diag) => throw new Exception(diag.message)
+        case Right(p)   => p
+      }
   if (Debug.enabled("tokens")) dumpRecordedTokens(ctx)
-      val out = ProgramCodegen.emit(program, ctx)
-      if (Debug.enabled("sam")) Debug.log("sam", () => s"Generated SAM size: ${out.length} chars")
-      out
+      val outEither = ProgramCodegen.emitD(program, ctx)
+      outEither match {
+        case Left(diag) => throw new Exception(diag.message)
+        case Right(code) =>
+          val out = code.toString
+          if (Debug.enabled("sam")) Debug.log("sam", () => s"Generated SAM size: ${out.length} chars")
+          out
+      }
     } catch {
-      case ce: CompilerException => throw ce
-      case t: Throwable          => throw new CompilerException(t.getMessage, -1)
+      case t: Throwable          => throw t
     } finally { cleanup() }
   }
 
   private def cleanup(): Unit = { CompilerUtils.clearTokens(); CompilerUtils.clearRecorder() }
 
   private def validateEntrypoint(symbols: ProgramSymbols): Unit = {
-    val ms = symbols.getEntrypoint().getOrElse(throw new CompilerException(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point", -1))
+    val ms = symbols.getEntrypoint().getOrElse(throw new Exception(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point"))
     if (ms.expectedUserArgs() != 0)
-      throw new CompilerException(s"$ENTRY_CLASS.$ENTRY_METHOD must not declare parameters", entrypointErrorLine(ms))
+      throw new Exception(s"$ENTRY_CLASS.$ENTRY_METHOD must not declare parameters")
     if (ms.parameters.isEmpty || !ms.parameters.head.isObject || ms.parameters.head.getClassTypeName != ENTRY_CLASS)
-      throw new CompilerException(s"$ENTRY_CLASS.$ENTRY_METHOD must be an instance method of $ENTRY_CLASS", entrypointErrorLine(ms))
+      throw new Exception(s"$ENTRY_CLASS.$ENTRY_METHOD must be an instance method of $ENTRY_CLASS")
   }
 
   private def entrypointErrorLine(ms: MethodSymbol): Int = { val ln = ms.getBodyStartLine(); if (ln > 0) ln else -1 }
@@ -98,8 +110,9 @@ object LiveOak3Compiler {
     val outFile = args(1)
     try {
       val samCode = compile(inFile)
-      val w = new BufferedWriter(new FileWriter(outFile))
-      try w.write(samCode) finally w.close()
+      Using.resource(new BufferedWriter(new FileWriter(outFile))) { w =>
+        w.write(samCode)
+      }
     } catch {
       case e: Exception =>
         System.err.println("Failed to compile " + normalizePathUnix(inFile))

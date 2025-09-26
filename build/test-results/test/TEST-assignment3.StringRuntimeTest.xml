@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="assignment3.StringRuntimeTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2025-09-26T17:05:02" hostname="codespaces-828514" time="0.018">
+  <properties/>
+  <testcase name="concat_two_strings()" classname="assignment3.StringRuntimeTest" time="0.003"/>
+  <testcase name="repeat_string_both_orders()" classname="assignment3.StringRuntimeTest" time="0.007"/>
+  <testcase name="compare_strings_lt_gt_eq()" classname="assignment3.StringRuntimeTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,7 +1,7 @@
 package assignment3.ast
 
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
-import assignment3.CompilerException
+// No longer throw CompilerException; use diagnostics or generic exceptions.
 
 /** Minimal forwarder: delegates semantic checks to IdiomaticSemantic. */
 final class SemanticChecker(currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols) {
@@ -9,11 +9,11 @@ final class SemanticChecker(currentMethod: MethodSymbol, defaultLine: Int, progr
 
   def check(e: Expr): Unit =
     if (e != null) IdiomaticSemantic.checkExprE(e, currentMethod, defaultLine, programSymbols) match
-      case Left(diag) => throw new CompilerException(diag.message, diag.line, diag.column)
+      case Left(diag) => throw new Exception(diag.message)
       case Right(_) => ()
   def check(s: Stmt): Unit =
     if (s != null) IdiomaticSemantic.checkStmtE(s, currentMethod, defaultLine, programSymbols) match
-      case Left(diag) => throw new CompilerException(diag.message, diag.line, diag.column)
+      case Left(diag) => throw new Exception(diag.message)
       case Right(_) => ()
 
   // Either-based convenience, preserving legacy API above

@@ -61,9 +61,7 @@ object CompilerUtils {
   def getInt(f: SamTokenizer): Int = { val v = f.getInt; rec(v.toString); v }
   def getOp(f: SamTokenizer): Char = { val o = f.getOp; rec(o.toString); o }
   def skipToken(f: SamTokenizer): Unit = { f.skipToken(); rec(".") }
-  private def currentColumn(f: SamTokenizer): Int =
-    try f.getClass.getMethod("colNo").invoke(f).asInstanceOf[Int] catch { case _: Throwable => -1 }
-  def column(f: SamTokenizer): Int = currentColumn(f)
+  def column(f: SamTokenizer): Int = TokenizerOps.column(f)
   def isTypeWord(
     tz: SamTokenizer,
     symbols: assignment3.symbol.ProgramSymbols,

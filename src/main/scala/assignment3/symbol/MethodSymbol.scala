@@ -6,7 +6,7 @@ import assignment3.{Type, ValueType}
 import scala.collection.mutable.ListBuffer
 import assignment3.ast.high.ReturnSig
 
-final class MethodSymbol(val name: String, val returnValueType: ValueType) {
+final class MethodSymbol(val name: String, ret: ValueType) {
   private val parametersBuf = ListBuffer.empty[VarSymbol]
   private val localsBuf = ListBuffer.empty[VarSymbol]
   private val byName = scala.collection.mutable.LinkedHashMap.empty[String, VarSymbol]
@@ -14,8 +14,9 @@ final class MethodSymbol(val name: String, val returnValueType: ValueType) {
   private var returnTypeLine: Int = -1
   private var returnTypeColumn: Int = -1
   private var frozen = false
+  private var returnValueTypeOpt0: Option[ValueType] = Option(ret)
 
-  // Java compatibility constructors
+  // Java compatibility constructors (prefer non-null ValueType; use Option helpers elsewhere)
   def this(name: String, returnType: Type) = this(name, if (returnType == null) null else ValueType.ofPrimitive(returnType))
   def this(name: String, classReturnTypeName: String) = this(name, ValueType.ofObject(classReturnTypeName))
   def this(name: String, returnType: Type, classReturnTypeName: String) =
@@ -25,12 +26,17 @@ final class MethodSymbol(val name: String, val returnValueType: ValueType) {
       else ValueType.ofPrimitive(returnType))
 
   def getName: String = name // temporary compatibility; prefer name
-  def getReturnValueType: ValueType = returnValueType // prefer returnValueType
+  def getReturnValueType: ValueType = returnValueTypeOpt0.orNull
+  def returnValueTypeOpt: Option[ValueType] = returnValueTypeOpt0
 
-  def getReturnSig: ReturnSig =
-    if (returnValueType == null) ReturnSig.Void
-    else if (returnValueType.isObject) ReturnSig.Obj(returnValueType.getObject.getClassName)
-    else ReturnSig.Prim(returnValueType.getPrimitive)
+  def getReturnSig: ReturnSig = returnValueTypeOpt0 match {
+    case None => ReturnSig.Void
+    case Some(vt) if vt.isObject => ReturnSig.Obj(vt.getObject.getClassName)
+    case Some(vt) => ReturnSig.Prim(vt.getPrimitive)
+  }
+
+  // Safer construction from Option types
+  def this(name: String, retOpt: Option[ValueType]) = this(name, retOpt.orNull)
 
   def parameters: List[VarSymbol] = parametersBuf.toList
   def locals: List[VarSymbol] = localsBuf.toList

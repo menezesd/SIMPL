@@ -5,6 +5,7 @@ import assignment3.symbol._
 import edu.utexas.cs.sam.io.SamTokenizer
 import edu.utexas.cs.sam.io.Tokenizer.TokenType
 import scala.collection.mutable.ListBuffer
+import assignment3.ast.{Diag, SyntaxDiag, TypeDiag, ResolveDiag}
 
 /** Scala port of high-level structural parser (classes/methods). */
 private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSymbols) {
@@ -16,11 +17,20 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
     ProgramNode(classes.toList)
   }
 
+  // Diagnostic-first parsing
+  def parseProgramD(): Either[Diag, ProgramNode] =
+    try Right(parseProgram())
+    catch
+      case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
+      case te: TypeErrorException   => Left(TypeDiag(te.getMessage, te.line, te.column))
+      case ce: CompilerException    => Left(ResolveDiag(ce.getMessage, ce.line, ce.column))
+      case t: Throwable             => Left(ResolveDiag(Option(t.getMessage).getOrElse("Unknown error"), -1))
+
   private def parseClass(): ClassNode = {
     CompilerUtils.expectWord(tz, "class", tz.lineNo())
     val className = CompilerUtils.getIdentifier(tz)
     val csOpt = symbols.getClass(className)
-    val cs = csOpt.getOrElse(throw new CompilerException(s"Class symbol missing for '$className'", tz.lineNo()))
+  val cs = csOpt.getOrElse(throw new SyntaxErrorException(s"Class symbol missing for '$className'", tz.lineNo()))
     if (CompilerUtils.check(tz, '(')) {
       if (!CompilerUtils.check(tz, ')')) {
         while (CompilerUtils.isTypeWord(tz, symbols, className, false, true)) {
@@ -51,25 +61,25 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
         if (vt.isObject) assignment3.ast.high.ReturnSig.Obj(vt.getObject.getClassName)
         else if (vt.isPrimitive) assignment3.ast.high.ReturnSig.Prim(vt.getPrimitive)
         else assignment3.ast.high.ReturnSig.Void
-      } else throw new SyntaxErrorException("Expected return type", tz.lineNo())
+  } else throw new SyntaxErrorException("Expected return type", tz.lineNo())
 
     val methodName = CompilerUtils.getIdentifier(tz)
     val msOpt = symbols.getMethod(className, methodName)
-    val ms = msOpt.getOrElse(throw new CompilerException(s"Method symbol missing for '$className.$methodName'", tz.lineNo()))
+  val ms = msOpt.getOrElse(throw new SyntaxErrorException(s"Method symbol missing for '$className.$methodName'", tz.lineNo()))
 
     CompilerUtils.expectChar(tz, '(', tz.lineNo())
     val expectedUserParams = assignment3.ast.MethodUtils.expectedUserArgs(ms)
     val params = ListBuffer.empty[ParamNode]
     var paramIndex = 0
     while (tz.peekAtKind() == TokenType.WORD) {
-      val pr = CompilerUtils.getWord(tz)
-      val vt = CompilerUtils.parseTypeOrObjectName(pr, tz.lineNo())
-  val pTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
-  val pobjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
+    val pr = CompilerUtils.getWord(tz)
+    val vt = CompilerUtils.parseTypeOrObjectName(pr, tz.lineNo())
+    val pTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
+    val pobjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
       val pName = CompilerUtils.getIdentifier(tz)
       if (paramIndex >= expectedUserParams) {
         val atLeast = paramIndex + 1
-        throw new SyntaxErrorException(s"Too many parameters in '$methodName': expected $expectedUserParams, got at least $atLeast", tz.lineNo())
+  throw new SyntaxErrorException(s"Too many parameters in '$methodName': expected $expectedUserParams, got at least $atLeast", tz.lineNo())
       }
       val formal = assignment3.ast.MethodUtils.userParamAt(ms, paramIndex)
       val typeOk = if (formal.isObject) pobjOpt.contains(formal.getClassTypeName) else pTypeOpt.contains(formal.getType)
@@ -78,9 +88,9 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
         val expectedType = if (formal.isObject) formal.getClassTypeName else String.valueOf(formal.getType)
         val actualType = pobjOpt.getOrElse(pTypeOpt.map(_.toString).getOrElse("void"))
         val msg = s"Parameter mismatch in '$methodName' at position $position: expected $expectedType ${formal.getName}, but found $actualType $pName"
-        throw new SyntaxErrorException(msg, tz.lineNo())
+  throw new SyntaxErrorException(msg, tz.lineNo())
       }
-      params += ParamNode(pName, pobjOpt.orNull, pTypeOpt.orNull)
+      params += ParamNode(pName, pobjOpt, pTypeOpt)
       paramIndex += 1
       if (!CompilerUtils.check(tz, ',')) { /* stop */ } else ()
     }
@@ -96,7 +106,7 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
       val parsed: assignment3.ast.Stmt = stmtParser.parseStmt()
       val s: assignment3.ast.Stmt = folder.foldStmt(parsed)
       assignment3.ast.IdiomaticSemantic.checkStmtE(s, ms, tz.lineNo(), symbols) match {
-        case Left(diag)  => throw assignment3.ast.Diag.toCompilerException(diag)
+        case Left(diag)  => throw new SyntaxErrorException(diag.message, diag.line, diag.column)
         case Right(()) => ()
       }
       stmts += s
@@ -140,5 +150,9 @@ private object ProgramParser {
   def parse(fileName: String, symbols: ProgramSymbols): ProgramNode = {
     val tz = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
     new ProgramParser(tz, symbols).parseProgram()
+  }
+  def parseD(fileName: String, symbols: ProgramSymbols): Either[Diag, ProgramNode] = {
+    val tz = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
+    new ProgramParser(tz, symbols).parseProgramD()
   }
 }

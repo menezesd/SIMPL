@@ -32,6 +32,11 @@ final case class VarSymbol(
   def getLine: Int = line
   def getColumn: Int = column
 
+  // Idiomatic Option-based accessors (preferred)
+  def primitiveOpt: Option[Type] = if (valueType.isPrimitive) Some(valueType.getPrimitive) else None
+  def classTypeNameOpt: Option[String] = if (valueType.isObject) Some(valueType.getObject.getClassName) else None
+  def objectTypeOpt: Option[ObjectType] = if (valueType.isObject) Some(valueType.getObject) else None
+
   /** Stack frame offset based on calling convention. */
   def stackAddress(totalParams: Int): Int = if (parameter) -(totalParams - index) else 2 + index
 

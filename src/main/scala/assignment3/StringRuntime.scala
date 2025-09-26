@@ -1,5 +1,7 @@
 package assignment3
 
+import assignment3.Offsets.StackOffset
+
 import assignment3.{BinopType, CompilerException, OperatorUtils, SyntaxErrorException, Type}
 
 /** Shared string runtime SAM snippets (Scala port). */
@@ -13,17 +15,27 @@ object StringRuntime {
 
   def repeatString(firstInputType: Type, secondInputType: Type): String = {
     val sb = new SamBuilder()
-    if (firstInputType == Type.STRING) sb.append("SWAP\n")
-    sb.append("LINK\n")
-      .append(s"JSR $REPEAT_LABEL\n")
-      .append("UNLINK\n")
-      .append("ADDSP -1\n")
+  if (firstInputType == Type.STRING) sb.swap()
+    sb.linkCall(REPEAT_LABEL)
+      .addSp(-1)
     sb.toString
   }
 
+  // Java-friendly wrappers: avoid referencing Scala enum constants in Java tests
+  def repeatStringSI(): String = repeatString(Type.STRING, Type.INT) // first is String, second is Int
+  def repeatStringIS(): String = repeatString(Type.INT, Type.STRING) // first is Int, second is String
+
+  // Code-returning convenience wrappers (optional)
+  def repeatStringC(firstInputType: Type, secondInputType: Type): Code = Code.fromString(repeatString(firstInputType, secondInputType))
+  def getStringLengthC(): Code = Code.fromString(getStringLength())
+  def reverseStringC(): Code = Code.fromString(reverseString())
+  def appendStringHeapC(): Code = Code.fromString(appendStringHeap())
+  def concatStringC(): Code = Code.fromString(concatString())
+  def compareStringC(op: Char): Code = Code.fromString(compareString(op))
+
   def getStringLength(): String = {
     val sb = new SamBuilder()
-    sb.append(s"JSR $LENGTH_LABEL\n")
+    sb.jsr(LENGTH_LABEL)
     sb.toString
   }
 
@@ -35,66 +47,65 @@ object StringRuntime {
     val startCountLabel = new Label()
     val stopCountLabel  = new Label()
     sb.label(LENGTH_LABEL)
-    sb.append("SWAP\nDUP\n")
+  sb.swap().dup()
     sb.label(startCountLabel.name)
-    sb.append("DUP\nPUSHIND\n")
-    sb.append("ISNIL\n")
-    sb.append(s"JUMPC ${stopCountLabel.name}\n")
-    sb.append("PUSHIMM 1\nADD\n")
-    sb.append(s"JUMP ${startCountLabel.name}\n")
+  sb.dup().pushInd()
+  sb.isNil().branchIfTruthy(stopCountLabel)
+  sb.pushImmInt(1).add()
+  sb.jump(startCountLabel.name)
     sb.label(stopCountLabel.name)
-    sb.append("SWAP\nSUB\nSWAP\nRST\n")
+  sb.swap().sub().swap().rst()
 
     // STR_REVERSE
     val reverseStartLoopLabel = new Label()
     val reverseStopLoopLabel  = new Label()
     sb.label(REVERSE_LABEL)
-    sb.append("PUSHIMM 0\nPUSHIMM 0\nPUSHIMM 0\n")
-    sb.append("PUSHOFF -1\n")
+  sb.pushImmInt(0).pushImmInt(0).pushImmInt(0)
+  sb.pushOffS(StackOffset(-1))
     sb.append(getStringLength())
-    sb.append("STOREOFF 2\n")
-    sb.append("PUSHOFF 2\nPUSHIMM 1\nADD\nMALLOC\nSTOREOFF 3\n")
-    sb.append("PUSHOFF 3\nSTOREOFF 4\n")
-    sb.append("PUSHOFF 3\nPUSHOFF 2\nADD\nPUSHIMMCH '\\0'\nSTOREIND\n")
+  sb.storeOffS(StackOffset(2))
+  sb.pushOffS(StackOffset(2)).pushImmInt(1).add().malloc().storeOffS(StackOffset(3))
+  sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(4))
+  sb.pushOffS(StackOffset(3)).pushOffS(StackOffset(2)).add().pushImmCh('\u0000').storeInd()
     sb.label(reverseStartLoopLabel.name)
-    sb.append(s"PUSHOFF 2\nISNIL\nJUMPC ${reverseStopLoopLabel.name}\n")
-    sb.append("PUSHOFF 3\nPUSHOFF -1\nPUSHOFF 2\nADD\nPUSHIMM 1\nSUB\nPUSHIND\nSTOREIND\n")
-    sb.append("PUSHOFF 3\nPUSHIMM 1\nADD\nSTOREOFF 3\n")
-    sb.append("PUSHOFF 2\nPUSHIMM 1\nSUB\nSTOREOFF 2\n")
-    sb.append(s"JUMP ${reverseStartLoopLabel.name}\n")
+  sb.pushOffS(StackOffset(2)).jumpIfNil(reverseStopLoopLabel)
+  sb.pushOffS(StackOffset(3)).pushOffS(StackOffset(-1)).pushOffS(StackOffset(2)).add().pushImmInt(1).sub().pushInd().storeInd()
+  sb.pushOffS(StackOffset(3)).pushImmInt(1).add().storeOffS(StackOffset(3))
+  sb.pushOffS(StackOffset(2)).pushImmInt(1).sub().storeOffS(StackOffset(2))
+  sb.jump(reverseStartLoopLabel.name)
     sb.label(reverseStopLoopLabel.name)
-    sb.append("PUSHOFF 4\nSTOREOFF -1\nADDSP -3\nRST\n")
+  sb.pushOffS(StackOffset(4)).storeOffS(StackOffset(-1)).addSp(-3).rst()
 
     // STR_CONCAT
     sb.label(CONCAT_LABEL)
-    sb.append("PUSHIMM 0\nPUSHIMM 0\n")
-    sb.append("PUSHOFF -1\n")
+  sb.pushImmInt(0).pushImmInt(0)
+  sb.pushOffS(StackOffset(-1))
     sb.append(getStringLength())
-    sb.append("PUSHOFF -2\n")
+  sb.pushOffS(StackOffset(-2))
     sb.append(getStringLength())
-    sb.append("ADD\nPUSHIMM 1\nADD\nMALLOC\nSTOREOFF 2\n")
-    sb.append("PUSHOFF 2\nSTOREOFF 3\n")
-    sb.append("PUSHIMM 0\nPUSHOFF 2\nPUSHOFF -2\n")
+  sb.add().pushImmInt(1).add().malloc().storeOffS(StackOffset(2))
+  sb.pushOffS(StackOffset(2)).storeOffS(StackOffset(3))
+  sb.pushImmInt(0).pushOffS(StackOffset(2)).pushOffS(StackOffset(-2))
     sb.append(appendStringHeap())
-    sb.append("STOREOFF 2\n")
-    sb.append("PUSHIMM 0\nPUSHOFF 2\nPUSHOFF -1\n")
+  sb.storeOffS(StackOffset(2))
+  sb.pushImmInt(0).pushOffS(StackOffset(2)).pushOffS(StackOffset(-1))
     sb.append(appendStringHeap())
-    sb.append("STOREOFF 2\n")
-    sb.append("PUSHOFF 3\nSTOREOFF -2\nADDSP -2\nRST\n")
+  sb.storeOffS(StackOffset(2))
+  sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(-2)).addSp(-2).rst()
 
     // STR_APPEND
     val appendStartLoopLabel = new Label()
     val appendStopLoopLabel  = new Label()
     sb.label(APPEND_LABEL)
-    sb.append("PUSHOFF -2\nPUSHOFF -1\n")
+  sb.pushOffS(StackOffset(-2)).pushOffS(StackOffset(-1))
     sb.label(appendStartLoopLabel.name)
-    sb.append(s"PUSHOFF 3\nPUSHIND\nISNIL\nJUMPC ${appendStopLoopLabel.name}\n")
-    sb.append("PUSHOFF 2\nPUSHOFF 3\nPUSHIND\nSTOREIND\n")
-    sb.append("PUSHOFF 2\nPUSHIMM 1\nADD\nSTOREOFF 2\n")
-    sb.append("PUSHOFF 3\nPUSHIMM 1\nADD\nSTOREOFF 3\n")
-    sb.append(s"JUMP ${appendStartLoopLabel.name}\n")
+  sb.pushOffS(StackOffset(3)).pushInd().jumpIfNil(appendStopLoopLabel)
+  sb.pushOffS(StackOffset(2)).pushOffS(StackOffset(3)).pushInd().storeInd()
+  sb.pushOffS(StackOffset(2)).pushImmInt(1).add().storeOffS(StackOffset(2))
+  sb.pushOffS(StackOffset(3)).pushImmInt(1).add().storeOffS(StackOffset(3))
+  sb.jump(appendStartLoopLabel.name)
     sb.label(appendStopLoopLabel.name)
-    sb.append("PUSHOFF 2\nPUSHIMMCH '\\0'\nSTOREIND\nPUSHOFF 2\nSTOREOFF -3\nADDSP -2\nRST\n")
+  sb.pushOffS(StackOffset(2)).pushImmCh('\u0000').storeInd().pushOffS(StackOffset(2)).storeOffS(StackOffset(-3)).addSp(-2).rst()
 
     // STR_REPEAT
     val repeatStartLoopLabel   = new Label()
@@ -102,61 +113,64 @@ object StringRuntime {
     val repeatInvalidParamLabel= new Label()
     val repeatReturnLabel      = new Label()
     sb.label(REPEAT_LABEL)
-    sb.append("PUSHIMM 0\nPUSHIMM 0\nPUSHIMM 0\n")
-    sb.append(s"PUSHOFF -2\nISNEG\nJUMPC ${repeatInvalidParamLabel.name}\n")
-    sb.append("PUSHOFF -1\n")
+  sb.pushImmInt(0).pushImmInt(0).pushImmInt(0)
+  sb.pushOffS(StackOffset(-2)).isNeg().branchIfTruthy(repeatInvalidParamLabel.name)
+  sb.pushOffS(StackOffset(-1))
     sb.append(getStringLength())
-    sb.append("PUSHOFF -2\nTIMES\nPUSHIMM 1\nADD\nMALLOC\nSTOREOFF 3\n")
-    sb.append("PUSHOFF 3\nSTOREOFF 4\n")
+  sb.pushOffS(StackOffset(-2)).mul().pushImmInt(1).add().malloc().storeOffS(StackOffset(3))
+  sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(4))
     sb.label(repeatStartLoopLabel.name)
-    sb.append(s"PUSHOFF 2\nPUSHOFF -2\nEQUAL\nJUMPC ${repeatStopLoopLabel.name}\n")
-    sb.append("PUSHIMM 0\nPUSHOFF 3\nPUSHOFF -1\n")
+  sb.pushOffS(StackOffset(2)).pushOffS(StackOffset(-2)).equal().branchIfTruthy(repeatStopLoopLabel)
+  sb.pushImmInt(0).pushOffS(StackOffset(3)).pushOffS(StackOffset(-1))
     sb.append(appendStringHeap())
-    sb.append("STOREOFF 3\n")
-    sb.append("PUSHOFF 2\nPUSHIMM 1\nADD\nSTOREOFF 2\n")
-    sb.append(s"JUMP ${repeatStartLoopLabel.name}\n")
+  sb.storeOffS(StackOffset(3))
+  sb.pushOffS(StackOffset(2)).pushImmInt(1).add().storeOffS(StackOffset(2))
+  sb.jump(repeatStartLoopLabel.name)
     sb.label(repeatStopLoopLabel.name)
-    sb.append(s"PUSHOFF 4\nSTOREOFF -2\nJUMP ${repeatReturnLabel.name}\n")
+  sb.pushOffS(StackOffset(4)).storeOffS(StackOffset(-2)).jump(repeatReturnLabel.name)
     sb.label(repeatInvalidParamLabel.name)
-    sb.append("PUSHIMMSTR \"\"\nSTOREOFF -2\n")
+  sb.pushImmStr("\"\"").storeOffS(StackOffset(-2))
     sb.label(repeatReturnLabel.name)
-    sb.append("ADDSP -3\nRST\n")
+  sb.addSp(-3).rst()
 
     // STR_COMPARE
     val cmpStartLoopLabel = new Label()
     val cmpStopLoopLabel  = new Label()
     sb.label(COMPARE_LABEL)
-    sb.append("PUSHIMM 0\nPUSHIMM 0\n")
+  sb.pushImmInt(0).pushImmInt(0)
     sb.label(cmpStartLoopLabel.name)
-    sb.append(s"PUSHOFF -2\nPUSHOFF 2\nADD\nPUSHIND\nISNIL\n\n")
-    sb.append("PUSHOFF -1\nPUSHOFF 2\nADD\nPUSHIND\nISNIL\nAND\n")
-    sb.append(s"JUMPC ${cmpStopLoopLabel.name}\n")
-    sb.append("PUSHOFF -2\nPUSHOFF 2\nADD\nPUSHIND\n")
-    sb.append("PUSHOFF -1\nPUSHOFF 2\nADD\nPUSHIND\nCMP\nSTOREOFF 3\n")
-    sb.append(s"PUSHOFF 3\nJUMPC ${cmpStopLoopLabel.name}\n")
-    sb.append("PUSHOFF 2\nPUSHIMM 1\nADD\nSTOREOFF 2\n")
-    sb.append(s"JUMP ${cmpStartLoopLabel.name}\n")
+  sb.pushOffS(StackOffset(-2)).pushOffS(StackOffset(2)).add().pushInd().isNil()
+  sb.pushOffS(StackOffset(-1)).pushOffS(StackOffset(2)).add().pushInd().isNil().and()
+  sb.branchIfTruthy(cmpStopLoopLabel.name)
+  sb.pushOffS(StackOffset(-2)).pushOffS(StackOffset(2)).add().pushInd()
+  sb.pushOffS(StackOffset(-1)).pushOffS(StackOffset(2)).add().pushInd().cmp().storeOffS(StackOffset(3))
+  sb.pushOffS(StackOffset(3)).branchIfTruthy(cmpStopLoopLabel.name)
+  sb.pushOffS(StackOffset(2)).pushImmInt(1).add().storeOffS(StackOffset(2))
+  sb.jump(cmpStartLoopLabel.name)
     sb.label(cmpStopLoopLabel.name)
-    sb.append("PUSHOFF 3\nSTOREOFF -2\nADDSP -2\nRST\n")
+  sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(-2)).addSp(-2).rst()
 
     sb.toString
   }
 
+  /** Code-returning variant of emitAllStringFunctions (preferred for composition). */
+  def emitAllStringFunctionsC(): Code = Code.fromString(emitAllStringFunctions())
+
   def reverseString(): String = {
     val sb = new SamBuilder()
-    sb.append(s"LINK\nJSR $REVERSE_LABEL\nUNLINK\n")
+  sb.linkCall(REVERSE_LABEL)
     sb.toString
   }
 
   def appendStringHeap(): String = {
     val sb = new SamBuilder()
-    sb.append(s"LINK\nJSR $APPEND_LABEL\nUNLINK\nADDSP -2\n")
+  sb.linkCall(APPEND_LABEL).addSp(-2)
     sb.toString
   }
 
   def concatString(): String = {
     val sb = new SamBuilder()
-    sb.append(s"LINK\nJSR $CONCAT_LABEL\nUNLINK\nADDSP -1\n")
+  sb.linkCall(CONCAT_LABEL).addSp(-1)
     sb.toString
   }
 
@@ -165,11 +179,11 @@ object StringRuntime {
     if (OperatorUtils.getBinopType(op) != BinopType.COMPARISON)
       throw new SyntaxErrorException(s"compareString receive invalid operation: $op", -1)
     val sb = new SamBuilder()
-    sb.append(s"LINK\nJSR $COMPARE_LABEL\nUNLINK\nADDSP -1\n")
-    if (op == '<') sb.append("PUSHIMM 1\n")
-    else if (op == '>') sb.append("PUSHIMM -1\n")
-    else sb.append("PUSHIMM 0\n")
-    sb.append("EQUAL\n")
+  sb.linkCall(COMPARE_LABEL).addSp(-1)
+    if (op == '<') sb.pushImmInt(1)
+    else if (op == '>') sb.pushImmInt(-1)
+    else sb.pushImmInt(0)
+    sb.equal()
     sb.toString
   }
 }
