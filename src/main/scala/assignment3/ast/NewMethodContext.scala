@@ -6,10 +6,7 @@ import assignment3.symbol.{MethodSymbol, ProgramSymbols, VarSymbol}
 /** MethodContext backed by MethodSymbol (Scala port). */
 final class NewMethodContext(val symbol: MethodSymbol, programSymbols: ProgramSymbols) extends MethodContext {
   override def getName: String = symbol.getName
-  override def getReturnType: Type = symbol.getReturnSig match {
-    case assignment3.ast.high.ReturnSig.Prim(t) => t
-    case _ => Type.INT
-  }
+  override def getReturnType: Type = assignment3.ast.CodegenTypes.loweredReturn(symbol)
   override def numParameters(): Int = symbol.numParameters()
   override def numLocals(): Int = symbol.numLocals()
   override def returnAddressOffset(): Int = symbol.returnAddressOffset()

@@ -4,6 +4,14 @@ import assignment3.Type
 
 /** Helpers for resolving simple Type and ValueType for idiomatic AST. */
 object IdiomaticTypeUtils:
+  // Lowered return type for expressions from a method/callable: object/void -> INT, primitive -> that type
+  def loweredReturnOf(m: CallableMethod): Type = m match
+    case sm: assignment3.ast.ScalaCallableMethod =>
+      sm.getReturnSig match
+        case assignment3.ast.high.ReturnSig.Prim(t) => t
+        case _ => Type.INT
+    case _ => m.getReturnType
+
   def typeOf(e: Expr, method: assignment3.ast.MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): Type = e match
     case IntLit(_, _)  => Type.INT
     case BoolLit(_, _) => Type.BOOL
@@ -21,20 +29,8 @@ object IdiomaticTypeUtils:
     case Ternary(_, t, _, rt, _) => rt.getOrElse(typeOf(t, method, programSymbols))
     case This(_) => Type.INT
     case FieldAccess(_, _, fi, _) => fi.filter(_.valueType.isPrimitive).map(_.valueType.getPrimitive).getOrElse(Type.INT)
-    case Call(m, _, _) =>
-      m match
-        case sm: assignment3.ast.ScalaCallableMethod =>
-          sm.getReturnSig match
-            case assignment3.ast.high.ReturnSig.Prim(t) => t
-            case _ => Type.INT
-        case _ => m.getReturnType
-    case InstanceCall(_, m, _, _) =>
-      m match
-        case sm: assignment3.ast.ScalaCallableMethod =>
-          sm.getReturnSig match
-            case assignment3.ast.high.ReturnSig.Prim(t) => t
-            case _ => Type.INT
-        case _ => m.getReturnType
+    case Call(m, _, _) => loweredReturnOf(m)
+    case InstanceCall(_, m, _, _) => loweredReturnOf(m)
     case NewObject(_, _, _) => Type.INT
 
   def classNameOf(e: Expr, method: assignment3.ast.MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): Option[String] = e match
