@@ -4,7 +4,10 @@ import assignment3.{Type, ValueType}
 import assignment3.symbol.MethodSymbol
 import assignment3.ast.high.ReturnSig
 
-/** Callable wrapper for instance methods (Scala port). */
+/**
+ * DEPRECATED: Use ScalaInstanceCallable defined in infrastructure.scala
+ */
+@deprecated("Use ScalaInstanceCallable instead", since = "3.0")
 final class InstanceCallableMethod(className: String, symbol: MethodSymbol) extends ScalaCallableMethod {
   override def getName: String = s"${className}_${symbol.getName}"
   override def getReturnValueType: ValueType = symbol.getReturnValueType

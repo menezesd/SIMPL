@@ -4,7 +4,11 @@ import assignment3.{Type, ValueType}
 import assignment3.symbol.MethodSymbol
 import assignment3.ast.high.ReturnSig
 
-/** Unified callable for instance method invocation (Scala port). */
+/**
+ * DEPRECATED: Use ScalaInstanceCallable (symbol-backed) or ScalaInstanceCallableFallback (label-only)
+ * defined in infrastructure.scala. This legacy class remains for historical parity but is not referenced.
+ */
+@deprecated("Use ScalaInstanceCallable or ScalaInstanceCallableFallback instead", since = "3.0")
 final class InstanceCallable(classNameOrLabel: String, methodSymbol: MethodSymbol, labelOnlyReturn: ValueType, labelOnlyParamCount: Int) extends ScalaCallableMethod {
   // If methodSymbol != null => symbol-backed, else label-only
   private val symbol = methodSymbol

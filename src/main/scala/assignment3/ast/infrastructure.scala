@@ -36,10 +36,10 @@ trait ScalaCallableMethod extends CallableMethod {
 
 final class ScalaInstanceCallable(className: String, symbol: MethodSymbol) extends ScalaCallableMethod {
   override def getName: String = s"${className}_${symbol.getName}"
-  // Ensure Expr type is always a lowered primitive for codegen; map object/void to INT
-  override def getReturnType: Type = {
-    val rv = symbol.getReturnValueType
-    if (rv == null || rv.isObject) Type.INT else rv.getPrimitive
+  // Ensure Expr type is always a lowered primitive for codegen; map object/void to INT using ReturnSig
+  override def getReturnType: Type = symbol.getReturnSig match {
+    case assignment3.ast.high.ReturnSig.Prim(t) => t
+    case _ => Type.INT
   }
   override def getReturnValueType: ValueType = symbol.getReturnValueType
   override def getReturnSig: assignment3.ast.high.ReturnSig = symbol.getReturnSig
@@ -50,12 +50,17 @@ final class ScalaInstanceCallable(className: String, symbol: MethodSymbol) exten
 
 final class ScalaInstanceCallableFallback(label: String, ret: ValueType, count: Int) extends ScalaCallableMethod {
   override def getName: String = label
-  override def getReturnType: Type = if (ret == null) Type.INT else ret.getPrimitive
+  override def getReturnType: Type = ret match {
+    case null => Type.INT
+    case vt if vt.isObject => Type.INT
+    case vt => vt.getPrimitive
+  }
   override def getReturnValueType: ValueType = ret
-  override def getReturnSig: assignment3.ast.high.ReturnSig =
-    if ret == null then assignment3.ast.high.ReturnSig.Void
-    else if ret.isObject then assignment3.ast.high.ReturnSig.Obj(ret.getObject.getClassName)
-    else assignment3.ast.high.ReturnSig.Prim(ret.getPrimitive)
+  override def getReturnSig: assignment3.ast.high.ReturnSig = ret match {
+    case null => assignment3.ast.high.ReturnSig.Void
+    case vt if vt.isObject => assignment3.ast.high.ReturnSig.Obj(vt.getObject.getClassName)
+    case vt => assignment3.ast.high.ReturnSig.Prim(vt.getPrimitive)
+  }
   override def getParamCount: Int = count
   override def getParameterType(index: Int): Type = Type.INT // lowered default
 }
