@@ -100,7 +100,7 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
       val parsed: assignment3.ast.Stmt = stmtParser.parseStmt()
       val s: assignment3.ast.Stmt = folder.foldStmt(parsed)
       assignment3.ast.IdiomaticSemantic.checkStmtE(s, ms, tz.lineNo(), symbols) match {
-        case Left(diag)  => throw new CompilerException("Semantic error: " + diag.message, tz.lineNo())
+        case Left(diag)  => throw assignment3.ast.Diag.toCompilerException(diag)
         case Right(()) => ()
       }
       stmts += s
