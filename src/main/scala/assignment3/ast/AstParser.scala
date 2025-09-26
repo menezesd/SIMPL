@@ -166,7 +166,11 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
           case assignment3.ast.high.ReturnSig.Prim(t) => assignment3.ValueType.ofPrimitive(t)
         }
         val callable: assignment3.ast.CallableMethod = msEither match
-          case Right(ms) => new assignment3.ast.ScalaInstanceCallable(classNameOpt.orNull, ms)
+          case Right(ms) =>
+            val cn = classNameOpt.getOrElse {
+              throw new TypeErrorException("Cannot determine target class for instance call", tokenizer.lineNo(), CompilerUtils.column(tokenizer))
+            }
+            new assignment3.ast.ScalaInstanceCallable(cn, ms)
           case Left(_) => new assignment3.ast.ScalaInstanceCallableFallback(
             labelName,
             retVtOpt.orNull,
