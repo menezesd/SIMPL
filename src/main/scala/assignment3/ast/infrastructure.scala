@@ -34,11 +34,8 @@ trait ScalaCallableMethod extends CallableMethod {
 
 final class ScalaInstanceCallable(className: String, symbol: MethodSymbol) extends ScalaCallableMethod {
   override def getName: String = s"${className}_${symbol.getName}"
-  // Ensure Expr type is always a lowered primitive for codegen; map object/void to INT using ReturnSig
-  override def getReturnType: Type = symbol.getReturnSig match {
-    case assignment3.ast.high.ReturnSig.Prim(t) => t
-    case _ => Type.INT
-  }
+  // Ensure Expr type is always a lowered primitive for codegen; map object/void to INT
+  override def getReturnType: Type = CodegenTypes.loweredReturn(symbol)
   override def getReturnValueType: ValueType = symbol.getReturnValueType
   override def getReturnSig: assignment3.ast.high.ReturnSig = symbol.getReturnSig
   override def getParamCount: Int = symbol.numParameters() + 1 // implicit this
