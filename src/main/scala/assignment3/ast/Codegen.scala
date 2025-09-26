@@ -56,39 +56,11 @@ object IdiomaticCodegen:
       // Short-circuit && and || implemented as '&' and '|'
       if ((op == BinaryOp.And || op == BinaryOp.Or) && lt == Type.BOOL && rt == Type.BOOL) then
         val sb = new SamBuilder()
-        if (op == BinaryOp.And) then
-          val falseLbl = new Label(); val endLbl = new Label()
-          sb.append(leftCode).append("ISNIL\nJUMPC ").append(falseLbl.getName).append("\n")
-          sb.append(rightCode).append("ISNIL\nJUMPC ").append(falseLbl.getName).append("\n")
-          sb.append("PUSHIMM 1\nJUMP ").append(endLbl.getName).append("\n")
-          sb.label(falseLbl.getName).append("PUSHIMM 0\n").label(endLbl.getName)
-          return sb.toString
-        else
-          val needRight = new Label(); val falseLbl = new Label(); val endLbl = new Label()
-          sb.append(leftCode).append("ISNIL\nJUMPC ").append(needRight.getName).append("\n")
-          sb.append("PUSHIMM 1\nJUMP ").append(endLbl.getName).append("\n")
-          sb.label(needRight.getName)
-          sb.append(rightCode).append("ISNIL\nJUMPC ").append(falseLbl.getName).append("\n")
-          sb.append("PUSHIMM 1\nJUMP ").append(endLbl.getName).append("\n")
-          sb.label(falseLbl.getName).append("PUSHIMM 0\n").label(endLbl.getName)
-          return sb.toString
+        if (op == BinaryOp.And) then return emitShortCircuitAnd(leftCode, rightCode, sb)
+        else return emitShortCircuitOr(leftCode, rightCode, sb)
       // String-special cases
       if (lt == Type.STRING || rt == Type.STRING) then
-        op match
-          case BinaryOp.Mul if (lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING) =>
-            return leftCode + rightCode + StringRuntime.repeatString(lt, rt)
-          case BinaryOp.Add =>
-            if (lt == Type.STRING && rt == Type.STRING) then return leftCode + rightCode + StringRuntime.concatString()
-            else throw new CompilerException("'+' only defined for String+String or numeric addition", -1)
-          case BinaryOp.Lt | BinaryOp.Gt | BinaryOp.Eq =>
-            if (lt == Type.STRING && rt == Type.STRING) then
-              val ch = op match
-                case BinaryOp.Lt => '<'
-                case BinaryOp.Gt => '>'
-                case _           => '='
-              return leftCode + rightCode + StringRuntime.compareString(ch)
-            else throw new CompilerException("String comparison requires both operands String", -1)
-          case _ => throw new CompilerException("Unsupported operator for String operands", -1)
+        return emitStringBinary(op, lt, rt, leftCode, rightCode)
       val ch = op match
         case BinaryOp.Add => '+'
         case BinaryOp.Sub => '-'
@@ -178,6 +150,44 @@ object IdiomaticCodegen:
   private def hasReturnValue(m: id.CallableMethod): Boolean = m match
     case sm: ScalaCallableMethod => sm.getReturnSig != ReturnSig.Void
     case _ => m.getReturnType != null
+
+  // Helper: short-circuit AND (both sides must be truthy; otherwise false)
+  private def emitShortCircuitAnd(leftCode: String, rightCode: String, sb: SamBuilder): String =
+    val falseLbl = new Label(); val endLbl = new Label()
+    sb.append(leftCode).append("ISNIL\nJUMPC ").append(falseLbl.getName).append("\n")
+      .append(rightCode).append("ISNIL\nJUMPC ").append(falseLbl.getName).append("\n")
+      .append("PUSHIMM 1\nJUMP ").append(endLbl.getName).append("\n")
+      .label(falseLbl.getName).append("PUSHIMM 0\n").label(endLbl.getName)
+    sb.toString
+
+  // Helper: short-circuit OR (if left true, skip right)
+  private def emitShortCircuitOr(leftCode: String, rightCode: String, sb: SamBuilder): String =
+    val needRight = new Label(); val falseLbl = new Label(); val endLbl = new Label()
+    sb.append(leftCode).append("ISNIL\nJUMPC ").append(needRight.getName).append("\n")
+      .append("PUSHIMM 1\nJUMP ").append(endLbl.getName).append("\n")
+      .label(needRight.getName)
+      .append(rightCode).append("ISNIL\nJUMPC ").append(falseLbl.getName).append("\n")
+      .append("PUSHIMM 1\nJUMP ").append(endLbl.getName).append("\n")
+      .label(falseLbl.getName).append("PUSHIMM 0\n").label(endLbl.getName)
+    sb.toString
+
+  // Helper: string binary operations
+  private def emitStringBinary(op: BinaryOp, lt: Type, rt: Type, leftCode: String, rightCode: String): String =
+    op match
+      case BinaryOp.Mul if (lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING) =>
+        leftCode + rightCode + StringRuntime.repeatString(lt, rt)
+      case BinaryOp.Add =>
+        if (lt == Type.STRING && rt == Type.STRING) then leftCode + rightCode + StringRuntime.concatString()
+        else throw new CompilerException("'+' only defined for String+String or numeric addition", -1)
+      case BinaryOp.Lt | BinaryOp.Gt | BinaryOp.Eq =>
+        if (lt == Type.STRING && rt == Type.STRING) then
+          val ch = op match
+            case BinaryOp.Lt => '<'
+            case BinaryOp.Gt => '>'
+            case _           => '='
+          leftCode + rightCode + StringRuntime.compareString(ch)
+        else throw new CompilerException("String comparison requires both operands String", -1)
+      case _ => throw new CompilerException("Unsupported operator for String operands", -1)
 
   def emitStmt(s: id.Stmt, ctx: Ctx): String = s match
     case id.Block(statements, _) =>
