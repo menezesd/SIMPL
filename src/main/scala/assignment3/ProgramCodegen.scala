@@ -11,7 +11,7 @@ private object ProgramCodegen {
   def emit(program: ProgramNode, ctx: CompilerContext): String = {
     ctx.symbols match {
       case Some(symbols) => new ProgramCodegen(symbols, ctx).generate(program)
-      case None => throw CompilerException("CompilerContext.symbols is not set", -1)
+      case None => throw new Exception("CompilerContext.symbols is not set")
     }
   }
 
@@ -58,7 +58,7 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
 
   private def emitMethod(m: MethodNode): Unit = {
     val ms = symbols.getMethod(m.className, m.name)
-      .getOrElse(throw CompilerException(s"Method symbol missing for '${m.className}.${m.name}'", -1))
+      .getOrElse(throw new Exception(s"Method symbol missing for '${m.className}.${m.name}'"))
   val label = ctx.labeler.methodLabel(m.className, m.name)
   sb.append("\n").label(label)
     val localCount = ms.numLocals()
@@ -75,10 +75,10 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
             val stmts = b.statements
             if (stmts.isEmpty || !stmts.last.isInstanceOf[id.Return]) sb.pushImm(0)
           }
-        case other => throw CompilerException(s"Unknown method body type: ${other.getClass.getName}", -1)
+        case other => throw new Exception(s"Unknown method body type: ${other.getClass.getName}")
       }
     } catch {
-      case e: Exception => throw CompilerException(s"Body codegen failed: ${e.getMessage}", -1)
+      case e: Exception => throw new Exception(s"Body codegen failed: ${e.getMessage}")
     }
     MethodEmit.end(sb, frame, cleanup)
   }

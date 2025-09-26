@@ -19,7 +19,6 @@ final class SymbolTableBuilder {
       /*excludeStmtStarters*/ true
     )
 
-  @throws[CompilerException]
   def build(tokenizer: SamTokenizer): ProgramSymbols = {
     while (tokenizer.peekAtKind() != TokenType.EOF) {
       parseClass(tokenizer)
@@ -36,7 +35,6 @@ final class SymbolTableBuilder {
     catch
       case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
       case te: TypeErrorException   => Left(TypeDiag(te.getMessage, te.line, te.column))
-      case ce: CompilerException    => Left(ResolveDiag(ce.getMessage, ce.line, ce.column))
       case t: Throwable             => Left(ResolveDiag(Option(t.getMessage).getOrElse("Unknown error"), -1))
 
   private def parseClass(tz: SamTokenizer): Unit = {

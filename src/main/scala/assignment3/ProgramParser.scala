@@ -23,7 +23,6 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
     catch
       case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
       case te: TypeErrorException   => Left(TypeDiag(te.getMessage, te.line, te.column))
-      case ce: CompilerException    => Left(ResolveDiag(ce.getMessage, ce.line, ce.column))
       case t: Throwable             => Left(ResolveDiag(Option(t.getMessage).getOrElse("Unknown error"), -1))
 
   private def parseClass(): ClassNode = {

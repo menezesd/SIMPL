@@ -3,9 +3,6 @@ package assignment3.ast
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 
 object AstEither:
-  // Adapters for existing call sites expecting CompilerException
-  def toCE[L <: Diag, R](e: Either[L, R]): Either[assignment3.CompilerException, R] = e.left.map(Diag.toCompilerException)
-
   /** Resolve the class name of an expression as Either[Diag, String]. */
   def resolveClassNameD(e: Expr, method: MethodContext, ps: ProgramSymbols, line: Int, column: Int = -1): Either[Diag, String] =
     IdiomaticTypeUtils.classNameOf(e, method, ps)
@@ -26,11 +23,6 @@ object AstEither:
       cs <- ps.getClass(cn).toRight(ResolveDiag(s"Unknown class '$cn'", line, column))
       fi <- cs.getFieldInfo(fieldName).toRight(ResolveDiag(s"Unknown field '$fieldName' on class '$cn'", line, column))
     yield fi
-
-  // Backwards-compat: CE-typed variants delegating to Diag and adapting the Left
-  def resolveClassName(e: Expr, method: MethodContext, ps: ProgramSymbols, line: Int) = toCE(resolveClassNameD(e, method, ps, line))
-  def resolveMethodOnExpr(e: Expr, methodName: String, method: MethodContext, ps: ProgramSymbols, line: Int) = toCE(resolveMethodOnExprD(e, methodName, method, ps, line))
-  def resolveFieldInfo(target: Expr, fieldName: String, method: MethodContext, ps: ProgramSymbols, line: Int) = toCE(resolveFieldInfoD(target, fieldName, method, ps, line))
 
   /** Type-check and build a binary expression with diagnostic result. Mirrors AstParser.buildBinary logic. */
   def buildBinaryD(left: Expr, op: Char, right: Expr, method: MethodContext, ps: ProgramSymbols, line: Int, column: Int = -1): Either[Diag, Expr] =

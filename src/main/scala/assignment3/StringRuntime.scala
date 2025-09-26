@@ -2,7 +2,7 @@ package assignment3
 
 import assignment3.Offsets.StackOffset
 
-import assignment3.{BinopType, CompilerException, OperatorUtils, SyntaxErrorException, Type}
+import assignment3.{BinopType, OperatorUtils, SyntaxErrorException, Type}
 
 /** Shared string runtime SAM snippets (Scala port). */
 object StringRuntime {
@@ -174,7 +174,6 @@ object StringRuntime {
     sb.toString
   }
 
-  @throws[CompilerException]
   def compareString(op: Char): String = {
     if (OperatorUtils.getBinopType(op) != BinopType.COMPARISON)
       throw new SyntaxErrorException(s"compareString receive invalid operation: $op", -1)
