@@ -27,103 +27,11 @@ object IdiomaticCodegen:
         case smf: SymbolMethodFrame => IdiomaticTypeUtils.typeOf(e, new NewMethodContext(smf.getSymbol, ictx.programSymbolsOpt.get), ictx.programSymbolsOpt.get)
         case _ => Type.INT
 
+  // Non-diagnostic codegen delegates to diagnostic versions and converts Diag -> Exception
   private def emitExprCore(e: id.Expr, ctx: Ctx): Code =
-    e match
-      case id.IntLit(v, _)  => Code.from(new SamBuilder().pushImmInt(v))
-      case id.BoolLit(v, _) => Code.from(new SamBuilder().pushImmInt(if v then 1 else 0))
-      case id.StrLit(v, _)  => Code.from(new SamBuilder().pushImmStr(s"\"${v}\""))
-      case id.NullLit(_)    => Code.from(new SamBuilder().pushImmInt(0))
-      case id.Var(name, _) =>
-        if ctx.frameOpt.nonEmpty then
-          val vbOpt = ctx.frameOpt.get.lookupVar(name)
-          val vb = vbOpt.getOrElse(throw new Exception("Undeclared variable: " + name))
-          Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
-        else Code.from(new SamBuilder().pushOffS(StackOffset.returnSlot))
-      case id.FieldAccess(target, _field, fieldInfo, _) =>
-        val off = fieldInfo.map(_.offset).getOrElse(-1)
-        if off < 0 then throw new Exception("Unknown field offset for field: " + _field)
-        val sb = new SamBuilder()
-        sb.append(emitExprCore(target, ctx)).addFieldOff(FieldOffset(off)).pushInd()
-        Code.from(sb)
-      case id.Unary(op, expr, rt, _) =>
-        val base = emitExprCore(expr, ctx)
-        op match
-          case UnaryOp.Neg =>
-            if rt.exists(_ == Type.STRING) then base + Code.fromString(StringRuntime.reverseString())
-            else base + Code.fromString(OperatorUtils.getUnop('~'))
-          case UnaryOp.Not =>
-            base + Code.fromString(OperatorUtils.getUnop('!'))
-      case id.Binary(op, left, right, _, _) =>
-        val lt = tOf(left, ctx); val rt = tOf(right, ctx)
-        val leftCode = emitExprCore(left, ctx); val rightCode = emitExprCore(right, ctx)
-        if (op == BinaryOp.And || op == BinaryOp.Or) && lt == Type.BOOL && rt == Type.BOOL then
-          val sb = new SamBuilder()
-          if op == BinaryOp.And then emitShortCircuitAndC(leftCode, rightCode, sb)
-          else emitShortCircuitOrC(leftCode, rightCode, sb)
-        else if (lt == Type.STRING || rt == Type.STRING) then
-          emitStringBinaryC(op, lt, rt, leftCode, rightCode)
-        else
-          val ch = op match
-            case BinaryOp.Add => '+'
-            case BinaryOp.Sub => '-'
-            case BinaryOp.Mul => '*'
-            case BinaryOp.Div => '/'
-            case BinaryOp.Mod => '%'
-            case BinaryOp.And => '&'
-            case BinaryOp.Or  => '|'
-            case BinaryOp.Eq  => '='
-            case BinaryOp.Lt  => '<'
-            case BinaryOp.Gt  => '>'
-            case BinaryOp.Le  => throw new Exception("'<= not supported by runtime'")
-            case BinaryOp.Ge  => throw new Exception(">= not supported by runtime")
-            case BinaryOp.Ne  => throw new Exception("!= not supported by runtime")
-            case BinaryOp.Concat => throw new Exception("concat is internal-only for strings")
-          leftCode + rightCode + Code.fromString(OperatorUtils.getBinop(ch))
-      case id.Ternary(cond, thenExpr, elseExpr, _, _) =>
-        val condCode = emitExprCore(cond, ctx)
-        val thenCode = emitExprCore(thenExpr, ctx)
-        val elseCode = emitExprCore(elseExpr, ctx)
-        val falseLabel = new Label(); val endLabel = new Label()
-        val sb = new SamBuilder()
-        sb.append(condCode).jumpIfNil(falseLabel).append(thenCode).jump(endLabel).label(falseLabel).append(elseCode).label(endLabel)
-        Code.from(sb)
-      case id.Call(m, args, _) =>
-        val sb = new SamBuilder()
-        val hasReturn = hasReturnValue(m)
-        sb.pushImmInt(0)
-        args.foreach(a => sb.append(emitExprCore(a, ctx)))
-        val paramCount = args.size
-        sb.append(emitCallC(m.getName, paramCount, hasReturn = hasReturn))
-        Code.from(sb)
-      case id.This(_) =>
-        if ctx.frameOpt.nonEmpty then
-          val vb = ctx.frameOpt.get.lookupVar("this").getOrElse(throw new Exception("'this' not found in current frame"))
-          Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
-        else Code.from(new SamBuilder().pushOffS(StackOffset.thisSlot))
-      case id.NewObject(className, args, _) =>
-        val psOpt = ctx.programSymbolsOpt
-        val csOpt = psOpt.flatMap(_.getClass(className))
-        val numFields = csOpt.map(_.numFields()).getOrElse(1)
-        val sb = new SamBuilder()
-        sb.pushImmInt(numFields).malloc()
-        if csOpt.exists(_.method(className).isDefined) then
-          sb.dup()
-          sb.pushImmInt(0).swap()
-          args.foreach(a => sb.append(emitExprCore(a, ctx)))
-          sb.linkCall(s"${className}_${className}")
-          val paramCount = args.size + 1
-          sb.addSp(-paramCount)
-          sb.addSp(-1)
-        Code.from(sb)
-      case id.InstanceCall(target, m, args, _) =>
-        val sb = new SamBuilder()
-        val hasReturn = hasReturnValue(m)
-        sb.pushImmInt(0)
-        sb.append(emitExprCore(target, ctx))
-        args.foreach(a => sb.append(emitExprCore(a, ctx)))
-        val paramCount = args.size + 1
-        sb.append(emitCallC(m.getName, paramCount, hasReturn))
-        Code.from(sb)
+    emitExprD(e, ctx) match
+      case Right(c) => c
+      case Left(d)  => throw new Exception(d.message)
 
   private def emitCallC(label: String, paramCount: Int, hasReturn: Boolean): Code =
     val sb = new SamBuilder()
@@ -173,58 +81,11 @@ object IdiomaticCodegen:
         else throw new Exception("String comparison requires both operands String")
       case _ => throw new Exception("Unsupported operator for String operands")
 
+  // Non-diagnostic statement codegen delegates to diagnostic version and converts Diag -> Exception
   private def emitStmtCore(s: id.Stmt, ctx: Ctx): Code =
-    s match
-      case id.Block(statements, _) =>
-        val sb = new SamBuilder()
-        statements.foreach(st => sb.append(emitStmtCore(st, ctx)))
-        Code.from(sb)
-      case id.VarDecl(_, _, _, initOpt, _) =>
-        initOpt.map(emitExprCore(_, ctx)).getOrElse(Code.from(new SamBuilder().pushImmInt(0)))
-      case id.Assign(name, value, _) =>
-        if ctx.frameOpt.isEmpty then throw new Exception("Missing frame for assignment codegen")
-        val vb = ctx.frameOpt.get.lookupVar(name).getOrElse(throw new Exception("Undeclared variable: " + name))
-        val code = emitExprCore(value, ctx)
-        val sb = new SamBuilder()
-        sb.append(code).storeOffS(StackOffset(vb.getAddress))
-        Code.from(sb)
-      case id.FieldAssign(target, _field, offset, value, _) =>
-        if offset < 0 then throw new Exception("Unknown field offset for field: " + _field)
-        val sb = new SamBuilder()
-        sb.append(emitExprCore(target, ctx))
-          .addFieldOff(FieldOffset(offset))
-          .append(emitExprCore(value, ctx))
-          .storeInd()
-        Code.from(sb)
-      case id.If(cond, thenB, elseB, _) =>
-        val elseLbl = new Label(); val endLbl = new Label()
-        val sb = new SamBuilder()
-        sb.append(emitExprCore(cond, ctx)).jumpIfNil(elseLbl)
-          .append(emitStmtCore(thenB, ctx))
-          .jump(endLbl)
-          .label(elseLbl)
-          .append(emitStmtCore(elseB, ctx))
-          .label(endLbl)
-        Code.from(sb)
-      case id.While(cond, body, _) =>
-        val start = new Label(); val stop = new Label()
-        val sb = new SamBuilder()
-        val innerCtx = ctx.copy(loopEndLabels = stop :: ctx.loopEndLabels)
-        sb.label(start)
-          .append(emitExprCore(cond, ctx)).jumpIfNil(stop)
-          .append(emitStmtCore(body, innerCtx))
-          .jump(start)
-          .label(stop)
-        Code.from(sb)
-      case id.Break(_) =>
-        val target = ctx.loopEndLabels.headOption.getOrElse(throw new Exception("'break' used outside of loop"))
-        Code.from(new SamBuilder().jump(target))
-      case id.Return(valueOpt, _) =>
-        val sb = new SamBuilder()
-        valueOpt.foreach(v => sb.append(emitExprCore(v, ctx)))
-        val ret = ctx.returnLabelOpt.getOrElse(throw new Exception("Return label not found in scope"))
-        sb.jump(ret)
-        Code.from(sb)
+    emitStmtD(s, ctx) match
+      case Right(c) => c
+      case Left(d)  => throw new Exception(d.message)
 
   // Public APIs: Code-returning preferred; String-returning wrappers for compatibility
   def emitExprC(e: id.Expr, ctx: Ctx): Code = emitExprCore(e, ctx)
