@@ -9,10 +9,9 @@ import assignment3.ast.SymbolMethodFrame
 /** Emits SAM code from a ProgramNode using existing lower-level codegen utilities (Scala port, idiomatic). */
 private object ProgramCodegen {
   def emit(program: ProgramNode, ctx: CompilerContext): String = {
-    ctx.symbols match {
-      case Some(symbols) => new ProgramCodegen(symbols, ctx).generate(program)
-      case None => throw new Exception("CompilerContext.symbols is not set")
-    }
+    emitD(program, ctx) match
+      case Right(code) => code.toString
+      case Left(diag) => throw new Exception(diag.message)
   }
 
   // Optional: Code-returning API for safer composition

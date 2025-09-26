@@ -8,13 +8,15 @@ final class SemanticChecker(currentMethod: MethodSymbol, defaultLine: Int, progr
   def this(currentMethod: MethodSymbol, defaultLine: Int) = this(currentMethod, defaultLine, null)
 
   def check(e: Expr): Unit =
-    if (e != null) IdiomaticSemantic.checkExprE(e, currentMethod, defaultLine, programSymbols) match
+    Option(e).foreach { ex => IdiomaticSemantic.checkExprE(ex, currentMethod, defaultLine, programSymbols) match
       case Left(diag) => throw new Exception(diag.message)
       case Right(_) => ()
+    }
   def check(s: Stmt): Unit =
-    if (s != null) IdiomaticSemantic.checkStmtE(s, currentMethod, defaultLine, programSymbols) match
+    Option(s).foreach { st => IdiomaticSemantic.checkStmtE(st, currentMethod, defaultLine, programSymbols) match
       case Left(diag) => throw new Exception(diag.message)
       case Right(_) => ()
+    }
 
   // Either-based convenience, preserving legacy API above
   def checkE(e: Expr): Either[Diag, Unit] =

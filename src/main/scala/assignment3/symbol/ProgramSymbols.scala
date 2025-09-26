@@ -1,14 +1,15 @@
 package assignment3.symbol
-import scala.collection.mutable
+
+import scala.collection.immutable.Map
 
 final class ProgramSymbols {
-  private val classes = mutable.LinkedHashMap.empty[String, ClassSymbol]
+  private var classes: Map[String, ClassSymbol] = Map.empty
   private var frozen = false
 
   def addClass(c: ClassSymbol): Unit = {
     if (frozen) throw new IllegalStateException(s"ProgramSymbols is frozen; cannot add class '${c.getName}'")
     if (classes.contains(c.getName)) throw new IllegalStateException(s"Duplicate class '${c.getName}'")
-    classes += c.getName -> c
+    classes = classes + (c.getName -> c)
   }
 
   def getClass(name: String): Option[ClassSymbol] = classes.get(name)

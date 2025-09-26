@@ -3,6 +3,7 @@ package assignment3
 import assignment3.symbol._
 import edu.utexas.cs.sam.io.SamTokenizer
 import assignment3.ast.Diag
+import assignment3.ast.ResolveDiag
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.util.Using
 import scala.jdk.CollectionConverters._
@@ -18,46 +19,51 @@ object LiveOak3Compiler {
 
   @static @throws[Exception]
   def compile(fileName: String): String = {
+    compileD(fileName) match
+      case Right(s) => s
+      case Left(diag) => throw new Exception(s"${diag.message} at ${diag.line}:${diag.column}")
+  }
+
+  // Diagnostic-first API: returns Either[Diag, String]
+  def compileD(fileName: String): Either[Diag, String] = {
     reset()
     val ctx = new CompilerContext()
     CompilerUtils.setRecorder(ctx.recorder)
-  try {
+    try {
       val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
       val stb   = new SymbolTableBuilder()
-      val symbols = stb.buildD(pass1) match {
-        case Left(diag)  => throw new Exception(s"${diag.message} at ${diag.line}:${diag.column}")
-        case Right(symb) => symb
-      }
-      symbols.freeze()
-  ctx.symbols = symbols
+  val symbols = stb.buildD(pass1) match { case Left(d) => return Left(d); case Right(s) => s }
+  symbols.freeze()
+      ctx.symbols = symbols
       if (Debug.enabled("symbols")) dumpSymbols(symbols)
-      validateEntrypoint(symbols)
-      val program = ProgramParser.parseD(fileName, symbols) match {
-        case Left(diag) => throw new Exception(s"${diag.message} at ${diag.line}:${diag.column}")
-        case Right(p)   => p
-      }
-  if (Debug.enabled("tokens")) dumpRecordedTokens(ctx)
-      val outEither = ProgramCodegen.emitD(program, ctx)
-      outEither match {
-        case Left(diag) => throw new Exception(diag.message)
+      validateEntrypointD(symbols) match
+        case Left(d) => return Left(d)
+        case Right(_) => ()
+  val program = ProgramParser.parseD(fileName, symbols) match { case Left(d) => return Left(d); case Right(p) => p }
+      if (Debug.enabled("tokens")) dumpRecordedTokens(ctx)
+      ProgramCodegen.emitD(program, ctx) match
+        case Left(d) => Left(d)
         case Right(code) =>
           val out = code.toString
           if (Debug.enabled("sam")) Debug.log("sam", () => s"Generated SAM size: ${out.length} chars")
-          out
-      }
+          Right(out)
     } catch {
-      case t: Throwable          => throw t
+      case t: Throwable => throw t
     } finally { cleanup() }
   }
 
   private def cleanup(): Unit = { CompilerUtils.clearTokens(); CompilerUtils.clearRecorder() }
 
-  private def validateEntrypoint(symbols: ProgramSymbols): Unit = {
-    val ms = symbols.getEntrypoint().getOrElse(throw new Exception(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point"))
-    if (ms.expectedUserArgs() != 0)
-      throw new Exception(s"$ENTRY_CLASS.$ENTRY_METHOD must not declare parameters")
-    if (ms.parameters.isEmpty || !ms.parameters.head.isObject || ms.parameters.head.getClassTypeName != ENTRY_CLASS)
-      throw new Exception(s"$ENTRY_CLASS.$ENTRY_METHOD must be an instance method of $ENTRY_CLASS")
+  private def validateEntrypoint(symbols: ProgramSymbols): Unit = validateEntrypointD(symbols) match { case Left(d) => throw new Exception(d.message); case Right(_) => () }
+
+  private def validateEntrypointD(symbols: ProgramSymbols): Either[Diag, Unit] = {
+    symbols.getEntrypoint() match
+      case None => Left(ResolveDiag(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point", -1))
+      case Some(ms) =>
+        if (ms.expectedUserArgs() != 0) Left(ResolveDiag(s"$ENTRY_CLASS.$ENTRY_METHOD must not declare parameters", entrypointErrorLine(ms)))
+        else if (ms.parameters.isEmpty || !ms.parameters.head.isObject || ms.parameters.head.getClassTypeName != ENTRY_CLASS)
+          Left(ResolveDiag(s"$ENTRY_CLASS.$ENTRY_METHOD must be an instance method of $ENTRY_CLASS", entrypointErrorLine(ms)))
+        else Right(())
   }
 
   private def entrypointErrorLine(ms: MethodSymbol): Int = { val ln = ms.getBodyStartLine(); if (ln > 0) ln else -1 }
