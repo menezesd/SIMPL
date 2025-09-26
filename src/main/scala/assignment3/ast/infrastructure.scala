@@ -39,7 +39,7 @@ final class ScalaInstanceCallable(className: String, symbol: MethodSymbol) exten
   override def getReturnValueType: ValueType = symbol.getReturnValueType
   override def getReturnSig: assignment3.ast.high.ReturnSig = symbol.getReturnSig
   override def getParamCount: Int = symbol.numParameters() + 1 // implicit this
-  override def getParameterType(index: Int): Type = if (index == 0) Type.INT else symbol.getParameters.get(index - 1).getType
+  override def getParameterType(index: Int): Type = if (index == 0) Type.INT else symbol.parameters(index - 1).getType
   def getSymbol: MethodSymbol = symbol
 }
 

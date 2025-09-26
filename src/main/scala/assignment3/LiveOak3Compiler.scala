@@ -18,17 +18,17 @@ object LiveOak3Compiler {
   def compile(fileName: String): String = {
     reset()
     val ctx = new CompilerContext()
-    CompilerUtils.setRecorder(ctx.getRecorder)
+    CompilerUtils.setRecorder(ctx.recorder)
     try {
       val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
       val stb   = new SymbolTableBuilder()
       val symbols = stb.build(pass1)
       symbols.freeze()
-      ctx.setSymbols(symbols)
+  ctx.symbols = symbols
       if (Debug.enabled("symbols")) dumpSymbols(symbols)
       validateEntrypoint(symbols)
       val program = ProgramParser.parse(fileName, symbols)
-      if (Debug.enabled("tokens")) dumpRecordedTokens(ctx)
+  if (Debug.enabled("tokens")) dumpRecordedTokens(ctx)
       val out = ProgramCodegen.emit(program, ctx)
       if (Debug.enabled("sam")) Debug.log("sam", () => s"Generated SAM size: ${out.length} chars")
       out
@@ -44,7 +44,7 @@ object LiveOak3Compiler {
     val ms = symbols.getEntrypoint().getOrElse(throw new CompilerException(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point", -1))
     if (ms.expectedUserArgs() != 0)
       throw new CompilerException(s"$ENTRY_CLASS.$ENTRY_METHOD must not declare parameters", entrypointErrorLine(ms))
-    if (ms.getParameters.isEmpty || !ms.getParameters.get(0).isObject || ms.getParameters.get(0).getClassTypeName != ENTRY_CLASS)
+    if (ms.parameters.isEmpty || !ms.parameters.head.isObject || ms.parameters.head.getClassTypeName != ENTRY_CLASS)
       throw new CompilerException(s"$ENTRY_CLASS.$ENTRY_METHOD must be an instance method of $ENTRY_CLASS", entrypointErrorLine(ms))
   }
 
@@ -63,9 +63,9 @@ object LiveOak3Compiler {
 
   private def dumpSymbols(symbols: ProgramSymbols): Unit = {
     System.err.println("[DEBUG] Program symbols:")
-    for (cs <- symbols.allClasses().asScala) {
+    for (cs <- symbols.allClasses) {
       System.err.println(s"  class ${cs.getName} (fields=${cs.numFields()})")
-      for (ms <- cs.allMethods.asScala) {
+      for (ms <- cs.allMethods) {
         val ret = ms.getReturnSig match {
           case assignment3.ast.high.ReturnSig.Void => "void"
           case assignment3.ast.high.ReturnSig.Obj(cn) => cn
@@ -76,7 +76,7 @@ object LiveOak3Compiler {
     }
   }
 
-  private def dumpRecordedTokens(ctx: CompilerContext): Unit = ctx.getRecorder match {
+  private def dumpRecordedTokens(ctx: CompilerContext): Unit = ctx.recorder match {
     case l: ListTokenRecorder =>
       val toks = l.snapshot()
       System.err.println(s"[DEBUG] Recorded tokens (${toks.size}):")

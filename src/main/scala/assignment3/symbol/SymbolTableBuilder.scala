@@ -85,7 +85,7 @@ final class SymbolTableBuilder {
         case (_, Some(className)) => new MethodSymbol(name, className)
         case (Some(rt), None) => new MethodSymbol(name, rt)
       }
-    if (classSym.getMethod(name).isDefined)
+    if (classSym.method(name).isDefined)
       throw new CompilerException(s"Method '$name' already defined in class '${classSym.getName}'", tz.lineNo())
     CompilerUtils.expectChar(tz, '(', tz.lineNo())
     method.setReturnTypePosition(rtLine, rtCol)
@@ -136,33 +136,23 @@ final class SymbolTableBuilder {
   }
 
   private def validateTypes(): Unit = {
-    val clsIter = program.allClasses().iterator()
-    while (clsIter.hasNext) {
-      val cls = clsIter.next()
-      val fIt = cls.allFields.iterator()
-      while (fIt.hasNext) {
-        val f = fIt.next()
+    for (cls <- program.allClasses) {
+      for (f <- cls.allFields) {
         if (f.isObject && !program.existsClass(f.getClassTypeName))
           throw new TypeErrorException(s"Unknown type '${f.getClassTypeName}' for field '${f.getName}' in class '${cls.getName}'", f.getLine, f.getColumn)
       }
-      val mIt = cls.allMethods.iterator()
-      while (mIt.hasNext) {
-        val m = mIt.next()
+      for (m <- cls.allMethods) {
         m.getReturnSig match {
           case assignment3.ast.high.ReturnSig.Obj(cn) =>
             if (!program.existsClass(cn))
               throw new TypeErrorException(s"Unknown return type '${cn}' in method '${cls.getName}.${m.getName}'", m.getReturnTypeLine(), m.getReturnTypeColumn())
           case _ => ()
         }
-        val pIt = m.getParameters.iterator()
-        while (pIt.hasNext) {
-          val p = pIt.next()
+        for (p <- m.parameters) {
           if (p.isObject && !program.existsClass(p.getClassTypeName))
             throw new TypeErrorException(s"Unknown parameter type '${p.getClassTypeName}' for parameter '${p.getName}' in method '${cls.getName}.${m.getName}'", p.getLine, p.getColumn)
         }
-        val lIt = m.getLocals.iterator()
-        while (lIt.hasNext) {
-          val v = lIt.next()
+        for (v <- m.locals) {
           if (v.isObject && !program.existsClass(v.getClassTypeName))
             throw new TypeErrorException(s"Unknown local type '${v.getClassTypeName}' for variable '${v.getName}' in method '${cls.getName}.${m.getName}'", v.getLine, v.getColumn)
         }

@@ -11,7 +11,7 @@ final class ClassSymbol(val name: String) {
   private val fieldOrder = mutable.ListBuffer.empty[String]
   private var frozen = false
 
-  def getName: String = name
+  def getName: String = name // temporary for external references; TODO remove
 
   def addField(v: VarSymbol): Unit = {
     if (frozen) throw new CompilerException(s"ClassSymbol '$name' is frozen; cannot add field", -1)
@@ -26,10 +26,10 @@ final class ClassSymbol(val name: String) {
     methods += m.getName -> m
   }
 
-  def getField(n: String): Option[VarSymbol] = fields.get(n)
-  def getMethod(n: String): Option[MethodSymbol] = methods.get(n)
-  def allFields: java.lang.Iterable[VarSymbol] = java.util.Collections.unmodifiableCollection(fields.values.toList.asJava)
-  def allMethods: java.lang.Iterable[MethodSymbol] = java.util.Collections.unmodifiableCollection(methods.values.toList.asJava)
+  def field(n: String): Option[VarSymbol] = fields.get(n)
+  def method(n: String): Option[MethodSymbol] = methods.get(n)
+  def allFields: List[VarSymbol] = fields.values.toList
+  def allMethods: List[MethodSymbol] = methods.values.toList
 
   import scala.jdk.CollectionConverters._
   def fieldOffset(fieldName: String): Int = fieldOrder.indexOf(fieldName)

@@ -12,7 +12,7 @@ final class SymbolCallableMethod(val symbol: MethodSymbol) extends ScalaCallable
   override def getReturnType: Type = CodegenTypes.loweredReturn(symbol)
   override def getParamCount: Int = symbol.numParameters()
   override def getParameterType(index: Int): Type = {
-    val v: VarSymbol = symbol.getParameters.get(index)
+    val v: VarSymbol = symbol.parameters(index)
     CodegenTypes.lowered(v.getValueType)
   }
   def getSymbol: MethodSymbol = symbol

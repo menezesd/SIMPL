@@ -14,6 +14,6 @@ object CodegenTypes {
     case ReturnSig.Void      => Type.INT
     case ReturnSig.Obj(_)    => Type.INT
     case ReturnSig.Prim(tpe) => tpe
-  def loweredParam(ms: MethodSymbol, rawIndex: Int): Type = lowered(ms.getParameters.get(rawIndex).getValueType)
+  def loweredParam(ms: MethodSymbol, rawIndex: Int): Type = lowered(ms.parameters.apply(rawIndex).getValueType)
   def loweredUserParam(ms: MethodSymbol, userIndex: Int): Type = loweredParam(ms, userIndex + 1)
 }

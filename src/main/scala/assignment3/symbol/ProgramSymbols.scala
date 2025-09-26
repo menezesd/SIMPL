@@ -16,14 +16,13 @@ final class ProgramSymbols {
   def getClass(name: String): Option[ClassSymbol] = classes.get(name)
   def existsClass(name: String): Boolean = classes.contains(name)
   import scala.jdk.CollectionConverters._
-  def allClasses(): java.lang.Iterable[ClassSymbol] = java.util.Collections.unmodifiableCollection(classes.values.toList.asJava)
+  def allClasses: List[ClassSymbol] = classes.values.toList
 
   def freeze(): Unit = if (!frozen) { frozen = true; classes.values.foreach(_.freeze()) }
   def isFrozen: Boolean = frozen
 
-  def getMethod(className: String, methodName: String): Option[MethodSymbol] = {
-    getClass(className).flatMap(_.getMethod(methodName))
-  }
+  def getMethod(className: String, methodName: String): Option[MethodSymbol] =
+    getClass(className).flatMap(_.method(methodName))
 
   def getEntrypoint(): Option[MethodSymbol] = getMethod("Main", "main")
 }

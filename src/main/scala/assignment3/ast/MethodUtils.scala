@@ -9,10 +9,10 @@ object MethodUtils {
   def expectedUserArgs(ms: MethodSymbol): Int = math.max(0, ms.numParameters() - 1)
 
   /** Get the i-th user parameter VarSymbol (0-based), skipping implicit 'this'. */
-  def userParamAt(ms: MethodSymbol, userIndex: Int): VarSymbol = ms.getParameters.get(userIndex + 1)
+  def userParamAt(ms: MethodSymbol, userIndex: Int): VarSymbol = ms.parameters.apply(userIndex + 1)
 
   /** Whether the method uses implicit 'this' (assumed true for instance methods). */
-  def hasThisParam(ms: MethodSymbol): Boolean = ms.numParameters() > 0 && ms.getParameters.get(0).getName == "this"
+  def hasThisParam(ms: MethodSymbol): Boolean = ms.numParameters() > 0 && ms.parameters.headOption.exists(_.getName == "this")
 
   def userParamCount(ms: MethodSymbol): Int = expectedUserArgs(ms)
   def returnValueType(ms: MethodSymbol): ValueType = ms.getReturnValueType

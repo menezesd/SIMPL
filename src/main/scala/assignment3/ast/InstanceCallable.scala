@@ -30,8 +30,8 @@ final class InstanceCallable(classNameOrLabel: String, methodSymbol: MethodSymbo
   override def getReturnType: Type = if (rvType == null || rvType.isObject) Type.INT else rvType.getPrimitive
   override def getParamCount: Int = pCount
   override def getParameterType(index: Int): Type = {
-    if (index == 0) return Type.INT // implicit 'this'
-    if (symbol != null) CodegenTypes.lowered(symbol.getParameters.get(index - 1).getValueType) else Type.INT
+  if (index == 0) return Type.INT // implicit 'this'
+  if (symbol != null) CodegenTypes.lowered(symbol.parameters.apply(index - 1).getValueType) else Type.INT
   }
   def hasSymbol: Boolean = symbol != null
   def getSymbol: MethodSymbol = symbol

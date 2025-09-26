@@ -43,19 +43,15 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
   }
 
   private def parseMethod(className: String): MethodNode = {
-    var returnSig: assignment3.ast.high.ReturnSig = assignment3.ast.high.ReturnSig.Void
-    var returnPrimOpt: Option[assignment3.Type] = None
-    var returnObjOpt: Option[String] = None
-    if (tz.test("void")) { CompilerUtils.expectWord(tz, "void", tz.lineNo()); returnSig = assignment3.ast.high.ReturnSig.Void }
-    else if (tz.peekAtKind() == TokenType.WORD) {
-      val rt = CompilerUtils.getWord(tz)
-      val vt = CompilerUtils.parseTypeOrObjectName(rt, tz.lineNo())
-      returnPrimOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
-      returnObjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
-      returnSig = returnObjOpt.map(assignment3.ast.high.ReturnSig.Obj.apply)
-        .orElse(returnPrimOpt.map(assignment3.ast.high.ReturnSig.Prim.apply))
-        .getOrElse(assignment3.ast.high.ReturnSig.Void)
-    } else throw new SyntaxErrorException("Expected return type", tz.lineNo())
+    val returnSig: assignment3.ast.high.ReturnSig =
+      if (tz.test("void")) { CompilerUtils.expectWord(tz, "void", tz.lineNo()); assignment3.ast.high.ReturnSig.Void }
+      else if (tz.peekAtKind() == TokenType.WORD) {
+        val rt = CompilerUtils.getWord(tz)
+        val vt = CompilerUtils.parseTypeOrObjectName(rt, tz.lineNo())
+        if (vt.isObject) assignment3.ast.high.ReturnSig.Obj(vt.getObject.getClassName)
+        else if (vt.isPrimitive) assignment3.ast.high.ReturnSig.Prim(vt.getPrimitive)
+        else assignment3.ast.high.ReturnSig.Void
+      } else throw new SyntaxErrorException("Expected return type", tz.lineNo())
 
     val methodName = CompilerUtils.getIdentifier(tz)
     val msOpt = symbols.getMethod(className, methodName)
@@ -68,8 +64,8 @@ private final class ProgramParser private (tz: SamTokenizer, symbols: ProgramSym
     while (tz.peekAtKind() == TokenType.WORD) {
       val pr = CompilerUtils.getWord(tz)
       val vt = CompilerUtils.parseTypeOrObjectName(pr, tz.lineNo())
-      val pTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
-      val pobjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
+  val pTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
+  val pobjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
       val pName = CompilerUtils.getIdentifier(tz)
       if (paramIndex >= expectedUserParams) {
         val atLeast = paramIndex + 1

@@ -24,16 +24,16 @@ final class MethodSymbol(val name: String, val returnValueType: ValueType) {
       else if (classReturnTypeName != null) ValueType.ofObject(classReturnTypeName)
       else ValueType.ofPrimitive(returnType))
 
-  def getName: String = name
-  def getReturnValueType: ValueType = returnValueType
+  def getName: String = name // temporary compatibility; prefer name
+  def getReturnValueType: ValueType = returnValueType // prefer returnValueType
 
   def getReturnSig: ReturnSig =
     if (returnValueType == null) ReturnSig.Void
     else if (returnValueType.isObject) ReturnSig.Obj(returnValueType.getObject.getClassName)
     else ReturnSig.Prim(returnValueType.getPrimitive)
 
-  def getParameters: java.util.List[VarSymbol] = java.util.Collections.unmodifiableList(parametersBuf.asJava)
-  def getLocals: java.util.List[VarSymbol] = java.util.Collections.unmodifiableList(localsBuf.asJava)
+  def parameters: List[VarSymbol] = parametersBuf.toList
+  def locals: List[VarSymbol] = localsBuf.toList
 
   import scala.jdk.CollectionConverters._
   def lookup(ident: String): Option[VarSymbol] = byName.get(ident)

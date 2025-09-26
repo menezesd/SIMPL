@@ -61,7 +61,7 @@ object IdiomaticSemantic:
                 else
                   val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
                   val firstErr: Option[Diag] = (0 until provided).iterator.flatMap { i =>
-                    val formal = ms.getParameters.get(i + 1)
+                    val formal = ms.parameters(i + 1)
                     val argType = TU.typeOf(args(i), ctx, programSymbols)
                     if !formal.getType.isCompatibleWith(argType) then
                       Some(TypeDiag("Argument type mismatch for parameter '" + formal.getName + "'", defaultLine))

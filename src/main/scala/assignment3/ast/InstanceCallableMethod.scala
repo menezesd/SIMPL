@@ -18,6 +18,6 @@ final class InstanceCallableMethod(className: String, symbol: MethodSymbol) exte
     if (rv == null || rv.isObject) Type.INT else rv.getPrimitive
   }
   override def getParamCount: Int = symbol.numParameters() + 1
-  override def getParameterType(index: Int): Type = if (index == 0) Type.INT else symbol.getParameters.get(index - 1).getType
+  override def getParameterType(index: Int): Type = if (index == 0) Type.INT else symbol.parameters(index - 1).getType
   def getSymbol: MethodSymbol = symbol
 }

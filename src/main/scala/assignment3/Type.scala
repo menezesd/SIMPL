@@ -1,3 +1,4 @@
+
 package assignment3
 
 /** Primitive types supported by LiveOak-3. */
@@ -13,9 +14,8 @@ enum Type(val typeName: String) {
 }
 
 object Type {
-  def fromString(typeString: String): Option[Type] = Option(typeString).flatMap { s =>
-    values.find(_.typeName == s)
-  }
+  def fromString(typeString: String): Option[Type] = Option(typeString).flatMap(s => values.find(_.typeName == s))
   @throws[TypeErrorException]
-  def parse(typeString: String, line: Int): Type = fromString(typeString).getOrElse(throw new TypeErrorException("Invalid type: " + typeString, line))
+  def parse(typeString: String, line: Int): Type =
+    fromString(typeString).getOrElse(throw TypeErrorException(s"Invalid type: $typeString", line))
 }

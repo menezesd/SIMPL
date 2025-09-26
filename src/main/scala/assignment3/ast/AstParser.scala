@@ -23,11 +23,11 @@ final class AstParser(tokenizer: SamTokenizer, method: MethodContext, programSym
     for {
       nmc <- method match { case n: NewMethodContext => Some(n); case _ => None }
       ms = nmc.getSymbol
-      if ms.numParameters() > 0 && ms.getParameters.get(0).getName == "this"
-      thisSym = ms.getParameters.get(0)
+      if ms.numParameters() > 0 && ms.parameters.headOption.exists(_.getName == "this")
+      thisSym = ms.parameters.head
       if thisSym.isObject
       cs <- programSymbols.getClass(thisSym.getClassTypeName)
-      fSym <- cs.getField(fieldName)
+  fSym <- cs.field(fieldName)
       off = cs.fieldOffset(fieldName)
       vt = fSym.getValueType
       fi = new assignment3.symbol.ClassSymbol.FieldInfo(off, vt, fSym)

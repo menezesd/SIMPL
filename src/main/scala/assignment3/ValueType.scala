@@ -9,11 +9,14 @@ final class ValueType private (val primitive: Type, val objectRef: ObjectType) {
 
   def isCompatibleWith(other: ValueType): Boolean = {
     if (other == null) return false
-    if (this.isPrimitive && other.isPrimitive) return this.primitive == other.primitive
-    if (this.isObject && other.isObject) return this.objectRef.isCompatibleWith(other.objectRef)
-    false
+    if (this.isPrimitive && other.isPrimitive) this.primitive == other.primitive
+    else if (this.isObject && other.isObject) this.objectRef.isCompatibleWith(other.objectRef)
+    else false
   }
-  override def toString: String = if (isPrimitive) primitive.toString else if (isObject) s"obj:${objectRef.getClassName}" else "<void>"
+  override def toString: String =
+    if (isPrimitive) primitive.toString
+    else if (isObject) s"obj:${objectRef.getClassName}"
+    else "<void>"
   override def equals(o: Any): Boolean = o match {
     case v: ValueType => primitive == v.primitive && objectRef == v.objectRef
     case _ => false
@@ -26,7 +29,9 @@ object ValueType {
   def ofObject(className: String): ValueType = new ValueType(null, ObjectType(java.util.Objects.requireNonNull(className)))
   def ofObject(ot: ObjectType): ValueType = new ValueType(null, java.util.Objects.requireNonNull(ot))
 
-  def sameObjectClass(a: ValueType, b: ValueType): Boolean = a != null && b != null && a.isObject && b.isObject && a.getObject.getClassName == b.getObject.getClassName
-  def samePrimitive(a: ValueType, b: ValueType): Boolean = a != null && b != null && a.isPrimitive && b.isPrimitive && a.getPrimitive == b.getPrimitive
+  def sameObjectClass(a: ValueType, b: ValueType): Boolean =
+    a != null && b != null && a.isObject && b.isObject && a.getObject.getClassName == b.getObject.getClassName
+  def samePrimitive(a: ValueType, b: ValueType): Boolean =
+    a != null && b != null && a.isPrimitive && b.isPrimitive && a.getPrimitive == b.getPrimitive
   def equalsNullable(a: ValueType, b: ValueType): Boolean = java.util.Objects.equals(a, b)
 }

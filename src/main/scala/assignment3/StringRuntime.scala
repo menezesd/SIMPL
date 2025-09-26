@@ -163,7 +163,7 @@ object StringRuntime {
   @throws[CompilerException]
   def compareString(op: Char): String = {
     if (OperatorUtils.getBinopType(op) != BinopType.COMPARISON)
-      throw new SyntaxErrorException("compareString receive invalid operation: " + op, -1)
+      throw new SyntaxErrorException(s"compareString receive invalid operation: $op", -1)
     val sb = new SamBuilder()
     sb.append(s"LINK\nJSR $COMPARE_LABEL\nUNLINK\nADDSP -1\n")
     if (op == '<') sb.append("PUSHIMM 1\n")

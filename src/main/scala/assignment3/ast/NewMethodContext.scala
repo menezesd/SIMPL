@@ -12,15 +12,10 @@ final class NewMethodContext(val symbol: MethodSymbol, programSymbols: ProgramSy
   override def returnAddressOffset(): Int = symbol.returnAddressOffset()
   override def lookupVar(name: String): Option[VarSymbol] = symbol.lookup(name)
   override def lookupMethodGlobal(name: String): Option[MethodSymbol] = {
-    val it = programSymbols.allClasses().iterator()
-    while (it.hasNext) {
-      val cs = it.next()
-      cs.getMethod(name) match {
-        case Some(ms) => return Some(ms)
-        case None => ()
-      }
-    }
-    None
+    programSymbols.allClasses.iterator
+      .flatMap(cs => cs.method(name))
+      .toSeq
+      .headOption
   }
   def getSymbol: MethodSymbol = symbol
 }

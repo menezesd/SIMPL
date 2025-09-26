@@ -111,7 +111,7 @@ object IdiomaticCodegen:
       val sb = new SamBuilder()
       // allocate object
       sb.append("PUSHIMM ").append(Integer.toString(numFields)).append("\nMALLOC\n")
-      if csOpt.exists(_.getMethod(className).isDefined) then
+      if csOpt.exists(_.method(className).isDefined) then
         // Keep a copy of the object pointer as the expression result
         sb.append("DUP\n")                 // [obj_saved, obj]
         // Push return slot and place it below 'this'

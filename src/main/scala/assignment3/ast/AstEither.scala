@@ -16,7 +16,7 @@ object AstEither:
     for
       cn <- resolveClassNameD(e, method, ps, line, column)
       cs <- ps.getClass(cn).toRight(ResolveDiag(s"Unknown class '$cn'", line, column))
-      ms <- cs.getMethod(methodName).toRight(ResolveDiag(s"Unknown method '$methodName' on class '$cn'", line, column))
+      ms <- cs.method(methodName).toRight(ResolveDiag(s"Unknown method '$methodName' on class '$cn'", line, column))
     yield ms
 
   /** Resolve field info on a target expression. */
