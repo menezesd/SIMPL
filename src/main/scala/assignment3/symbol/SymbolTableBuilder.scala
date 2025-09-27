@@ -8,7 +8,8 @@ import scala.collection.mutable
 
 /** Scala port of first-pass symbol table builder. */
 final class SymbolTableBuilder {
-  private val program = new ProgramSymbols()
+  // Build into immutable structures directly
+  private var classesAcc = Vector.empty[ClassSymbol]
 
   // Diagnostic-first helpers
   private inline def ok[A](a: A): Result[A] = Right(a)
@@ -33,11 +34,11 @@ final class SymbolTableBuilder {
     try ok(CompilerUtils.getWord(tz))
     catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
 
-  private def isTypeToken(tz: SamTokenizer, current: ClassSymbol): Boolean =
+  private def isTypeToken(tz: SamTokenizer, currentClassName: String): Boolean =
     CompilerUtils.isTypeWord(
       tz,
-      program,
-      current.getName,
+      ProgramSymbols(classesAcc.map(c => c.name -> c).toMap),
+      currentClassName,
       /*allowUnknownNames*/ true,
       /*excludeStmtStarters*/ true
     )
@@ -49,7 +50,8 @@ final class SymbolTableBuilder {
       else ok(())
     for
       _ <- outer()
-      _ <- validateTypesR()
+      program = ProgramSymbols(classesAcc.map(c => c.name -> c).toMap)
+      _ <- validateTypesR(program)
     yield program
 
   /** Diagnostic-first variant: never throws; returns Either[Diag, ProgramSymbols]. */
@@ -59,50 +61,79 @@ final class SymbolTableBuilder {
     for
       _ <- expectWordR(tz, "class")
       className <- getIdentifierR(tz)
-      classSym = new ClassSymbol(className)
-      _ <-
-        if (CompilerUtils.check(tz, '(')) then
-          if (!CompilerUtils.check(tz, ')')) then
-            def fieldsLoop(): Result[Unit] =
-              if (tz.peekAtKind() != TokenType.WORD) then
-                if (CompilerUtils.check(tz, ')')) ok(()) else syntax(") expected after field declarations", tz)
-              else
-                for
-                  rawType <- getWordR(tz)
-                  vt = CompilerUtils.parseTypeOrObjectName(rawType, tz.lineNo())
-                  varTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
-                  classRefOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
-                  name <- getIdentifierR(tz)
-                  line = tz.lineNo(); col = CompilerUtils.column(tz)
-                  valueType = classRefOpt.map(ValueType.ofObject).orElse(varTypeOpt.map(ValueType.ofPrimitive)).get
-                  _ = classSym.addField(new VarSymbol(name, valueType, false, -1, line, col))
-                  _ <-
-                    def moreLoop(): Result[Unit] =
-                      if (CompilerUtils.check(tz, ',')) then
-                        for
-                          n2 <- getIdentifierR(tz)
-                          line2 = tz.lineNo(); col2 = CompilerUtils.column(tz)
-                          vt2 = classRefOpt.map(ValueType.ofObject).orElse(varTypeOpt.map(ValueType.ofPrimitive)).get
-                          _ = classSym.addField(new VarSymbol(n2, vt2, false, -1, line2, col2))
-                          _ <- moreLoop()
-                        yield ()
-                      else ok(())
-                    moreLoop()
-                  _ <- if (!CompilerUtils.check(tz, ';')) then syntax("Expected ';' in field declaration", tz) else ok(())
-                  res <- if (CompilerUtils.check(tz, ')')) then ok(()) else fieldsLoop()
-                yield res
-            fieldsLoop()
-          else ok(())
+      // Reject duplicate class declarations
+      _ <- {
+        if (classesAcc.exists(_.name == className)) then
+          err[Unit](ResolveDiag(s"Duplicate class '$className' declared", tz.lineNo(), CompilerUtils.column(tz)))
         else ok(())
-      _ <- if (!CompilerUtils.check(tz, '{')) then syntax(s"Expected '{' after class header for class '$className'", tz) else ok(())
-      _ <-
-        def methodsLoop(): Result[Unit] =
-          if (!CompilerUtils.check(tz, '}')) then parseMethodR(tz, classSym).flatMap(_ => methodsLoop()) else ok(())
-        methodsLoop()
-      _ = program.addClass(classSym)
-    yield ()
+      }
+      res <- {
+        // accumulate fields
+        var fieldSyms = Vector.empty[VarSymbol]
+        var fieldOrder = Vector.empty[String]
 
-  private def parseMethodR(tz: SamTokenizer, classSym: ClassSymbol): Result[Unit] =
+        // Parse optional field list in parentheses
+        def parseFields(): Result[Unit] =
+          if (CompilerUtils.check(tz, '(')) then
+            if (CompilerUtils.check(tz, ')')) ok(())
+            else
+              def fieldsLoop(): Result[Unit] =
+                if (tz.peekAtKind() != TokenType.WORD) then
+                  if (CompilerUtils.check(tz, ')')) ok(()) else syntax(") expected after field declarations", tz)
+                else
+                  for
+                    rawType <- getWordR(tz)
+                    vt = CompilerUtils.parseTypeOrObjectName(rawType, tz.lineNo())
+                    name <- getIdentifierR(tz)
+                    line = tz.lineNo(); col = CompilerUtils.column(tz)
+                    valueType = if (vt.isObject) ValueType.ofObject(vt.getObject.getClassName) else ValueType.ofPrimitive(vt.getPrimitive)
+                    _ = { fieldSyms :+= new VarSymbol(name, valueType, false, -1, line, col); fieldOrder :+= name }
+                    _ <- {
+                      // allow additional names of same type separated by commas
+                      def moreLoop(): Result[Unit] =
+                        if (CompilerUtils.check(tz, ',')) then
+                          for
+                            n2 <- getIdentifierR(tz)
+                            line2 = tz.lineNo(); col2 = CompilerUtils.column(tz)
+                            vt2 = valueType
+                            _ = { fieldSyms :+= new VarSymbol(n2, vt2, false, -1, line2, col2); fieldOrder :+= n2 }
+                            _ <- moreLoop()
+                          yield ()
+                        else ok(())
+                      moreLoop()
+                    }
+                    _ <- if (!CompilerUtils.check(tz, ';')) then syntax("Expected ';' in field declaration", tz) else ok(())
+                    res <- if (CompilerUtils.check(tz, ')')) ok(()) else fieldsLoop()
+                  yield res
+              fieldsLoop()
+          else ok(())
+
+        val headerRes =
+          for
+            _ <- parseFields()
+            _ <- if (!CompilerUtils.check(tz, '{')) then syntax(s"Expected '{' after class header for class '$className'", tz) else ok(())
+          yield ()
+
+        headerRes.flatMap { _ =>
+          // Parse methods until closing '}'
+          def methodsLoop(acc: Vector[MethodSymbol]): Result[Vector[MethodSymbol]] =
+            if (CompilerUtils.check(tz, '}')) then ok(acc)
+            else parseMethodR(tz, className).flatMap(m => methodsLoop(acc :+ m))
+
+          methodsLoop(Vector.empty).map { ms =>
+            val cls = ClassSymbol(className, fieldSyms, ms.map(m => m.name -> m).toMap, fieldOrder)
+            classesAcc :+= cls
+            ()
+          }
+        }
+      }
+    yield res
+
+  private def parseMethodR(tz: SamTokenizer, className: String): Result[MethodSymbol] = {
+    // mutable accumulators for params/locals
+    var params = Vector(new VarSymbol("this", ValueType.ofObject(className), true, 0, -1, -1))
+    var locals = Vector.empty[VarSymbol]
+
     for
       typeWord <- getWordR(tz)
       rtLine = tz.lineNo(); rtCol = CompilerUtils.column(tz)
@@ -112,62 +143,62 @@ final class SymbolTableBuilder {
           try (Some(Type.parse(typeWord, tz.lineNo())), None)
           catch case _: TypeErrorException => (Some(Type.INT), Some(typeWord))
       name <- getIdentifierR(tz)
-      method = (returnTypeOpt, classReturnTypeNameOpt) match
-        case (None, None) => new MethodSymbol(name, None)
-        case (_, Some(className)) => new MethodSymbol(name, Some(ValueType.ofObject(className)))
-        case (Some(rt), None) => new MethodSymbol(name, Some(ValueType.ofPrimitive(rt)))
-      _ <- if (classSym.method(name).isDefined) then syntax(s"Method '$name' already defined in class '${classSym.getName}'", tz) else ok(())
+      methodRet = (returnTypeOpt, classReturnTypeNameOpt) match
+        case (None, None) => None
+        case (_, Some(cn)) => Some(ValueType.ofObject(cn))
+        case (Some(rt), None) => Some(ValueType.ofPrimitive(rt))
       _ <- expectCharR(tz, '(')
-      _ = method.setReturnTypePosition(rtLine, rtCol)
-      _ = method.addParameterObject("this", classSym.getName)
-      _ <- if (classSym.getName == "Main" && name == "main" && tz.peekAtKind() == TokenType.WORD)
+      _ <- if (className == "Main" && name == "main" && tz.peekAtKind() == TokenType.WORD)
         then syntax("Main.main method must not have parameters", tz) else ok(())
-      _ <-
+      _ <- {
         def paramsLoop(): Result[Unit] =
-          if (isTypeToken(tz, classSym)) then
+          if (isTypeToken(tz, className)) then
             for
               rawType <- getWordR(tz)
               vt = CompilerUtils.parseTypeOrObjectName(rawType, tz.lineNo())
               pName <- getIdentifierR(tz)
               line = tz.lineNo(); col = CompilerUtils.column(tz)
-              _ = if (vt.isObject) method.addParameterObject(pName, vt.getObject.getClassName, line, col)
-                  else method.addParameter(pName, vt.getPrimitive, line, col)
+              _ = if (vt.isObject) params :+= new VarSymbol(pName, ValueType.ofObject(vt.getObject.getClassName), true, params.size, line, col)
+                  else params :+= new VarSymbol(pName, ValueType.ofPrimitive(vt.getPrimitive), true, params.size, line, col)
               _ = if (CompilerUtils.check(tz, ',')) () else ()
               _ <- paramsLoop()
             yield ()
           else ok(())
         paramsLoop()
+      }
       _ <- expectCharR(tz, ')')
       _ <- expectCharR(tz, '{')
-      _ = method.setBodyStartLine(tz.lineNo())
-      _ <-
-        def localsLoop(): Result[Unit] =
-          if (isTypeToken(tz, classSym)) then
+      bodyStart = tz.lineNo()
+      _ <- {
+        def localsOuter(): Result[Unit] =
+          if (isTypeToken(tz, className)) then
             for
               rawType <- getWordR(tz)
               vt = CompilerUtils.parseTypeOrObjectName(rawType, tz.lineNo())
-              _ <-
-                def inner(more: Boolean = true): Result[Unit] =
-                  if (more) then
+              _ <- {
+                def inner(): Result[Unit] =
+                  if (true) then
                     for
                       lName <- getIdentifierR(tz)
                       line = tz.lineNo(); col = CompilerUtils.column(tz)
-                      _ = if (vt.isObject) method.addLocalObject(lName, vt.getObject.getClassName, line, col)
-                          else method.addLocal(lName, vt.getPrimitive, line, col)
+                      _ = if (vt.isObject) locals :+= new VarSymbol(lName, ValueType.ofObject(vt.getObject.getClassName), false, locals.size, line, col)
+                          else locals :+= new VarSymbol(lName, ValueType.ofPrimitive(vt.getPrimitive), false, locals.size, line, col)
                       res <-
-                        if (CompilerUtils.check(tz, ',')) then inner(true)
+                        if (CompilerUtils.check(tz, ',')) then inner()
                         else if (CompilerUtils.check(tz, ';')) then ok(())
                         else syntax("Expected ',' or ';' in variable declaration", tz)
                     yield res
                   else ok(())
                 inner()
-              _ <- localsLoop()
+              }
+              _ <- localsOuter()
             yield ()
           else ok(())
-        localsLoop()
+        localsOuter()
+      }
       _ <- skipBodyRemainderR(tz)
-      _ = classSym.addMethod(method)
-    yield ()
+    yield MethodSymbol(name, params, locals, methodRet, bodyStart, rtLine, rtCol)
+  }
 
   private def skipBodyRemainderR(tz: SamTokenizer): Result[Unit] = {
     val stack = new java.util.ArrayDeque[Char]()
@@ -180,7 +211,7 @@ final class SymbolTableBuilder {
     if (!stack.isEmpty) Left(SyntaxDiag("Unbalanced braces in method body", tz.lineNo(), CompilerUtils.column(tz))) else Right(())
   }
 
-  private def validateTypesR(): Result[Unit] = {
+  private def validateTypesR(program: ProgramSymbols): Result[Unit] = {
     import assignment3.ast.high.ReturnSig
 
     // Helper functions to validate, short-circuiting on first error

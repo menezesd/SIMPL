@@ -12,28 +12,67 @@ class CompilerUtilsTypeWordTest {
     @DisplayName("isTypeWord: excludes statement starters when requested")
     void testExcludesStatementStarters() throws Exception {
         SamTokenizer tz = new SamTokenizer(new java.io.StringReader("return"), SamTokenizer.TokenizerOptions.PROCESS_STRINGS);
-        assertFalse(CompilerUtils.isTypeWord(tz, new ProgramSymbols(), "Main", false, true));
+        assertFalse(CompilerUtils.isTypeWord(
+                tz,
+                new ProgramSymbols(scala.collection.immutable.Map$.MODULE$.<String, assignment3.symbol.ClassSymbol>empty()),
+                "Main",
+                false,
+                true
+        ));
     }
 
     @Test
     @DisplayName("isTypeWord: recognizes primitive types")
     void testRecognizesPrimitiveTypes() throws Exception {
         SamTokenizer tz1 = new SamTokenizer(new java.io.StringReader("int"), SamTokenizer.TokenizerOptions.PROCESS_STRINGS);
-        assertTrue(CompilerUtils.isTypeWord(tz1, new ProgramSymbols(), null, false, true));
+    assertTrue(CompilerUtils.isTypeWord(
+        tz1,
+        new ProgramSymbols(scala.collection.immutable.Map$.MODULE$.<String, assignment3.symbol.ClassSymbol>empty()),
+        null,
+        false,
+        true
+    ));
 
         SamTokenizer tz2 = new SamTokenizer(new java.io.StringReader("bool"), SamTokenizer.TokenizerOptions.PROCESS_STRINGS);
-        assertTrue(CompilerUtils.isTypeWord(tz2, new ProgramSymbols(), null, false, true));
+    assertTrue(CompilerUtils.isTypeWord(
+        tz2,
+        new ProgramSymbols(scala.collection.immutable.Map$.MODULE$.<String, assignment3.symbol.ClassSymbol>empty()),
+        null,
+        false,
+        true
+    ));
 
         SamTokenizer tz3 = new SamTokenizer(new java.io.StringReader("String"), SamTokenizer.TokenizerOptions.PROCESS_STRINGS);
-        assertTrue(CompilerUtils.isTypeWord(tz3, new ProgramSymbols(), null, false, true));
+    assertTrue(CompilerUtils.isTypeWord(
+        tz3,
+        new ProgramSymbols(scala.collection.immutable.Map$.MODULE$.<String, assignment3.symbol.ClassSymbol>empty()),
+        null,
+        false,
+        true
+    ));
     }
 
     @Test
     @DisplayName("isTypeWord: recognizes class names including current class")
     void testRecognizesClassNames() throws Exception {
-        ProgramSymbols symbols = new ProgramSymbols();
-        symbols.addClass(new assignment3.symbol.ClassSymbol("C"));
-        symbols.addClass(new assignment3.symbol.ClassSymbol("Main"));
+    // Build immutable ProgramSymbols with classes C and Main
+    scala.collection.immutable.Map<String, assignment3.symbol.ClassSymbol> m =
+        scala.collection.immutable.Map$.MODULE$.empty();
+    assignment3.symbol.ClassSymbol clsC = new assignment3.symbol.ClassSymbol(
+        "C",
+        scala.collection.immutable.Vector$.MODULE$.<assignment3.symbol.VarSymbol>empty(),
+        scala.collection.immutable.Map$.MODULE$.<String, assignment3.symbol.MethodSymbol>empty(),
+        scala.collection.immutable.Vector$.MODULE$.<String>empty()
+    );
+    assignment3.symbol.ClassSymbol clsMain = new assignment3.symbol.ClassSymbol(
+        "Main",
+        scala.collection.immutable.Vector$.MODULE$.<assignment3.symbol.VarSymbol>empty(),
+        scala.collection.immutable.Map$.MODULE$.<String, assignment3.symbol.MethodSymbol>empty(),
+        scala.collection.immutable.Vector$.MODULE$.<String>empty()
+    );
+    m = m.updated("C", clsC);
+    m = m.updated("Main", clsMain);
+    ProgramSymbols symbols = new ProgramSymbols(m);
 
         SamTokenizer tzC = new SamTokenizer(new java.io.StringReader("C"), SamTokenizer.TokenizerOptions.PROCESS_STRINGS);
         assertTrue(CompilerUtils.isTypeWord(tzC, symbols, null, false, true));
