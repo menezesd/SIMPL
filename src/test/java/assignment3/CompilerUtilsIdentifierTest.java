@@ -21,10 +21,10 @@ class CompilerUtilsIdentifierTest {
     @Test
     void accepts_valid_identifiers(@TempDir Path dir) throws Exception {
         SamTokenizer tz1 = tokenizerFor(dir, "foo");
-        assertEquals("foo", CompilerUtils.getIdentifier(tz1));
+        assertEquals("foo", CompilerUtils.getIdentifier(tz1, CompilerUtils.noRecorder()));
 
         SamTokenizer tz2 = tokenizerFor(dir, "a1_b2");
-        assertEquals("a1_b2", CompilerUtils.getIdentifier(tz2));
+        assertEquals("a1_b2", CompilerUtils.getIdentifier(tz2, CompilerUtils.noRecorder()));
     }
 
     @Test
@@ -35,7 +35,7 @@ class CompilerUtilsIdentifierTest {
         };
         for (String w : reserved) {
             SamTokenizer tz = tokenizerFor(dir, w);
-            SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz), w + " should be reserved");
+            SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz, CompilerUtils.noRecorder()), w + " should be reserved");
             assertTrue(ex.getMessage().contains("Reserved word"));
         }
     }
@@ -43,14 +43,14 @@ class CompilerUtilsIdentifierTest {
     @Test
     void rejects_when_not_a_word(@TempDir Path dir) throws Exception {
         SamTokenizer tz = tokenizerFor(dir, "1abc");
-        SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz));
+        SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz, CompilerUtils.noRecorder()));
         assertTrue(ex.getMessage().contains("Expected identifier"));
     }
 
     @Test
     void rejects_invalid_pattern_starting_underscore(@TempDir Path dir) throws Exception {
         SamTokenizer tz = tokenizerFor(dir, "_bad");
-        SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz));
+        SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz, CompilerUtils.noRecorder()));
         // Depending on tokenizer, '_' may not be a WORD token. Accept either message.
         String msg = ex.getMessage();
         assertTrue(msg.contains("Invalid identifier") || msg.contains("Expected identifier"), msg);

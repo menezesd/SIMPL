@@ -3,7 +3,6 @@ package assignment3
 import assignment3.symbol._
 import edu.utexas.cs.sam.io.SamTokenizer
 import assignment3.ast.Diag
-import assignment3.ast.ResolveDiag
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.util.Using
 import scala.jdk.CollectionConverters._
@@ -15,71 +14,79 @@ object LiveOak3Compiler {
   @static final val ENTRY_CLASS: String  = "Main"
   @static final val ENTRY_METHOD: String = "main"
 
-  @static def reset(): Unit = CompilerUtils.clearTokens()
+  @static def reset(): Unit =
+    CompilerUtils.clearTokens()(using CompilerUtils.RecorderContext.default)
 
   // NOTE: compileD is the canonical public API (diagnostic-first). Remove the
   // legacy throwing adapter to discourage exception-based flow.
 
-  // Diagnostic-first API: returns Either[Diag, String]
-  def compileD(fileName: String): Either[Diag, String] = {
-    reset()
+  // Diagnostic-first API: returns CompilationResult
+  def compileD(fileName: String): CompilationResult = {
     val ctx = new CompilerContext()
-    CompilerUtils.setRecorder(ctx.recorder)
+    given CompilerUtils.RecorderContext = CompilerUtils.RecorderContext(Some(ctx.recorder))
     try {
-      val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
-      val stb   = new SymbolTableBuilder()
-  val symbols = stb.buildD(pass1) match { case Left(d) => return Left(d); case Right(s) => s }
-  symbols.freeze()
-      ctx.symbols = symbols
-      if (Debug.enabled("symbols")) dumpSymbols(symbols)
-      validateEntrypointD(symbols) match
-        case Left(d) => return Left(d)
-        case Right(_) => ()
-  val program = ProgramParser.parseD(fileName, symbols) match { case Left(d) => return Left(d); case Right(p) => p }
-      if (Debug.enabled("tokens")) dumpRecordedTokens(ctx)
-      ProgramCodegen.emitD(program, ctx) match
-        case Left(d) => Left(d)
-        case Right(code) =>
+      val resultEither =
+        for
+          _ <- EitherOps.unit(logStage(CompilationStage.Symbols, "build symbols"))
+          symbols <- buildSymbolsD(fileName, ctx)
+          _ <- EitherOps.unit(logStage(CompilationStage.Validate, "validate entrypoint"))
+          _ <- ValidationStage.validateEntrypointD(symbols, ENTRY_CLASS, ENTRY_METHOD)
+          _ <- EitherOps.unit(logStage(CompilationStage.Parse, "parse program"))
+          program <- parseProgramD(fileName, symbols)
+          _ <- EitherOps.unit(if (Debug.enabled("tokens")) dumpRecordedTokens(ctx))
+          _ <- EitherOps.unit(logStage(CompilationStage.Codegen, "emit code"))
+          code <- emitCodeD(program, ctx)
+        yield
           val out = code.toString
           if (Debug.enabled("sam")) Debug.log("sam", () => s"Generated SAM size: ${out.length} chars")
-          Right(out)
-    } catch {
-      case t: Throwable => throw t
-    } finally { cleanup() }
+          out
+      resultEither match
+        case Right(out) => CompilationResult.success(out)
+        case Left(diag) => CompilationResult.failure(diag)
+    } finally { cleanup(ctx) }
   }
 
-  private def cleanup(): Unit = { CompilerUtils.clearTokens(); CompilerUtils.clearRecorder() }
+  private def cleanup(ctx: CompilerContext): Unit = ctx.recorder.clear()
 
-  // legacy throwing variant removed; use validateEntrypointD instead when you
+  // legacy throwing variant removed; use ValidationStage.validateEntrypointD instead when you
   // need a diagnostic result.
 
-  private def validateEntrypointD(symbols: ProgramSymbols): Either[Diag, Unit] = {
-    symbols.getEntrypoint() match
-      case None => Left(ResolveDiag(s"Missing $ENTRY_CLASS.$ENTRY_METHOD entry point", -1))
-      case Some(ms) =>
-        if (ms.expectedUserArgs() != 0) Left(ResolveDiag(s"$ENTRY_CLASS.$ENTRY_METHOD must not declare parameters", entrypointErrorLine(ms)))
-        else if (ms.parameters.isEmpty || !ms.parameters.head.isObject || ms.parameters.head.getClassTypeName != ENTRY_CLASS)
-          Left(ResolveDiag(s"$ENTRY_CLASS.$ENTRY_METHOD must be an instance method of $ENTRY_CLASS", entrypointErrorLine(ms)))
-        else Right(())
+  private def buildSymbolsD(fileName: String, ctx: CompilerContext)(using CompilerUtils.RecorderContext): Either[Diag, ProgramSymbols] = {
+    val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
+    val stb = new SymbolTableBuilder()
+    stb.buildD(pass1).map { symbols =>
+      symbols.freeze()
+      ctx.symbols = symbols
+      if (Debug.enabled("symbols")) dumpSymbols(symbols)
+      symbols
+    }
   }
 
-  private def entrypointErrorLine(ms: MethodSymbol): Int = { val ln = ms.getBodyStartLine(); if (ln > 0) ln else -1 }
+  private def parseProgramD(fileName: String, symbols: ProgramSymbols)(using CompilerUtils.RecorderContext): Either[Diag, assignment3.ast.high.ProgramNode] =
+    ProgramParser.parseD(fileName, symbols)
+
+  private def emitCodeD(program: assignment3.ast.high.ProgramNode, ctx: CompilerContext): Either[Diag, Code] =
+    ProgramCodegen.emitD(program, ctx)
+
+  private def logStage(stage: CompilationStage, msg: => String): Unit =
+    if (Debug.enabled("stage")) Debug.log("stage", () => s"${stage.toString.toLowerCase}: $msg")
+
+  def compileEitherD(fileName: String): Either[Diag, String] =
+    compileD(fileName).toEither
 
   @static def compiler(fileName: String): String = {
     try {
-      compileD(fileName) match
+      compileEitherD(fileName) match
         case Right(code) => code
         case Left(diag) =>
           // Preserve test/legacy behavior: print failure message and throw Error
           System.err.println("Failed to compile " + normalizePathUnix(fileName))
-          cleanup()
           throw new Error(diag.message + " at " + diag.line + ":" + diag.column)
     } catch {
       // Only handle unexpected non-Error Throwables here; if we intentionally
       // threw an Error above, let it propagate so we don't double-print.
       case t: Throwable if !t.isInstanceOf[Error] =>
         System.err.println("Failed to compile " + normalizePathUnix(fileName))
-        cleanup()
         throw new Error(t)
     }
   }
@@ -121,14 +128,13 @@ object LiveOak3Compiler {
     }
     val inFile = args(0)
     val outFile = args(1)
-    compileD(inFile) match
+    compileEitherD(inFile) match
       case Right(samCode) =>
         Using.resource(new BufferedWriter(new FileWriter(outFile))) { w =>
           w.write(samCode)
         }
       case Left(diag) =>
         System.err.println(s"${diag.message} at ${diag.line}:${diag.column}")
-        cleanup()
         System.exit(1)
   }
 }

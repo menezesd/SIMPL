@@ -16,3 +16,16 @@ final case class ProgramSymbols(classes: Map[String, ClassSymbol]) {
 
   def getEntrypoint(): Option[MethodSymbol] = getMethod("Main", "main")
 }
+
+object ProgramSymbols {
+  def empty(): ProgramSymbols = ProgramSymbols(Map.empty)
+
+  @scala.annotation.varargs
+  def withClassNames(names: String*): ProgramSymbols = {
+    val classes = names.map { name =>
+      val cls = ClassSymbol(name, Vector.empty[VarSymbol], Map.empty, Vector.empty)
+      name -> cls
+    }.toMap
+    ProgramSymbols(classes)
+  }
+}
