@@ -1,6 +1,6 @@
 package assignment3.symbol
 
-import assignment3.ValueType
+import assignment3.{ValueType, PrimitiveType, ObjectRefType}
 import scala.collection.immutable.Vector
 import assignment3.ast.high.ReturnSig
 
@@ -14,12 +14,11 @@ final case class MethodSymbol(
   returnTypeColumn: Int = -1
 ) {
   def getName: String = name
-  // Compatibility: prior API exposed a nullable ValueType (null means void)
-  def getReturnValueType: ValueType = returnValueTypeOpt.orNull
+
   def getReturnSig: ReturnSig = returnValueTypeOpt match {
     case None => ReturnSig.Void
-    case Some(vt) if vt.isObject => ReturnSig.Obj(vt.getObject.getClassName)
-    case Some(vt) => ReturnSig.Prim(vt.getPrimitive)
+    case Some(ObjectRefType(ot)) => ReturnSig.Obj(ot.getClassName)
+    case Some(PrimitiveType(t)) => ReturnSig.Prim(t)
   }
 
   def numParameters(): Int = parameters.size
@@ -31,13 +30,14 @@ final case class MethodSymbol(
   def getReturnTypeLine(): Int = returnTypeLine
   def getReturnTypeColumn(): Int = returnTypeColumn
 
-  def lookup(ident: String): Option[VarSymbol] = (parameters ++ locals).find(_.getName == ident)
+  def lookup(ident: String): Option[VarSymbol] =
+    (parameters ++ locals).find(_.getName == ident)
 
   override def toString: String = {
     val ret = getReturnSig match {
       case ReturnSig.Void => "void"
-      case ReturnSig.Obj(cn) => s"obj:${cn}"
-      case ReturnSig.Prim(t) => String.valueOf(t)
+      case ReturnSig.Obj(cn) => s"obj:$cn"
+      case ReturnSig.Prim(t) => t.toString
     }
     s"MethodSymbol{$name, return=$ret, params=${parameters.toList}, locals=${locals.toList}}"
   }

@@ -1,6 +1,6 @@
 package assignment3.ast
 
-import assignment3.Type
+import assignment3.{Type, PrimitiveType, ObjectRefType}
 
 /** Helpers for resolving simple Type and ValueType for idiomatic AST. */
 object IdiomaticTypeUtils:
@@ -20,7 +20,7 @@ object IdiomaticTypeUtils:
     case Var(name, _)  =>
       method match
         case nmc: NewMethodContext =>
-          nmc.lookupVar(name).map(_.getType).getOrElse(Type.INT)
+          nmc.lookupVar(name).flatMap(_.primitiveOpt).getOrElse(Type.INT)
         case _ => Type.INT
     case Unary(UnaryOp.Not, _, _, _) => Type.BOOL
     case Unary(UnaryOp.Neg, inner, _, _) =>
@@ -28,14 +28,26 @@ object IdiomaticTypeUtils:
     case Binary(_, _, _, rt, _) => rt.getOrElse(Type.INT)
     case Ternary(_, t, _, rt, _) => rt.getOrElse(typeOf(t, method, programSymbols))
     case This(_) => Type.INT
-    case FieldAccess(_, _, fi, _) => fi.filter(_.valueType.isPrimitive).map(_.valueType.getPrimitive).getOrElse(Type.INT)
+    case FieldAccess(_, _, fi, _) =>
+      fi.flatMap { f =>
+        f.valueType match {
+          case PrimitiveType(t) => Some(t)
+          case _ => None
+        }
+      }.getOrElse(Type.INT)
     case Call(m, _, _) => loweredReturnOf(m)
     case InstanceCall(_, m, _, _) => loweredReturnOf(m)
     case NewObject(_, _, _) => Type.INT
 
   def classNameOf(e: Expr, method: assignment3.ast.MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): Option[String] = e match
     case NewObject(cn, _, _) => Some(cn)
-    case FieldAccess(_, _, fi, _) => fi.filter(_.valueType.isObject).map(_.valueType.getObject.getClassName)
+    case FieldAccess(_, _, fi, _) =>
+      fi.flatMap { f =>
+        f.valueType match {
+          case ObjectRefType(ot) => Some(ot.getClassName)
+          case _ => None
+        }
+      }
     case InstanceCall(_, m, _, _) =>
       m match
         case sm: assignment3.ast.ScalaCallableMethod =>
@@ -53,6 +65,6 @@ object IdiomaticTypeUtils:
     case Var(name, _) =>
       method match
         case nmc: NewMethodContext =>
-          nmc.lookupVar(name).filter(_.isObject).map(_.getClassTypeName)
+          nmc.lookupVar(name).flatMap(_.classTypeNameOpt)
         case _ => None
     case _ => None

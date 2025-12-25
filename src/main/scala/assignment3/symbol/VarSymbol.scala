@@ -1,6 +1,6 @@
 package assignment3.symbol
 
-import assignment3.{Type, ValueType, ObjectType}
+import assignment3.{Type, ValueType, ObjectType, PrimitiveType, ObjectRefType}
 
 final case class VarSymbol(
   name: String,
@@ -10,38 +10,36 @@ final case class VarSymbol(
   line: Int = -1,
   column: Int = -1
 ) {
-  // Convenience secondary constructors (Java style interop if needed)
-  def this(name: String, primitive: Type, parameter: Boolean, index: Int) =
-    this(name, ValueType.ofPrimitive(primitive), parameter, index)
-  def this(name: String, classTypeName: String, parameter: Boolean, index: Int) =
-    this(name, ValueType.ofObject(classTypeName), parameter, index)
-  def this(name: String, primitive: Type, parameter: Boolean, index: Int, line: Int, column: Int) =
-    this(name, ValueType.ofPrimitive(primitive), parameter, index, line, column)
-  def this(name: String, classTypeName: String, parameter: Boolean, index: Int, line: Int, column: Int) =
-    this(name, ValueType.ofObject(classTypeName), parameter, index, line, column)
-
-  // Backwards helpers
   def getName: String = name
   def getValueType: ValueType = valueType
-  def getType: Type = if (valueType.isPrimitive) valueType.getPrimitive else Type.INT // fallback
-  def getClassTypeName: String = if (valueType.isObject) valueType.getObject.getClassName else null
-  def isObject: Boolean = valueType.isObject
-  def getObjectType: ObjectType = if (valueType.isObject) valueType.getObject else null
   def isParameter: Boolean = parameter
   def getIndex: Int = index
   def getLine: Int = line
   def getColumn: Int = column
 
-  // Idiomatic Option-based accessors (preferred)
-  def primitiveOpt: Option[Type] = if (valueType.isPrimitive) Some(valueType.getPrimitive) else None
-  def classTypeNameOpt: Option[String] = if (valueType.isObject) Some(valueType.getObject.getClassName) else None
-  def objectTypeOpt: Option[ObjectType] = if (valueType.isObject) Some(valueType.getObject) else None
+  /** Pattern-matching based type access. */
+  def primitiveOpt: Option[Type] = valueType match {
+    case PrimitiveType(t) => Some(t)
+    case _ => None
+  }
+
+  def objectTypeOpt: Option[ObjectType] = valueType match {
+    case ObjectRefType(ot) => Some(ot)
+    case _ => None
+  }
+
+  def classTypeNameOpt: Option[String] = objectTypeOpt.map(_.getClassName)
 
   /** Stack frame offset based on calling convention. */
-  def stackAddress(totalParams: Int): Int = if (parameter) -(totalParams - index) else 2 + index
+  def stackAddress(totalParams: Int): Int =
+    if (parameter) -(totalParams - index) else 2 + index
 
   override def toString: String = {
-    val typeRepr = if (valueType.isObject) s"obj:${valueType.getObject.getClassName}" else String.valueOf(valueType.getPrimitive)
-    s"VarSymbol{$name:$typeRepr${if (parameter) ",param@" else ",local@"}$index}";
+    val typeRepr = valueType match {
+      case PrimitiveType(t) => t.toString
+      case ObjectRefType(ot) => s"obj:${ot.getClassName}"
+    }
+    val loc = if (parameter) s"param@$index" else s"local@$index"
+    s"VarSymbol{$name:$typeRepr,$loc}"
   }
 }

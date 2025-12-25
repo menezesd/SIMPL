@@ -17,6 +17,9 @@ object LiveOak3Compiler {
   @static def reset(): Unit =
     CompilerUtils.clearTokens()(using CompilerUtils.RecorderContext.default)
 
+  // Helper to run side-effecting code within for-comprehension
+  private inline def unit(body: => Unit): Either[Diag, Unit] = { body; Right(()) }
+
   // NOTE: compileD is the canonical public API (diagnostic-first). Remove the
   // legacy throwing adapter to discourage exception-based flow.
 
@@ -27,14 +30,14 @@ object LiveOak3Compiler {
     try {
       val resultEither =
         for
-          _ <- EitherOps.unit(logStage(CompilationStage.Symbols, "build symbols"))
+          _ <- unit(logStage(CompilationStage.Symbols, "build symbols"))
           symbols <- buildSymbolsD(fileName, ctx)
-          _ <- EitherOps.unit(logStage(CompilationStage.Validate, "validate entrypoint"))
+          _ <- unit(logStage(CompilationStage.Validate, "validate entrypoint"))
           _ <- ValidationStage.validateEntrypointD(symbols, ENTRY_CLASS, ENTRY_METHOD)
-          _ <- EitherOps.unit(logStage(CompilationStage.Parse, "parse program"))
+          _ <- unit(logStage(CompilationStage.Parse, "parse program"))
           program <- parseProgramD(fileName, symbols)
-          _ <- EitherOps.unit(if (Debug.enabled("tokens")) dumpRecordedTokens(ctx))
-          _ <- EitherOps.unit(logStage(CompilationStage.Codegen, "emit code"))
+          _ <- unit(if (Debug.enabled("tokens")) dumpRecordedTokens(ctx))
+          _ <- unit(logStage(CompilationStage.Codegen, "emit code"))
           code <- emitCodeD(program, ctx)
         yield
           val out = code.toString
@@ -55,7 +58,6 @@ object LiveOak3Compiler {
     val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
     val stb = new SymbolTableBuilder()
     stb.buildD(pass1).map { symbols =>
-      symbols.freeze()
       ctx.symbols = symbols
       if (Debug.enabled("symbols")) dumpSymbols(symbols)
       symbols

@@ -1,6 +1,7 @@
 package assignment3.ast
 
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
+import assignment3.{PrimitiveType, ObjectRefType}
 
 /** Idiomatic semantic checker for idiomatic AST. */
 object IdiomaticSemantic:
@@ -18,19 +19,20 @@ object IdiomaticSemantic:
       objMismatchMsg: String,
       primMismatchMsg: String
   ): Either[Diag, Unit] =
-    if expected.isObject then
-      if rhs.isInstanceOf[NullLit] then Right(())
-      else
-        TU.classNameOf(rhs, ctx, programSymbols) match
-          case Some(rhsClass) =>
-            val expectedClass = expected.getObject.getClassName
-            if rhsClass == expectedClass then Right(())
-            else Left(TypeDiag(objMismatchMsg, defaultLine))
-          case None => Right(()) // unknown at this stage; be permissive as before
-    else
-      val et = TU.typeOf(rhs, ctx, programSymbols)
-      if expected.getPrimitive.isCompatibleWith(et) then Right(())
-      else Left(TypeDiag(primMismatchMsg, defaultLine))
+    expected match {
+      case ObjectRefType(ot) =>
+        if rhs.isInstanceOf[NullLit] then Right(())
+        else
+          TU.classNameOf(rhs, ctx, programSymbols) match
+            case Some(rhsClass) =>
+              if rhsClass == ot.getClassName then Right(())
+              else Left(TypeDiag(objMismatchMsg, defaultLine))
+            case None => Right(()) // unknown at this stage; be permissive as before
+      case PrimitiveType(pt) =>
+        val et = TU.typeOf(rhs, ctx, programSymbols)
+        if pt.isCompatibleWith(et) then Right(())
+        else Left(TypeDiag(primMismatchMsg, defaultLine))
+    }
 
   // Either-based versions
   def checkExprE(e: Expr, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] = e match
@@ -63,9 +65,11 @@ object IdiomaticSemantic:
                   val firstErr: Option[Diag] = (0 until provided).iterator.flatMap { i =>
                     val formal = ms.parameters(i + 1)
                     val argType = TU.typeOf(args(i), ctx, programSymbols)
-                    if !formal.getType.isCompatibleWith(argType) then
-                      Some(TypeDiag("Argument type mismatch for parameter '" + formal.getName + "'", defaultLine))
-                    else None
+                    formal.valueType match {
+                      case PrimitiveType(pt) if !pt.isCompatibleWith(argType) =>
+                        Some(TypeDiag("Argument type mismatch for parameter '" + formal.getName + "'", defaultLine))
+                      case _ => None
+                    }
                   }.toSeq.headOption
                   firstErr.map(Left(_)).getOrElse(Right(()))
               case _ => Right(())
@@ -142,7 +146,7 @@ object IdiomaticSemantic:
             case Some(vs) =>
               val ctx = new assignment3.ast.NewMethodContext(cm, programSymbols)
               checkAssignable(
-                vs.getValueType,
+                vs.valueType,
                 value,
                 ctx,
                 programSymbols,

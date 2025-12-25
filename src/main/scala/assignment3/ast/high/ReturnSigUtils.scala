@@ -1,14 +1,16 @@
 package assignment3.ast.high
 
-import assignment3.{CompilerUtils, ValueType}
+import assignment3.{CompilerUtils, ValueType, PrimitiveType, ObjectRefType}
 
 object ReturnSigUtils {
   def fromRawType(rawType: String, line: Int): ReturnSig =
     if ("void" == rawType) ReturnSig.Void
     else {
       val vt = CompilerUtils.parseTypeOrObjectName(rawType, line)
-      if (vt.isObject) ReturnSig.Obj(vt.getObject.getClassName)
-      else ReturnSig.Prim(vt.getPrimitive)
+      vt match {
+        case ObjectRefType(ot) => ReturnSig.Obj(ot.getClassName)
+        case PrimitiveType(t) => ReturnSig.Prim(t)
+      }
     }
 
   def toValueTypeOpt(sig: ReturnSig): Option[ValueType] = sig match {

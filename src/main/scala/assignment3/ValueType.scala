@@ -1,38 +1,52 @@
 package assignment3
 
-/** Wrapper representing either a primitive Type or an object reference type. */
-final class ValueType private (val primitive: Type, val objectRef: ObjectType) {
-  def isPrimitive: Boolean = primitive != null
-  def isObject: Boolean = objectRef != null
-  def getPrimitive: Type = primitive
-  def getObject: ObjectType = objectRef
+/** Sealed union representing either a primitive Type or an object reference type. */
+sealed trait ValueType {
+  def isPrimitive: Boolean = this.isInstanceOf[PrimitiveType]
+  def isObject: Boolean = this.isInstanceOf[ObjectRefType]
 
-  def isCompatibleWith(other: ValueType): Boolean =
-    Option(other) match
-      case None => false
-      case Some(o) =>
-        if (this.isPrimitive && o.isPrimitive) this.primitive == o.primitive
-        else if (this.isObject && o.isObject) this.objectRef.isCompatibleWith(o.objectRef)
-        else false
-  override def toString: String =
-    if (isPrimitive) primitive.toString
-    else if (isObject) s"obj:${objectRef.getClassName}"
-    else "<void>"
-  override def equals(o: Any): Boolean = o match {
-    case v: ValueType => primitive == v.primitive && objectRef == v.objectRef
+  /** Safe Option-based extractors (preferred). */
+  def primitiveOpt: Option[Type] = this match {
+    case PrimitiveType(t) => Some(t)
+    case _ => None
+  }
+
+  def objectTypeOpt: Option[ObjectType] = this match {
+    case ObjectRefType(ot) => Some(ot)
+    case _ => None
+  }
+
+  def classNameOpt: Option[String] = objectTypeOpt.map(_.getClassName)
+
+  /** Extract primitive type or throw. Prefer pattern matching or primitiveOpt. */
+  def primitive: Type = this match {
+    case PrimitiveType(t) => t
+    case _ => throw new IllegalStateException("Not a primitive type")
+  }
+
+  /** Extract object type or throw. Prefer pattern matching or objectTypeOpt. */
+  def objectRef: ObjectType = this match {
+    case ObjectRefType(ot) => ot
+    case _ => throw new IllegalStateException("Not an object type")
+  }
+
+  def isCompatibleWith(other: ValueType): Boolean = (this, other) match {
+    case (PrimitiveType(t1), PrimitiveType(t2)) => t1 == t2
+    case (ObjectRefType(ot1), ObjectRefType(ot2)) => ot1.isCompatibleWith(ot2)
     case _ => false
   }
-  override def hashCode(): Int = java.util.Objects.hash(primitive, objectRef)
+
+  override def toString: String = this match {
+    case PrimitiveType(t) => t.toString
+    case ObjectRefType(ot) => s"obj:${ot.getClassName}"
+  }
 }
 
-object ValueType {
-  def ofPrimitive(t: Type): ValueType = new ValueType(java.util.Objects.requireNonNull(t), null)
-  def ofObject(className: String): ValueType = new ValueType(null, ObjectType(java.util.Objects.requireNonNull(className)))
-  def ofObject(ot: ObjectType): ValueType = new ValueType(null, java.util.Objects.requireNonNull(ot))
+final case class PrimitiveType(t: Type) extends ValueType
+final case class ObjectRefType(ot: ObjectType) extends ValueType
 
-  def sameObjectClass(a: ValueType, b: ValueType): Boolean =
-    a != null && b != null && a.isObject && b.isObject && a.getObject.getClassName == b.getObject.getClassName
-  def samePrimitive(a: ValueType, b: ValueType): Boolean =
-    a != null && b != null && a.isPrimitive && b.isPrimitive && a.getPrimitive == b.getPrimitive
-  def equalsNullable(a: ValueType, b: ValueType): Boolean = java.util.Objects.equals(a, b)
+object ValueType {
+  def ofPrimitive(t: Type): ValueType = PrimitiveType(t)
+  def ofObject(className: String): ValueType = ObjectRefType(ObjectType(className))
+  def ofObject(ot: ObjectType): ValueType = ObjectRefType(ot)
 }

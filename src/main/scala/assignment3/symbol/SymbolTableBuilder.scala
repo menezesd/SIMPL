@@ -2,259 +2,217 @@ package assignment3.symbol
 
 import assignment3._
 import assignment3.{ParserBase, TokenizerView}
-import scala.compiletime.uninitialized
 import assignment3.ast.{Diag, SyntaxDiag, TypeDiag, ResolveDiag, Result}
 import edu.utexas.cs.sam.io.{SamTokenizer, Tokenizer}
 import Tokenizer.TokenType
-import scala.collection.mutable
 
-/** Scala port of first-pass symbol table builder. */
-final class SymbolTableBuilder(
-  rules: CompilerUtils.LexicalRules = CompilerUtils.LexicalRules.Default
-)(using CompilerUtils.RecorderContext) extends ParserBase {
-  // Build into immutable structures directly
-  private var classesAcc = Vector.empty[ClassSymbol]
-  private var tvInst: TokenizerView = uninitialized
-  override protected def tv: TokenizerView = tvInst
+/** Immutable first-pass symbol table builder. */
+object SymbolTableBuilder {
+  def buildD(
+    tokenizer: SamTokenizer,
+    rules: CompilerUtils.LexicalRules = CompilerUtils.LexicalRules.Default
+  )(using CompilerUtils.RecorderContext): Either[Diag, ProgramSymbols] = {
+    val parser = new Parser(new TokenizerView(tokenizer, rules), rules)
+    parser.buildProgram()
+  }
 
-  // Diagnostic-first helpers
-  private inline def typeE[A](msg: String, line: Int, col: Int): Result[A] = Left(TypeDiag(msg, line, col))
+  private class Parser(
+    override protected val tv: TokenizerView,
+    rules: CompilerUtils.LexicalRules
+  )(using CompilerUtils.RecorderContext) extends ParserBase {
 
-  private def expectCharR(ch: Char): Result[Unit] = tv.expectChar(ch)
-  private def expectWordR(word: String): Result[Unit] = tv.expectWord(word)
-  private def getIdentifierR(): Result[String] = tv.getIdentifier
-  private def getWordR(): Result[String] = tv.getWord
+    private inline def typeE[A](msg: String, line: Int, col: Int): Result[A] =
+      Left(TypeDiag(msg, line, col))
 
-  private def isTypeToken(currentClassName: String): Boolean =
-    tv.isTypeWord(
-      ProgramSymbols(classesAcc.map(c => c.name -> c).toMap),
-      currentClassName,
-      allowUnknown = true,
-      excludeStmtStarters = true
-    )
+    def buildProgram(): Result[ProgramSymbols] =
+      parseClasses(Vector.empty).flatMap { classes =>
+        val program = ProgramSymbols(classes.map(c => c.name -> c).toMap)
+        validateTypes(program).map(_ => program)
+      }
 
-  private def parseNameListWithSemicolonR(addVar: (String, Int, Int) => Unit, errorMsg: String): Result[Unit] = {
-    var res: Result[Boolean] = ok(true)
-    def shouldContinue: Boolean = res match
-      case Right(true) => true
-      case _ => false
-    while (shouldContinue) {
-      res =
+    private def isTypeToken(knownClasses: Vector[ClassSymbol], currentClassName: String): Boolean =
+      tv.isTypeWord(
+        ProgramSymbols(knownClasses.map(c => c.name -> c).toMap),
+        currentClassName,
+        allowUnknown = true,
+        excludeStmtStarters = true
+      )
+
+    private def parseClasses(acc: Vector[ClassSymbol]): Result[Vector[ClassSymbol]] =
+      if (tv.peekKind() == TokenType.EOF) ok(acc)
+      else parseClass(acc).flatMap(cls => parseClasses(acc :+ cls))
+
+    private def parseClass(knownClasses: Vector[ClassSymbol]): Result[ClassSymbol] =
+      for
+        _ <- expectWordR("class")
+        className <- getIdentifierR()
+        _ <- if (knownClasses.exists(_.name == className))
+          err[Unit](ResolveDiag(Messages.duplicateClass(className), tv.line, tv.col))
+        else ok(())
+        fields <- parseFields(className)
+        _ <- if (!tv.consumeChar('{')) syntax(Messages.expectedClassHeaderOpenBrace(className)) else ok(())
+        methods <- parseMethods(knownClasses, className, Vector.empty)
+      yield ClassSymbol(className, fields._1, methods.map(m => m.name -> m).toMap, fields._2)
+
+    private def parseFields(className: String): Result[(Vector[VarSymbol], Vector[String])] =
+      if (!tv.consumeChar('(')) ok((Vector.empty, Vector.empty))
+      else if (tv.consumeChar(')')) ok((Vector.empty, Vector.empty))
+      else parseFieldGroups(Vector.empty, Vector.empty)
+
+    private def parseFieldGroups(fields: Vector[VarSymbol], order: Vector[String]): Result[(Vector[VarSymbol], Vector[String])] =
+      if (tv.peekKind() != TokenType.WORD) {
+        if (tv.consumeChar(')')) ok((fields, order))
+        else syntax(Messages.expectedCloseParenAfterFieldDecls)
+      } else {
+        for
+          rawType <- getWordR()
+          vt = CompilerUtils.parseTypeOrObjectName(rawType, tv.line)
+          namesResult <- parseNameList(vt, isParam = false, startIndex = -1)
+          (newFields, newOrder) = namesResult.foldLeft((fields, order)) { case ((fs, os), sym) =>
+            (fs :+ sym, os :+ sym.name)
+          }
+          result <- if (tv.consumeChar(')')) ok((newFields, newOrder)) else parseFieldGroups(newFields, newOrder)
+        yield result
+      }
+
+    private def parseNameList(vt: ValueType, isParam: Boolean, startIndex: Int): Result[Vector[VarSymbol]] = {
+      def loop(acc: Vector[VarSymbol], idx: Int): Result[Vector[VarSymbol]] =
         for
           name <- getIdentifierR()
           atName = tv.at(name)
-          _ = addVar(atName.value, atName.line, atName.col)
-          next <-
-            if (tv.consumeChar(',')) then ok(true)
-            else if (tv.consumeChar(';')) then ok(false)
-            else syntax(errorMsg)
-        yield next
+          sym = VarSymbol(atName.value, vt, isParam, idx, atName.line, atName.col)
+          result <- {
+            if (tv.consumeChar(',')) loop(acc :+ sym, idx + 1)
+            else if (tv.consumeChar(';')) ok(acc :+ sym)
+            else syntax(Messages.expectedFieldDeclSemicolon)
+          }
+        yield result
+      loop(Vector.empty, startIndex)
     }
-    res.map(_ => ())
-  }
 
-  private def parseParamsR(className: String, addParam: (ValueType, String, Int, Int) => Unit): Result[Unit] = {
-    var res: Result[Unit] = ok(())
-    while (res.isRight && isTypeToken(className)) {
-      res =
+    private def parseMethods(knownClasses: Vector[ClassSymbol], className: String, acc: Vector[MethodSymbol]): Result[Vector[MethodSymbol]] =
+      if (tv.consumeChar('}')) ok(acc)
+      else parseMethod(knownClasses, className).flatMap(m => parseMethods(knownClasses, className, acc :+ m))
+
+    private def parseMethod(knownClasses: Vector[ClassSymbol], className: String): Result[MethodSymbol] =
+      for
+        typeWord <- getWordR()
+        rtLine = tv.line
+        rtCol = tv.col
+        returnSig = assignment3.ast.high.ReturnSigUtils.fromRawType(typeWord, tv.line)
+        name <- getIdentifierR()
+        methodRet = assignment3.ast.high.ReturnSigUtils.toValueTypeOpt(returnSig)
+        _ <- expectCharR('(')
+        _ <- if (className == "Main" && name == "main" && tv.peekKind() == TokenType.WORD)
+          syntax(Messages.mainNoParams) else ok(())
+        params <- parseParams(knownClasses, className, Vector(VarSymbol("this", ValueType.ofObject(className), true, 0, -1, -1)))
+        _ <- expectCharR(')')
+        _ <- expectCharR('{')
+        bodyStart = tv.line
+        locals <- parseLocals(knownClasses, className, Vector.empty)
+        _ <- skipBodyRemainder()
+      yield MethodSymbol(name, params, locals, methodRet, bodyStart, rtLine, rtCol)
+
+    private def parseParams(knownClasses: Vector[ClassSymbol], className: String, acc: Vector[VarSymbol]): Result[Vector[VarSymbol]] =
+      if (!isTypeToken(knownClasses, className)) ok(acc)
+      else
         for
           rawType <- getWordR()
           vt = CompilerUtils.parseTypeOrObjectName(rawType, tv.line)
           pName <- getIdentifierR()
           atName = tv.at(pName)
-          _ = addParam(vt, atName.value, atName.line, atName.col)
-          _ = if (tv.consumeChar(',')) () else ()
-        yield ()
-    }
-    res
-  }
+          sym = VarSymbol(atName.value, vt, true, acc.size, atName.line, atName.col)
+          _ = tv.consumeChar(',')
+          result <- parseParams(knownClasses, className, acc :+ sym)
+        yield result
 
-  private def buildR(tokenizer: SamTokenizer): Result[ProgramSymbols] =
-    tvInst = new TokenizerView(tokenizer, rules)
-    def outer(): Result[Unit] =
-      if (tv.peekKind() != TokenType.EOF) then
-        parseClassR().flatMap(_ => outer())
-      else ok(())
-    for
-      _ <- outer()
-      program = ProgramSymbols(classesAcc.map(c => c.name -> c).toMap)
-      _ <- validateTypesR(program)
-    yield program
+    private def parseLocals(knownClasses: Vector[ClassSymbol], className: String, acc: Vector[VarSymbol]): Result[Vector[VarSymbol]] =
+      if (!isTypeToken(knownClasses, className)) ok(acc)
+      else
+        for
+          rawType <- getWordR()
+          vt = CompilerUtils.parseTypeOrObjectName(rawType, tv.line)
+          newLocals <- parseLocalNames(vt, acc.size, Vector.empty)
+          result <- parseLocals(knownClasses, className, acc ++ newLocals)
+        yield result
 
-  /** Diagnostic-first variant: never throws; returns Either[Diag, ProgramSymbols]. */
-  def buildD(tokenizer: SamTokenizer): Either[Diag, ProgramSymbols] = buildR(tokenizer)
-
-  private def parseClassR(): Result[Unit] =
-    for
-      _ <- expectWordR("class")
-      className <- getIdentifierR()
-      // Reject duplicate class declarations
-      _ <- {
-        if (classesAcc.exists(_.name == className)) then
-          err[Unit](ResolveDiag(Messages.duplicateClass(className), tv.line, tv.col))
-        else ok(())
-      }
-      res <- {
-        // accumulate fields
-        var fieldSyms = Vector.empty[VarSymbol]
-        var fieldOrder = Vector.empty[String]
-
-        // Parse optional field list in parentheses
-        def parseFields(): Result[Unit] =
-          if (tv.consumeChar('(')) then
-            if (tv.consumeChar(')')) ok(())
-            else
-              def fieldsLoop(): Result[Unit] =
-                if (tv.peekKind() != TokenType.WORD) then
-                  if (tv.consumeChar(')')) ok(()) else syntax(Messages.expectedCloseParenAfterFieldDecls)
-                else
-                  for
-                    rawType <- getWordR()
-                    vt = CompilerUtils.parseTypeOrObjectName(rawType, tv.line)
-                    valueType = if (vt.isObject) ValueType.ofObject(vt.getObject.getClassName) else ValueType.ofPrimitive(vt.getPrimitive)
-                    _ <- parseNameListWithSemicolonR(
-                      (name, line, col) => {
-                        fieldSyms :+= new VarSymbol(name, valueType, false, -1, line, col)
-                        fieldOrder :+= name
-                      },
-                      Messages.expectedFieldDeclSemicolon
-                    )
-                    res <- if (tv.consumeChar(')')) ok(()) else fieldsLoop()
-                  yield res
-              fieldsLoop()
-          else ok(())
-
-        val headerRes =
-          for
-            _ <- parseFields()
-            _ <- if (!tv.consumeChar('{')) then syntax(Messages.expectedClassHeaderOpenBrace(className)) else ok(())
-          yield ()
-
-        headerRes.flatMap { _ =>
-          // Parse methods until closing '}'
-          def methodsLoop(acc: Vector[MethodSymbol]): Result[Vector[MethodSymbol]] =
-            if (tv.consumeChar('}')) then ok(acc)
-            else parseMethodR(className).flatMap(m => methodsLoop(acc :+ m))
-
-          methodsLoop(Vector.empty).map { ms =>
-            val cls = ClassSymbol(className, fieldSyms, ms.map(m => m.name -> m).toMap, fieldOrder)
-            classesAcc :+= cls
-            ()
-          }
+    private def parseLocalNames(vt: ValueType, startIdx: Int, acc: Vector[VarSymbol]): Result[Vector[VarSymbol]] =
+      for
+        name <- getIdentifierR()
+        atName = tv.at(name)
+        sym = VarSymbol(atName.value, vt, false, startIdx + acc.size, atName.line, atName.col)
+        result <- {
+          if (tv.consumeChar(',')) parseLocalNames(vt, startIdx, acc :+ sym)
+          else if (tv.consumeChar(';')) ok(acc :+ sym)
+          else syntax(Messages.expectedVarDeclSeparator)
         }
-      }
-    yield res
+      yield result
 
-  private def parseMethodR(className: String): Result[MethodSymbol] = {
-    // mutable accumulators for params/locals
-    var params = Vector(new VarSymbol("this", ValueType.ofObject(className), true, 0, -1, -1))
-    var locals = Vector.empty[VarSymbol]
-
-    for
-      typeWord <- getWordR()
-      rtLine = tv.line; rtCol = tv.col
-      returnSig = assignment3.ast.high.ReturnSigUtils.fromRawType(typeWord, tv.line)
-      name <- getIdentifierR()
-      methodRet = assignment3.ast.high.ReturnSigUtils.toValueTypeOpt(returnSig)
-      _ <- expectCharR('(')
-      _ <- if (className == "Main" && name == "main" && tv.peekKind() == TokenType.WORD)
-        then syntax(Messages.mainNoParams) else ok(())
-      _ <- parseParamsR(
-        className,
-        (vt, pName, line, col) =>
-          if (vt.isObject) params :+= new VarSymbol(pName, ValueType.ofObject(vt.getObject.getClassName), true, params.size, line, col)
-          else params :+= new VarSymbol(pName, ValueType.ofPrimitive(vt.getPrimitive), true, params.size, line, col)
-      )
-      _ <- expectCharR(')')
-      _ <- expectCharR('{')
-      bodyStart = tv.line
-      _ <- {
-        def localsOuter(): Result[Unit] =
-          if (isTypeToken(className)) then
-            for
-              rawType <- getWordR()
-              vt = CompilerUtils.parseTypeOrObjectName(rawType, tv.line)
-              valueType = if (vt.isObject) ValueType.ofObject(vt.getObject.getClassName) else ValueType.ofPrimitive(vt.getPrimitive)
-              _ <- parseNameListWithSemicolonR(
-                (lName, line, col) =>
-                  locals :+= new VarSymbol(lName, valueType, false, locals.size, line, col),
-                Messages.expectedVarDeclSeparator
-              )
-              _ <- localsOuter()
-            yield ()
-          else ok(())
-        localsOuter()
-      }
-      _ <- skipBodyRemainderR()
-    yield MethodSymbol(name, params, locals, methodRet, bodyStart, rtLine, rtCol)
-  }
-
-  private def skipBodyRemainderR(): Result[Unit] = {
-    val stack = new java.util.ArrayDeque[Char]()
-    stack.push('{')
-    while (!stack.isEmpty && tv.peekKind() != TokenType.EOF) {
-      if (tv.consumeChar('{')) stack.push('{')
-      else if (tv.consumeChar('}')) stack.pop()
-      else CompilerUtils.skipToken(tv.tz)
+    private def skipBodyRemainder(): Result[Unit] = {
+      def loop(depth: Int): Result[Unit] =
+        if (depth == 0) ok(())
+        else if (tv.peekKind() == TokenType.EOF) Left(SyntaxDiag(Messages.unbalancedBraces, tv.line, tv.col))
+        else if (tv.consumeChar('{')) loop(depth + 1)
+        else if (tv.consumeChar('}')) loop(depth - 1)
+        else { CompilerUtils.skipToken(tv.tz); loop(depth) }
+      loop(1)
     }
-    if (!stack.isEmpty) Left(SyntaxDiag(Messages.unbalancedBraces, tv.line, tv.col)) else Right(())
+
+    private def validateTypes(program: ProgramSymbols): Result[Unit] = {
+      import assignment3.ast.high.ReturnSig
+
+      def checkField(cls: ClassSymbol, f: VarSymbol): Result[Unit] =
+        f.valueType match {
+          case ObjectRefType(ot) if !program.existsClass(ot.getClassName) =>
+            err(TypeDiag(Messages.unknownFieldType(cls.getName, f.getName, ot.getClassName), f.getLine, f.getColumn))
+          case _ => ok(())
+        }
+
+      def checkParam(cls: ClassSymbol, m: MethodSymbol, p: VarSymbol): Result[Unit] =
+        p.valueType match {
+          case ObjectRefType(ot) if !program.existsClass(ot.getClassName) =>
+            err(TypeDiag(Messages.unknownParamType(cls.getName, m.getName, p.getName, ot.getClassName), p.getLine, p.getColumn))
+          case _ => ok(())
+        }
+
+      def checkLocal(cls: ClassSymbol, m: MethodSymbol, v: VarSymbol): Result[Unit] =
+        v.valueType match {
+          case ObjectRefType(ot) if !program.existsClass(ot.getClassName) =>
+            err(TypeDiag(Messages.unknownLocalType(cls.getName, m.getName, v.getName, ot.getClassName), v.getLine, v.getColumn))
+          case _ => ok(())
+        }
+
+      def checkMethodReturn(cls: ClassSymbol, m: MethodSymbol): Result[Unit] = m.getReturnSig match {
+        case ReturnSig.Obj(cn) if !program.existsClass(cn) =>
+          err(TypeDiag(Messages.unknownReturnType(cls.getName, m.getName, cn), m.getReturnTypeLine(), m.getReturnTypeColumn()))
+        case _ => ok(())
+      }
+
+      def validateList[A](items: List[A])(check: A => Result[Unit]): Result[Unit] =
+        items.foldLeft[Result[Unit]](ok(())) { (acc, item) => acc.flatMap(_ => check(item)) }
+
+      def validateMethod(cls: ClassSymbol, m: MethodSymbol): Result[Unit] =
+        for
+          _ <- checkMethodReturn(cls, m)
+          _ <- validateList(m.parameters.toList)(p => checkParam(cls, m, p))
+          _ <- validateList(m.locals.toList)(v => checkLocal(cls, m, v))
+        yield ()
+
+      def validateClass(cls: ClassSymbol): Result[Unit] =
+        for
+          _ <- validateList(cls.allFields)(f => checkField(cls, f))
+          _ <- validateList(cls.allMethods)(m => validateMethod(cls, m))
+        yield ()
+
+      validateList(program.allClasses)(validateClass)
+    }
   }
+}
 
-  private def validateTypesR(program: ProgramSymbols): Result[Unit] = {
-    import assignment3.ast.high.ReturnSig
-
-    // Helper functions to validate, short-circuiting on first error
-    def checkField(cls: ClassSymbol, f: VarSymbol): Result[Unit] =
-      if (f.isObject) then
-        val cn = f.classTypeNameOpt.getOrElse(f.getClassTypeName)
-        if (!program.existsClass(cn)) then err(TypeDiag(Messages.unknownFieldType(cls.getName, f.getName, cn), f.getLine, f.getColumn))
-        else ok(())
-      else ok(())
-
-    def checkParam(cls: ClassSymbol, m: MethodSymbol, p: VarSymbol): Result[Unit] =
-      if (p.isObject) then
-        val cn = p.classTypeNameOpt.getOrElse(p.getClassTypeName)
-        if (!program.existsClass(cn)) then err(TypeDiag(Messages.unknownParamType(cls.getName, m.getName, p.getName, cn), p.getLine, p.getColumn))
-        else ok(())
-      else ok(())
-
-    def checkLocal(cls: ClassSymbol, m: MethodSymbol, v: VarSymbol): Result[Unit] =
-      if (v.isObject) then
-        val cn = v.classTypeNameOpt.getOrElse(v.getClassTypeName)
-        if (!program.existsClass(cn)) then err(TypeDiag(Messages.unknownLocalType(cls.getName, m.getName, v.getName, cn), v.getLine, v.getColumn))
-        else ok(())
-      else ok(())
-
-    def checkMethodReturn(cls: ClassSymbol, m: MethodSymbol): Result[Unit] = m.getReturnSig match
-      case ReturnSig.Obj(cn) => if (!program.existsClass(cn)) then err(TypeDiag(Messages.unknownReturnType(cls.getName, m.getName, cn), m.getReturnTypeLine(), m.getReturnTypeColumn())) else ok(())
-      case _ => ok(())
-
-    def loopFields(it: Iterator[VarSymbol], cls: ClassSymbol): Result[Unit] =
-      if (!it.hasNext) ok(()) else checkField(cls, it.next()).flatMap(_ => loopFields(it, cls))
-
-    def loopParams(it: Iterator[VarSymbol], cls: ClassSymbol, m: MethodSymbol): Result[Unit] =
-      if (!it.hasNext) ok(()) else checkParam(cls, m, it.next()).flatMap(_ => loopParams(it, cls, m))
-
-    def loopLocals(it: Iterator[VarSymbol], cls: ClassSymbol, m: MethodSymbol): Result[Unit] =
-      if (!it.hasNext) ok(()) else checkLocal(cls, m, it.next()).flatMap(_ => loopLocals(it, cls, m))
-
-    def loopMethods(it: Iterator[MethodSymbol], cls: ClassSymbol): Result[Unit] =
-      if (!it.hasNext) ok(())
-      else
-        val m = it.next()
-        checkMethodReturn(cls, m)
-          .flatMap(_ => loopParams(m.parameters.iterator, cls, m))
-          .flatMap(_ => loopLocals(m.locals.iterator, cls, m))
-          .flatMap(_ => loopMethods(it, cls))
-
-    def loopClasses(it: Iterator[ClassSymbol]): Result[Unit] =
-      if (!it.hasNext) ok(())
-      else
-        val cls = it.next()
-        loopFields(cls.allFields.iterator, cls)
-          .flatMap(_ => loopMethods(cls.allMethods.iterator, cls))
-          .flatMap(_ => loopClasses(it))
-
-    loopClasses(program.allClasses.iterator)
-  }
+/** Legacy class-based API for backwards compatibility. */
+final class SymbolTableBuilder(
+  rules: CompilerUtils.LexicalRules = CompilerUtils.LexicalRules.Default
+)(using CompilerUtils.RecorderContext) {
+  def buildD(tokenizer: SamTokenizer): Either[Diag, ProgramSymbols] =
+    SymbolTableBuilder.buildD(tokenizer, rules)
 }

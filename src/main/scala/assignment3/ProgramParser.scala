@@ -16,11 +16,6 @@ private final class ProgramParser private (
 )(using CompilerUtils.RecorderContext) extends ParserBase {
   override protected val tv: TokenizerView = new TokenizerView(tz, rules)
 
-  private def expectCharR(ch: Char): Result[Unit] = tv.expectChar(ch)
-  private def expectWordR(word: String): Result[Unit] = tv.expectWord(word)
-  private def getIdentifierR(): Result[String] = tv.getIdentifier
-  private def getWordR(): Result[String] = tv.getWord
-
   private def parseProgramR(): Result[ProgramNode] =
     val classes = ListBuffer.empty[ClassNode]
     def loop(): Result[Unit] =
@@ -53,12 +48,7 @@ private final class ProgramParser private (
     )
 
   private def parseMethodsR(className: String): Result[List[MethodNode]] =
-    val methods = ListBuffer.empty[MethodNode]
-    def loop(): Result[Unit] =
-      if (!tv.consumeChar('}')) then
-        parseMethodR(className).flatMap(m => { methods += m; loop() })
-      else ok(())
-    loop().map(_ => methods.toList)
+    collectUntil('}')(parseMethodR(className))
 
   private def parseMethodR(className: String): Result[MethodNode] =
     for
@@ -74,7 +64,7 @@ private final class ProgramParser private (
     yield MethodNode(className, methodName, params, returnSig, body)
 
   private def parseParamsR(ms: MethodSymbol, methodName: String): Result[List[ParamNode]] =
-    val expectedUserParams = assignment3.ast.MethodUtils.expectedUserArgs(ms)
+    val expectedUserParams = ms.expectedUserArgs()
     val params = ListBuffer.empty[ParamNode]
     var paramIndex = 0
     def loop(): Result[Unit] =
@@ -82,19 +72,27 @@ private final class ProgramParser private (
         for
           pr <- getWordR()
           vt = CompilerUtils.parseTypeOrObjectName(pr, tv.line)
-          pTypeOpt = if (vt.isPrimitive) Some(vt.getPrimitive) else None
-          pobjOpt = if (vt.isObject) Some(vt.getObject.getClassName) else None
+          (pTypeOpt, pobjOpt) = vt match {
+            case PrimitiveType(t) => (Some(t), None)
+            case ObjectRefType(ot) => (None, Some(ot.getClassName))
+          }
           pName <- getIdentifierR()
           _ <-
             if (paramIndex >= expectedUserParams) then
               val atLeast = paramIndex + 1
               syntax(Messages.tooManyParameters(methodName, expectedUserParams, atLeast))
             else ok(())
-          formal = assignment3.ast.MethodUtils.userParamAt(ms, paramIndex)
-          typeOk = if (formal.isObject) pobjOpt.contains(formal.getClassTypeName) else pTypeOpt.contains(formal.getType)
+          formal = ms.parameters(paramIndex + 1) // +1 skips implicit 'this'
+          typeOk = formal.valueType match {
+            case ObjectRefType(ot) => pobjOpt.contains(ot.getClassName)
+            case PrimitiveType(t) => pTypeOpt.contains(t)
+          }
           _ <- if (!typeOk || formal.getName != pName) then
             val position = paramIndex + 1
-            val expectedType = if (formal.isObject) formal.getClassTypeName else String.valueOf(formal.getType)
+            val expectedType = formal.valueType match {
+              case ObjectRefType(ot) => ot.getClassName
+              case PrimitiveType(t) => t.toString
+            }
             val actualType = pobjOpt.getOrElse(pTypeOpt.map(_.toString).getOrElse("void"))
             syntax(Messages.parameterMismatch(methodName, position, expectedType, formal.getName, actualType, pName))
           else ok(())

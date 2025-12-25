@@ -2,14 +2,11 @@ package assignment3.symbol
 
 import scala.collection.immutable.Map
 
-/** Immutable program symbol table with compatibility methods. */
+/** Immutable program symbol table. */
 final case class ProgramSymbols(classes: Map[String, ClassSymbol]) {
   def getClass(name: String): Option[ClassSymbol] = classes.get(name)
   def existsClass(name: String): Boolean = classes.contains(name)
   def allClasses: List[ClassSymbol] = classes.values.toList
-  // Compatibility: freeze/isFrozen no-ops for prior API
-  def freeze(): Unit = ()
-  def isFrozen: Boolean = true
 
   def getMethod(className: String, methodName: String): Option[MethodSymbol] =
     getClass(className).flatMap(_.method(methodName))

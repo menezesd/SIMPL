@@ -23,17 +23,8 @@ final class AstParser(
 
   // Public API (diagnostic-first)
 
-  // Result helpers
   import assignment3.ast.{Result, SyntaxDiag, TypeDiag, ResolveDiag}
   override protected val tv: TokenizerView = new TokenizerView(tokenizer, rules)
-
-  private def expectCharR(ch: Char): Result[Unit] = tv.expectChar(ch)
-  private def expectWordR(word: String): Result[Unit] = tv.expectWord(word)
-  private def getIdentifierR(): Result[String] = tv.getIdentifier
-  private def getWordR(): Result[String] = tv.getWord
-  private def getIntR(): Result[Int] = tv.getInt
-  private def getStringR(): Result[String] = tv.getString
-  private def getOpR(): Result[Char] = tv.getOp
 
   // Diagnostic-first, no-throw variants
   def parseExprD(): Result[Expr] = parseExprR()
@@ -47,12 +38,11 @@ final class AstParser(
       ms = nmc.getSymbol
       if ms.numParameters() > 0 && ms.parameters.headOption.exists(_.getName == "this")
       thisSym = ms.parameters.head
-      if thisSym.isObject
-      cs <- programSymbols.getClass(thisSym.getClassTypeName)
+      className <- thisSym.classTypeNameOpt
+      cs <- programSymbols.getClass(className)
       fSym <- cs.field(fieldName)
       off = cs.fieldOffset(fieldName)
-      vt = fSym.getValueType
-      fi = new assignment3.symbol.ClassSymbol.FieldInfo(off, vt, fSym)
+      fi = assignment3.symbol.ClassSymbol.FieldInfo(off, fSym.valueType, fSym)
     } yield FieldAccess(This(), fieldName, Some(fi))
 
   private def resolveFieldInfo(target: Expr, fieldName: String): Option[assignment3.symbol.ClassSymbol.FieldInfo] =
@@ -99,10 +89,7 @@ final class AstParser(
 
   private def parseStmtR(): Result[Stmt] =
     if tv.consumeChar( '{') then
-      val stmts = ListBuffer.empty[Stmt]
-      def loop(): Result[Unit] =
-        if tv.consumeChar( '}') then ok(()) else parseStmtR().flatMap(s => { stmts += s; loop() })
-      loop().map(_ => Block(stmts.toList))
+      collectUntil('}')(parseStmtR()).map(Block(_))
     else if tv.consumeChar( ';') then ok(Block(Nil))
     else if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedStatement)
     else if tv.test("break") then
@@ -160,12 +147,7 @@ final class AstParser(
   private def parseBlockR(): Result[Block] =
     for
       _ <- expectCharR('{')
-      stmts <-
-        val buf = ListBuffer.empty[Stmt]
-        def loop(): Result[List[Stmt]] =
-          if tv.consumeChar( '}') then ok(buf.toList)
-          else parseStmtR().flatMap(s => { buf += s; loop() })
-        loop()
+      stmts <- collectUntil('}')(parseStmtR())
     yield Block(stmts)
 
   private def parseExprR(): Result[Expr] =
@@ -210,18 +192,6 @@ final class AstParser(
       for
         base0 <- parseTerminalR()
         result <-
-          def parseArgsR(): Result[List[Expr]] =
-            if tv.consumeChar( ')') then ok(Nil)
-            else
-              for
-                first <- parseExprR()
-                args <-
-                  def loop(acc: List[Expr]): Result[List[Expr]] =
-                    if tv.consumeChar( ',') then
-                      parseExprR().flatMap(e => loop(acc :+ e))
-                    else expectCharR(')').map(_ => acc)
-                  loop(List(first))
-              yield args
           def loop(base: Expr, dotCount: Int): Result[Expr] =
             if tv.consumeChar( '.') then
               AstEither.checkSingleChainLevelD(dotCount, tv.line, tv.col) match
@@ -236,14 +206,14 @@ final class AstParser(
                           case This(_) => AstEither.methodCallOnThisForbiddenD(tv.line, tv.col)
                           case _       => ok(())
                         )
-                        args <- parseArgsR()
+                        args <- parseCommaSeparatedList(')')(parseExprR())
                         msEither = AstEither.resolveMethodOnExprD(base, ident, method, programSymbols, tv.line, tv.col)
                         classNameOpt = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
                         labelName = classNameOpt.map(cn => s"${cn}_${ident}").getOrElse(ident)
-                        retVtOpt = msEither.toOption.map(_.getReturnSig).map {
-                          case assignment3.ast.high.ReturnSig.Void => null
-                          case assignment3.ast.high.ReturnSig.Obj(cn) => assignment3.ValueType.ofObject(cn)
-                          case assignment3.ast.high.ReturnSig.Prim(t) => assignment3.ValueType.ofPrimitive(t)
+                        retVtOpt: Option[ValueType] = msEither.toOption.map(_.getReturnSig).flatMap {
+                          case assignment3.ast.high.ReturnSig.Void => None
+                          case assignment3.ast.high.ReturnSig.Obj(cn) => Some(assignment3.ValueType.ofObject(cn))
+                          case assignment3.ast.high.ReturnSig.Prim(t) => Some(assignment3.ValueType.ofPrimitive(t))
                         }
                         callable <- (msEither match
                           case Right(ms) =>
@@ -252,7 +222,7 @@ final class AstParser(
                               case None     => err(TypeDiag(Messages.cannotDetermineTargetClass, tv.line, tv.col))
                           case Left(_) => ok(new assignment3.ast.ScalaInstanceCallableFallback(
                               labelName,
-                              retVtOpt.getOrElse(null),
+                              retVtOpt,
                               args.size + 1
                             ))
                         )
@@ -279,22 +249,10 @@ final class AstParser(
             case "null"  => ok(NullLit())
             case "this"  => ok(This())
             case "new" =>
-              def parseArgsAfterOpenParenR(): Result[List[Expr]] =
-                if tv.consumeChar( ')') then ok(Nil)
-                else
-                  for
-                    first <- parseExprR()
-                    args <-
-                      def loop(acc: List[Expr]): Result[List[Expr]] =
-                        if tv.consumeChar( ',') then
-                          parseExprR().flatMap(e => loop(acc :+ e))
-                        else expectCharR(')').map(_ => acc)
-                      loop(List(first))
-                  yield args
               for
                 cls <- getIdentifierR()
                 _ <- expectCharR('(')
-                args <- parseArgsAfterOpenParenR()
+                args <- parseCommaSeparatedList(')')(parseExprR())
               yield NewObject(cls, args)
             case _ =>
               method.lookupVar(w) match
@@ -302,21 +260,9 @@ final class AstParser(
                 case _ =>
                   method.lookupMethodGlobal(w) match
                     case Some(ms: assignment3.symbol.MethodSymbol) =>
-                      def parseArgsAfterOpenParenR(): Result[List[Expr]] =
-                        if tv.consumeChar( ')') then ok(Nil)
-                        else
-                          for
-                            first <- parseExprR()
-                            args <-
-                              def loop(acc: List[Expr]): Result[List[Expr]] =
-                                if tv.consumeChar( ',') then
-                                  parseExprR().flatMap(e => loop(acc :+ e))
-                                else expectCharR(')').map(_ => acc)
-                              loop(List(first))
-                          yield args
                       for
                         _ <- expectCharR('(')
-                        args <- parseArgsAfterOpenParenR()
+                        args <- parseCommaSeparatedList(')')(parseExprR())
                       yield Call(new assignment3.ast.SymbolCallableMethod(ms), args)
                     case None =>
                       tryImplicitThisField(w) match
@@ -327,6 +273,3 @@ final class AstParser(
 
   private def buildBinaryR(left: Expr, op: Char, right: Expr): Result[Expr] =
     AstEither.buildBinaryD(left, op, right, method, programSymbols, tv.line, tv.col)
-
-  // Removed legacy throwing parseTerminal; parseTerminalR is the canonical one
-  

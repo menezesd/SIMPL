@@ -1,6 +1,6 @@
 package assignment3.symbol
 
-import assignment3.ValueType
+import assignment3.{ValueType, ObjectRefType}
 import scala.collection.immutable.{Map, Vector}
 
 final case class ClassSymbol(
@@ -18,14 +18,10 @@ final case class ClassSymbol(
   def fieldOffset(fieldName: String): Int = fieldOrder.indexOf(fieldName)
   def numFields(): Int = fieldOrder.size
 
-  // Compatibility no-op
-  def freeze(): Unit = ()
-
   def getFieldInfo(fieldName: String): Option[ClassSymbol.FieldInfo] = {
     field(fieldName).map { vs =>
       val off = fieldOffset(fieldName)
-      val vt = vs.getValueType
-      ClassSymbol.FieldInfo(off, vt, vs)
+      ClassSymbol.FieldInfo(off, vs.valueType, vs)
     }
   }
 
@@ -34,6 +30,9 @@ final case class ClassSymbol(
 
 object ClassSymbol {
   final case class FieldInfo(offset: Int, valueType: ValueType, symbol: VarSymbol) {
-    def objectType(): Option[assignment3.ObjectType] = if (valueType.isObject) Some(valueType.getObject) else None
+    def objectType(): Option[assignment3.ObjectType] = valueType match {
+      case ObjectRefType(ot) => Some(ot)
+      case _ => None
+    }
   }
 }
