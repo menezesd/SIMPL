@@ -29,29 +29,93 @@ object CompilerUtils {
   private def rec(t: String)(using ctx: RecorderContext): Unit =
     Option(t).foreach(s => ctx.recorder.foreach(_.record(s)))
 
+  import assignment3.ast.{Diag, SyntaxDiag}
+
+  // --- Either-returning variants (preferred for new code) ---
+
+  def expectE(f: SamTokenizer, expected: Char, line: Int)(using RecorderContext): Either[Diag, Unit] =
+    if (!f.check(expected)) Left(SyntaxDiag(s"Expected '$expected'", line, column(f)))
+    else { rec(expected.toString); Right(()) }
+
+  def expectE(f: SamTokenizer, expected: String, line: Int)(using RecorderContext): Either[Diag, Unit] =
+    if (!f.check(expected)) Left(SyntaxDiag(s"Expected '$expected'", line, column(f)))
+    else { rec(expected); Right(()) }
+
+  def expectIdentifierE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, String] =
+    if (f.peekAtKind != TokenType.WORD) Left(SyntaxDiag("Expected identifier", line, column(f)))
+    else { val w = f.getWord; rec(w); Right(w) }
+
+  def expectIntE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, Int] =
+    if (f.peekAtKind != TokenType.INTEGER) Left(SyntaxDiag("Expected integer", line, column(f)))
+    else { val v = f.getInt; rec(v.toString); Right(v) }
+
+  def expectStringE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, String] =
+    if (f.peekAtKind != TokenType.STRING) Left(SyntaxDiag("Expected string literal", line, column(f)))
+    else { val s = f.getString; rec(s"\"$s\""); Right(s) }
+
+  def expectWordE(f: SamTokenizer, expected: String, line: Int)(using RecorderContext): Either[Diag, Unit] =
+    if (f.peekAtKind != TokenType.WORD) Left(SyntaxDiag(s"Expected '$expected'", line, column(f)))
+    else {
+      val w = f.getWord; rec(w)
+      if (w != expected) Left(SyntaxDiag(s"Expected '$expected'", line, column(f)))
+      else Right(())
+    }
+
+  def getIdentifierE(f: SamTokenizer)(using RecorderContext): Either[Diag, String] =
+    getIdentifierE(f, LexicalRules.Default)
+
+  def getIdentifierE(f: SamTokenizer, rules: LexicalRules)(using RecorderContext): Either[Diag, String] =
+    if (f.peekAtKind != TokenType.WORD) Left(SyntaxDiag("Expected identifier", f.lineNo, column(f)))
+    else {
+      val id = f.getWord; rec(id)
+      if (rules.reservedWords.contains(id)) Left(SyntaxDiag(s"Reserved word cannot be used as identifier: $id", f.lineNo, column(f)))
+      else if (!rules.identifierPattern.matches(id)) Left(SyntaxDiag(s"Invalid identifier: $id", f.lineNo, column(f)))
+      else Right(id)
+    }
+
+  def expectOperatorE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, Char] =
+    if (f.peekAtKind != TokenType.OPERATOR) Left(SyntaxDiag("Expected operator", line, column(f)))
+    else { val op = f.getOp; rec(op.toString); Right(op) }
+
+  // --- Legacy throwing variants (deprecated - use *E variants for new code) ---
+
+  @deprecated("Use expectE instead", "2.0")
   def expect(f: SamTokenizer, expected: Char, line: Int)(using RecorderContext): Unit =
     if (!f.check(expected)) throw SyntaxErrorException(s"Expected '$expected'", line, column(f)) else rec(expected.toString)
+
+  @deprecated("Use expectE instead", "2.0")
   def expect(f: SamTokenizer, expected: String, line: Int)(using RecorderContext): Unit =
     if (!f.check(expected)) throw SyntaxErrorException(s"Expected '$expected'", line, column(f)) else rec(expected)
+
+  @deprecated("Use expectIdentifierE instead", "2.0")
   def expectIdentifier(f: SamTokenizer, line: Int)(using RecorderContext): String = {
     if (f.peekAtKind != TokenType.WORD) throw SyntaxErrorException("Expected identifier", line, column(f))
     val w = f.getWord; rec(w); w
   }
+
+  @deprecated("Use expectIntE instead", "2.0")
   def expectInt(f: SamTokenizer, line: Int)(using RecorderContext): Int = {
     if (f.peekAtKind != TokenType.INTEGER) throw SyntaxErrorException("Expected integer", line, column(f))
     val v = f.getInt; rec(v.toString); v
   }
+
+  @deprecated("Use expectStringE instead", "2.0")
   def expectString(f: SamTokenizer, line: Int)(using RecorderContext): String = {
     if (f.peekAtKind != TokenType.STRING) throw SyntaxErrorException("Expected string literal", line, column(f))
     val s = f.getString; rec(s"\"$s\""); s
   }
+
+  @deprecated("Use expectWordE instead", "2.0")
   def expectWord(f: SamTokenizer, expected: String, line: Int)(using RecorderContext): Unit = {
     if (f.peekAtKind != TokenType.WORD) throw SyntaxErrorException(s"Expected '$expected'", line, column(f))
     val w = f.getWord; rec(w); if (w != expected) throw SyntaxErrorException(s"Expected '$expected'", line, column(f))
   }
+
+  @deprecated("Use getIdentifierE instead", "2.0")
   def getIdentifier(f: SamTokenizer)(using RecorderContext): String =
     getIdentifier(f, LexicalRules.Default)
 
+  @deprecated("Use getIdentifierE instead", "2.0")
   def getIdentifier(f: SamTokenizer, rules: LexicalRules)(using RecorderContext): String = {
     if (f.peekAtKind != TokenType.WORD) throw SyntaxErrorException("Expected identifier", f.lineNo, column(f))
     val id = f.getWord; rec(id)
@@ -59,7 +123,11 @@ object CompilerUtils {
     if (!rules.identifierPattern.matches(id)) throw SyntaxErrorException(s"Invalid identifier: $id", f.lineNo, column(f))
     id
   }
+
+  @deprecated("Use expectE instead", "2.0")
   def expectChar(f: SamTokenizer, expected: Char, line: Int)(using RecorderContext): Unit = expect(f, expected, line)
+
+  @deprecated("Use expectOperatorE instead", "2.0")
   def expectOperator(f: SamTokenizer, line: Int)(using RecorderContext): Char = {
     if (f.peekAtKind != TokenType.OPERATOR) throw SyntaxErrorException("Expected operator", line, column(f))
     val op = f.getOp; rec(op.toString); op

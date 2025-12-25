@@ -1,7 +1,7 @@
 package assignment3.ast
 
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
-import assignment3.{PrimitiveType, ObjectRefType}
+import assignment3.{Messages, PrimitiveType, ObjectRefType}
 
 /** Idiomatic semantic checker for idiomatic AST. */
 object IdiomaticSemantic:
@@ -9,13 +9,15 @@ object IdiomaticSemantic:
   import assignment3.ast.high.ReturnSig
   import assignment3.ast.{Diag, SyntaxDiag, TypeDiag}
 
+  /** Semantic checking context - caches NewMethodContext to avoid repeated allocation. */
+  private final class CheckContext(val method: MethodSymbol, val symbols: ProgramSymbols, val line: Int):
+    lazy val methodCtx: NewMethodContext = new NewMethodContext(method, symbols)
+
   // Shared helper: ensure RHS is assignable to expected ValueType (primitive/object rules, null allowed for objects).
   private def checkAssignable(
       expected: assignment3.ValueType,
       rhs: Expr,
-      ctx: assignment3.ast.NewMethodContext,
-      programSymbols: ProgramSymbols,
-      defaultLine: Int,
+      ctx: CheckContext,
       objMismatchMsg: String,
       primMismatchMsg: String
   ): Either[Diag, Unit] =
@@ -23,51 +25,53 @@ object IdiomaticSemantic:
       case ObjectRefType(ot) =>
         if rhs.isInstanceOf[NullLit] then Right(())
         else
-          TU.classNameOf(rhs, ctx, programSymbols) match
+          TU.classNameOf(rhs, ctx.methodCtx, ctx.symbols) match
             case Some(rhsClass) =>
               if rhsClass == ot.getClassName then Right(())
-              else Left(TypeDiag(objMismatchMsg, defaultLine))
+              else Left(TypeDiag(objMismatchMsg, ctx.line))
             case None => Right(()) // unknown at this stage; be permissive as before
       case PrimitiveType(pt) =>
-        val et = TU.typeOf(rhs, ctx, programSymbols)
+        val et = TU.typeOf(rhs, ctx.methodCtx, ctx.symbols)
         if pt.isCompatibleWith(et) then Right(())
-        else Left(TypeDiag(primMismatchMsg, defaultLine))
+        else Left(TypeDiag(primMismatchMsg, ctx.line))
     }
 
-  // Either-based versions
-  def checkExprE(e: Expr, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] = e match
+  // Public API - creates context and delegates
+  def checkExprE(e: Expr, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] =
+    checkExprImpl(e, CheckContext(currentMethod, programSymbols, defaultLine))
+
+  private def checkExprImpl(e: Expr, ctx: CheckContext): Either[Diag, Unit] = e match
     case _: (IntLit | BoolLit | StrLit | NullLit | This) => Right(())
     case Var(_, _) => Right(())
-    case Unary(_, expr, _, _) => checkExprE(expr, currentMethod, defaultLine, programSymbols)
-    case Binary(_, l, r, _, _) => for { _ <- checkExprE(l, currentMethod, defaultLine, programSymbols); _ <- checkExprE(r, currentMethod, defaultLine, programSymbols) } yield ()
-    case Ternary(c, t, el, _, _) => for { _ <- checkExprE(c, currentMethod, defaultLine, programSymbols); _ <- checkExprE(t, currentMethod, defaultLine, programSymbols); _ <- checkExprE(el, currentMethod, defaultLine, programSymbols) } yield ()
+    case Unary(_, expr, _, _) => checkExprImpl(expr, ctx)
+    case Binary(_, l, r, _, _) => for { _ <- checkExprImpl(l, ctx); _ <- checkExprImpl(r, ctx) } yield ()
+    case Ternary(c, t, el, _, _) => for { _ <- checkExprImpl(c, ctx); _ <- checkExprImpl(t, ctx); _ <- checkExprImpl(el, ctx) } yield ()
     case Call(_, args, _) =>
-      args.foldLeft[Either[Diag, Unit]](Right(())) { (acc, a) => acc.flatMap(_ => checkExprE(a, currentMethod, defaultLine, programSymbols)) }
+      Result.sequenceE(args)(a => checkExprImpl(a, ctx))
     case NewObject(_, args, _) =>
-      args.foldLeft[Either[Diag, Unit]](Right(())) { (acc, a) => acc.flatMap(_ => checkExprE(a, currentMethod, defaultLine, programSymbols)) }
+      Result.sequenceE(args)(a => checkExprImpl(a, ctx))
     case InstanceCall(target, method, args, _) =>
       target match
-        case This(_) => Left(SyntaxDiag("Explicit 'this.method()' is not allowed in LO-3", defaultLine))
-        case NullLit(_) => Left(SyntaxDiag("Null dereference in instance call", defaultLine))
+        case This(_) => Left(SyntaxDiag(Messages.Semantic.thisMethodCallNotAllowed, ctx.line))
+        case NullLit(_) => Left(SyntaxDiag(Messages.Semantic.nullDerefInstanceCall, ctx.line))
         case _ =>
           val checked = for {
-            _ <- checkExprE(target, currentMethod, defaultLine, programSymbols)
-            _ <- args.foldLeft[Either[Diag, Unit]](Right(())) { (acc, a) => acc.flatMap(_ => checkExprE(a, currentMethod, defaultLine, programSymbols)) }
+            _ <- checkExprImpl(target, ctx)
+            _ <- Result.sequenceE(args)(a => checkExprImpl(a, ctx))
           } yield ()
           checked.flatMap { _ =>
             method match
               case ic: assignment3.ast.ScalaInstanceCallable =>
                 val ms = ic.getSymbol
                 val expected = ms.expectedUserArgs(); val provided = args.size
-                if expected != provided then Left(SyntaxDiag("Incorrect number of arguments for instance method", defaultLine))
+                if expected != provided then Left(SyntaxDiag(Messages.Semantic.incorrectArgCount, ctx.line))
                 else
-                  val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
                   val firstErr: Option[Diag] = (0 until provided).iterator.flatMap { i =>
                     val formal = ms.parameters(i + 1)
-                    val argType = TU.typeOf(args(i), ctx, programSymbols)
+                    val argType = TU.typeOf(args(i), ctx.methodCtx, ctx.symbols)
                     formal.valueType match {
                       case PrimitiveType(pt) if !pt.isCompatibleWith(argType) =>
-                        Some(TypeDiag("Argument type mismatch for parameter '" + formal.getName + "'", defaultLine))
+                        Some(TypeDiag(Messages.Semantic.argTypeMismatch(formal.getName), ctx.line))
                       case _ => None
                     }
                   }.toSeq.headOption
@@ -76,62 +80,63 @@ object IdiomaticSemantic:
           }
     case FieldAccess(target, field, _, _) =>
       target match
-        case NullLit(_) => Left(SyntaxDiag("Null dereference in field access '" + field + "'", defaultLine))
-        case _ => checkExprE(target, currentMethod, defaultLine, programSymbols)
+        case NullLit(_) => Left(SyntaxDiag(Messages.Semantic.nullDerefFieldAccess(field), ctx.line))
+        case _ => checkExprImpl(target, ctx)
 
-  def checkStmtE(s: Stmt, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] = s match
+  def checkStmtE(s: Stmt, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] =
+    checkStmtImpl(s, CheckContext(currentMethod, programSymbols, defaultLine))
+
+  private def checkStmtImpl(s: Stmt, ctx: CheckContext): Either[Diag, Unit] = s match
     case Block(stmts, _) =>
-      stmts.foldLeft[Either[Diag, Unit]](Right(())) { (acc, st) => acc.flatMap(_ => checkStmtE(st, currentMethod, defaultLine, programSymbols)) }
+      Result.sequenceE(stmts)(st => checkStmtImpl(st, ctx))
     case If(c, t, e, _) =>
-      val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
       for {
-        _ <- checkExprE(c, currentMethod, defaultLine, programSymbols)
-        _ <- if assignment3.ast.IdiomaticTypeUtils.typeOf(c, ctx, programSymbols) == assignment3.Type.BOOL then Right(()) else Left(TypeDiag("If condition must be BOOL", defaultLine))
-        _ <- checkStmtE(t, currentMethod, defaultLine, programSymbols)
-        _ <- checkStmtE(e, currentMethod, defaultLine, programSymbols)
+        _ <- checkExprImpl(c, ctx)
+        _ <- if TU.typeOf(c, ctx.methodCtx, ctx.symbols) == assignment3.Type.BOOL then Right(())
+             else Left(TypeDiag(Messages.Semantic.ifConditionMustBeBool, ctx.line))
+        _ <- checkStmtImpl(t, ctx)
+        _ <- checkStmtImpl(e, ctx)
       } yield ()
     case While(c, b, _) =>
-      val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
       for {
-        _ <- checkExprE(c, currentMethod, defaultLine, programSymbols)
-        _ <- if assignment3.ast.IdiomaticTypeUtils.typeOf(c, ctx, programSymbols) == assignment3.Type.BOOL then Right(()) else Left(TypeDiag("While condition must be BOOL", defaultLine))
-        _ <- checkStmtE(b, currentMethod, defaultLine, programSymbols)
+        _ <- checkExprImpl(c, ctx)
+        _ <- if TU.typeOf(c, ctx.methodCtx, ctx.symbols) == assignment3.Type.BOOL then Right(())
+             else Left(TypeDiag(Messages.Semantic.whileConditionMustBeBool, ctx.line))
+        _ <- checkStmtImpl(b, ctx)
       } yield ()
     case Break(_) => Right(())
     case Return(v, _) =>
-      val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
-      val rs = currentMethod.getReturnSig
+      val rs = ctx.method.getReturnSig
       v match
         case None =>
           rs match
             case ReturnSig.Void => Right(())
-            case _ => Left(TypeDiag("Non-void method must return a value", defaultLine))
+            case _ => Left(TypeDiag(Messages.Semantic.nonVoidMustReturnValue, ctx.line))
         case Some(expr) =>
           for {
-            _ <- checkExprE(expr, currentMethod, defaultLine, programSymbols)
+            _ <- checkExprImpl(expr, ctx)
             _ <- rs match
-              case ReturnSig.Void => Left(TypeDiag("Void method should not return a value", defaultLine))
+              case ReturnSig.Void => Left(TypeDiag(Messages.Semantic.voidShouldNotReturn, ctx.line))
               case ReturnSig.Prim(t) =>
-                val et = TU.typeOf(expr, ctx, programSymbols)
-                if t.isCompatibleWith(et) then Right(()) else Left(TypeDiag("Return type mismatch", defaultLine))
+                val et = TU.typeOf(expr, ctx.methodCtx, ctx.symbols)
+                if t.isCompatibleWith(et) then Right(()) else Left(TypeDiag(Messages.Semantic.returnTypeMismatch, ctx.line))
               case ReturnSig.Obj(cn) =>
                 if expr.isInstanceOf[NullLit] then Right(())
-                else TU.classNameOf(expr, ctx, programSymbols) match
-                  case Some(ec) => if ec == cn then Right(()) else Left(TypeDiag("Return object type mismatch", defaultLine))
+                else TU.classNameOf(expr, ctx.methodCtx, ctx.symbols) match
+                  case Some(ec) => if ec == cn then Right(()) else Left(TypeDiag(Messages.Semantic.returnObjectTypeMismatch, ctx.line))
                   case None => Right(())
           } yield ()
     case VarDecl(name, vtypeOpt, valueTypeOpt, initOpt, _) =>
       initOpt
         .map { init =>
-          val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
           for {
-            _ <- checkExprE(init, currentMethod, defaultLine, programSymbols)
+            _ <- checkExprImpl(init, ctx)
             expectedOpt = valueTypeOpt.orElse(vtypeOpt.map(assignment3.ValueType.ofPrimitive))
             _ <- expectedOpt
               .map { expected =>
-                checkAssignable(expected, init, ctx, programSymbols, defaultLine,
-                  objMismatchMsg = "Object assignment type mismatch for variable '" + name + "'",
-                  primMismatchMsg = "Type mismatch in assignment to '" + name + "'"
+                checkAssignable(expected, init, ctx,
+                  objMismatchMsg = Messages.Semantic.objAssignMismatch(name),
+                  primMismatchMsg = Messages.Semantic.primAssignMismatch(name)
                 )
               }
               .getOrElse(Right(()))
@@ -140,47 +145,33 @@ object IdiomaticSemantic:
         .getOrElse(Right(()))
     case Assign(varName, value, _) =>
       for {
-        _ <- checkExprE(value, currentMethod, defaultLine, programSymbols)
-        res <- Option(currentMethod).fold[Either[Diag, Unit]](Right(())) { cm =>
-          cm.lookup(varName) match
-            case Some(vs) =>
-              val ctx = new assignment3.ast.NewMethodContext(cm, programSymbols)
-              checkAssignable(
-                vs.valueType,
-                value,
-                ctx,
-                programSymbols,
-                defaultLine,
-                objMismatchMsg = "Object assignment type mismatch for variable '" + varName + "'",
-                primMismatchMsg = "Type mismatch in assignment to '" + varName + "'"
-              )
-            case None => Right(())
-        }
+        _ <- checkExprImpl(value, ctx)
+        res <- ctx.method.lookup(varName) match
+          case Some(vs) =>
+            checkAssignable(vs.valueType, value, ctx,
+              objMismatchMsg = Messages.Semantic.objAssignMismatch(varName),
+              primMismatchMsg = Messages.Semantic.primAssignMismatch(varName)
+            )
+          case None => Right(())
       } yield ()
     case FieldAssign(target, fieldName, _offset, value, _) =>
       for {
-        _ <- checkExprE(target, currentMethod, defaultLine, programSymbols)
-        _ <- checkExprE(value, currentMethod, defaultLine, programSymbols)
+        _ <- checkExprImpl(target, ctx)
+        _ <- checkExprImpl(value, ctx)
         _ <- target match
-          case _: NullLit => Left(SyntaxDiag("Null dereference in field assignment '" + fieldName + "'", defaultLine))
+          case _: NullLit => Left(SyntaxDiag(Messages.Semantic.nullDerefFieldAssign(fieldName), ctx.line))
           case _ => Right(())
         _ <-
-          val ctx = new assignment3.ast.NewMethodContext(currentMethod, programSymbols)
-          val classNameOpt = TU.classNameOf(target, ctx, programSymbols)
+          val classNameOpt = TU.classNameOf(target, ctx.methodCtx, ctx.symbols)
           (for {
             cn <- classNameOpt
-            cs <- programSymbols.getClass(cn)
+            cs <- ctx.symbols.getClass(cn)
             fi <- cs.getFieldInfo(fieldName)
           } yield fi) match
             case Some(fi) =>
-              checkAssignable(
-                fi.valueType,
-                value,
-                ctx,
-                programSymbols,
-                defaultLine,
-                objMismatchMsg = "Object assignment type mismatch for field '" + fieldName + "'",
-                primMismatchMsg = "Type mismatch assigning to field '" + fieldName + "'"
+              checkAssignable(fi.valueType, value, ctx,
+                objMismatchMsg = Messages.Semantic.fieldObjAssignMismatch(fieldName),
+                primMismatchMsg = Messages.Semantic.fieldPrimAssignMismatch(fieldName)
               )
             case None => Right(())
       } yield ()

@@ -9,14 +9,10 @@ object ParserSupport {
   def at[A](tz: SamTokenizer, value: A): At[A] =
     At(value, tz.lineNo(), CompilerUtils.column(tz))
 
-  def syntax(msg: String, tz: SamTokenizer): Diag =
-    SyntaxDiag(msg, tz.lineNo(), CompilerUtils.column(tz))
-
-  def typeE(msg: String, tz: SamTokenizer): Diag =
-    TypeDiag(msg, tz.lineNo(), CompilerUtils.column(tz))
-
-  def resolveE(msg: String, tz: SamTokenizer): Diag =
-    ResolveDiag(msg, tz.lineNo(), CompilerUtils.column(tz))
+  // Delegate to Diag companion object for consistency
+  def syntax(msg: String, tz: SamTokenizer): Diag = Diag.syntax(msg, tz)
+  def typeE(msg: String, tz: SamTokenizer): Diag = Diag.typeErr(msg, tz)
+  def resolveE(msg: String, tz: SamTokenizer): Diag = Diag.resolve(msg, tz)
 
   def wrapSyntax[A](tz: SamTokenizer)(body: => A): Either[Diag, A] =
     try Right(body)

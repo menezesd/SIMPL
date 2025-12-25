@@ -3,12 +3,11 @@ package assignment3.ast.high
 import assignment3.Type
 import assignment3.ast.Stmt
 
-sealed trait ReturnSig
-object ReturnSig {
-  case object Void extends ReturnSig
-  final case class Prim(tpe: Type) extends ReturnSig
-  final case class Obj(className: String) extends ReturnSig
-}
+/** Return type signature for methods (Scala 3 enum). */
+enum ReturnSig:
+  case Void
+  case Prim(tpe: Type)
+  case Obj(className: String)
 
 final case class MethodNode(
   className: String,

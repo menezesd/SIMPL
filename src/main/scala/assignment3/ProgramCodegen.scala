@@ -29,7 +29,7 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
 
   private def emitMethodD(local: SamBuilder, m: MethodNode): Either[Diag, Unit] = {
     ParserSupport.requireMethodResolved(symbols, m.className, m.name).flatMap { ms =>
-      val label = ctx.labeler.methodLabel(m.className, m.name)
+      val label = Labeler.methodLabel(m.className, m.name)
       local.append("\n").label(label)
       val localCount = ms.numLocals()
       val frame = new SymbolMethodFrame(ms)
@@ -55,12 +55,8 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
   }
 
   private def emitMethodsD(local: SamBuilder, program: ProgramNode): Either[Diag, Unit] =
-    program.classes.foldLeft[Either[Diag, Unit]](Right(())) { (accCls, cls) =>
-      accCls.flatMap { _ =>
-        cls.methods.foldLeft[Either[Diag, Unit]](Right(())) { (accM, m) =>
-          accM.flatMap(_ => emitMethodD(local, m))
-        }
-      }
+    id.Result.sequenceE(program.classes) { cls =>
+      id.Result.sequenceE(cls.methods)(m => emitMethodD(local, m))
     }
 
   private def ensureVoidReturn(local: SamBuilder, b: id.Block, returnSig: assignment3.ast.high.ReturnSig): Unit = {
@@ -77,7 +73,7 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
     // Prepare return slot and 'this' for Main.main
     sb.pushImmInt(0) // return slot
     sb.swap()       // place 'this' below return slot
-    sb.call(ctx.labeler.methodLabel(LiveOak3Compiler.ENTRY_CLASS, LiveOak3Compiler.ENTRY_METHOD), 1, returns = false)
+    sb.call(Labeler.methodLabel(LiveOak3Compiler.ENTRY_CLASS, LiveOak3Compiler.ENTRY_METHOD), 1, returns = false)
     sb.stop()
   }
 

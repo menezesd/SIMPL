@@ -15,4 +15,9 @@ object Code {
   val empty: Code = Code("")
   inline def fromString(s: String): Code = Code(s)
   inline def from(sb: SamBuilder): Code = Code(sb.toString)
+  // Convenience factories for common single-value patterns
+  def pushInt(n: Int): Code = from(new SamBuilder().pushImmInt(n))
+  def pushBool(b: Boolean): Code = from(new SamBuilder().pushBool(b))
+  def pushNull: Code = from(new SamBuilder().pushNull())
+  def returnSlot: Code = from(new SamBuilder().returnSlot())
 }

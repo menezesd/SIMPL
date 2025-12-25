@@ -149,6 +149,7 @@ object SymbolTableBuilder {
       yield result
 
     private def skipBodyRemainder(): Result[Unit] = {
+      @scala.annotation.tailrec
       def loop(depth: Int): Result[Unit] =
         if (depth == 0) ok(())
         else if (tv.peekKind() == TokenType.EOF) Left(SyntaxDiag(Messages.unbalancedBraces, tv.line, tv.col))
@@ -189,7 +190,7 @@ object SymbolTableBuilder {
       }
 
       def validateList[A](items: List[A])(check: A => Result[Unit]): Result[Unit] =
-        items.foldLeft[Result[Unit]](ok(())) { (acc, item) => acc.flatMap(_ => check(item)) }
+        Result.sequenceE(items)(check)
 
       def validateMethod(cls: ClassSymbol, m: MethodSymbol): Result[Unit] =
         for

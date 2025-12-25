@@ -93,7 +93,7 @@ object LiveOak3Compiler {
     }
   }
 
-  private def normalizePathUnix(path: String): String = Option(path).map(_.replace('\\', '/')).getOrElse(null)
+  private def normalizePathUnix(path: String): String = Option(path).fold("")(_.replace('\\', '/'))
 
   private def dumpSymbols(symbols: ProgramSymbols): Unit = {
     System.err.println("[DEBUG] Program symbols:")

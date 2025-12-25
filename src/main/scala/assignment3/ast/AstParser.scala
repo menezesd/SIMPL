@@ -87,62 +87,76 @@ final class AstParser(
         if tv.peekKind() == TokenType.WORD then parseOneGroup().flatMap(_ => outer()) else ok(())
       outer().map(_ => decls.toList)
 
+  // --- Statement parsing helpers ---
+
+  private def parseBreakR(): Result[Stmt] =
+    for { _ <- expectWordR("break"); _ <- expectCharR(';') } yield Break()
+
+  private def parseReturnR(): Result[Stmt] =
+    for { _ <- expectWordR("return"); value <- parseExprR(); _ <- expectCharR(';') } yield Return(Some(value))
+
+  private def parseIfR(): Result[Stmt] =
+    for
+      _ <- expectWordR("if")
+      _ <- expectCharR('(')
+      cond <- parseExprR()
+      _ <- expectCharR(')')
+      thenB <- parseBlockR()
+      _ <- expectWordR("else")
+      elseB <- parseBlockR()
+    yield If(cond, thenB, elseB)
+
+  private def parseWhileR(): Result[Stmt] =
+    for
+      _ <- expectWordR("while")
+      _ <- expectCharR('(')
+      cond <- parseExprR()
+      _ <- expectCharR(')')
+      body <- parseBlockR()
+    yield While(cond, body)
+
+  private def parseAssignmentR(): Result[Stmt] =
+    for
+      firstIdent <- getIdentifierR()
+      lhsBase <-
+        method.lookupVar(firstIdent) match
+          case Some(_: VarSymbol) if method.isInstanceOf[NewMethodContext] => ok(Var(firstIdent))
+          case _ if method.isInstanceOf[NewMethodContext] =>
+            tryImplicitThisField(firstIdent).map(ok(_)).getOrElse(syntax(Messages.undeclaredVariable(firstIdent)))
+          case _ => syntax(Messages.undeclaredVariable(firstIdent))
+      lhsFinal <- parseLhsChainR(lhsBase)
+      _ <- expectCharR('=')
+      rhs <- parseExprR()
+      _ <- expectCharR(';')
+      stmtRes <- lhsFinal match
+        case Var(name, _) => ok(Assign(name, rhs))
+        case FieldAccess(t, f, fi, _) => ok(FieldAssign(t, f, fi.map(_.offset).getOrElse(-1), rhs))
+        case _ => syntax(Messages.unsupportedLhs)
+    yield stmtRes
+
+  private def parseLhsChainR(base: Expr): Result[Expr] =
+    def loop(current: Expr, dotCount: Int): Result[Expr] =
+      if tv.consumeChar('.') then
+        AstEither.checkSingleChainLevelD(dotCount, tv.line, tv.col) match
+          case Left(diag) => Left(SyntaxDiag(diag.message, tv.line, tv.col))
+          case Right(()) =>
+            getIdentifierR().flatMap { fld =>
+              val fiOpt = resolveFieldInfo(current, fld)
+              loop(FieldAccess(current, fld, fiOpt), dotCount + 1)
+            }
+      else ok(current)
+    loop(base, 0)
+
   private def parseStmtR(): Result[Stmt] =
-    if tv.consumeChar( '{') then
+    if tv.consumeChar('{') then
       collectUntil('}')(parseStmtR()).map(Block(_))
-    else if tv.consumeChar( ';') then ok(Block(Nil))
+    else if tv.consumeChar(';') then ok(Block(Nil))
     else if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedStatement)
-    else if tv.test("break") then
-      for { _ <- expectWordR("break"); _ <- expectCharR(';') } yield Break()
-    else if tv.test("return") then
-      for { _ <- expectWordR("return"); value <- parseExprR(); _ <- expectCharR(';') } yield Return(Some(value))
-    else if tv.test("if") then
-      for
-        _ <- expectWordR("if")
-        _ <- expectCharR('(')
-        cond <- parseExprR()
-        _ <- expectCharR(')')
-        thenB <- parseBlockR()
-        _ <- expectWordR("else")
-        elseB <- parseBlockR()
-      yield If(cond, thenB, elseB)
-    else if tv.test("while") then
-      for
-        _ <- expectWordR("while")
-        _ <- expectCharR('(')
-        cond <- parseExprR()
-        _ <- expectCharR(')')
-        body <- parseBlockR()
-      yield While(cond, body)
-    else
-      for
-        firstIdent <- getIdentifierR()
-        lhsBase <-
-          method.lookupVar(firstIdent) match
-            case Some(_: VarSymbol) if method.isInstanceOf[NewMethodContext] => ok(Var(firstIdent))
-            case _ if method.isInstanceOf[NewMethodContext] =>
-              tryImplicitThisField(firstIdent).map(ok(_)).getOrElse(syntax(Messages.undeclaredVariable(firstIdent)))
-            case _ => syntax(Messages.undeclaredVariable(firstIdent))
-        lhsFinal <-
-          def loop(base: Expr, dotCount: Int): Result[Expr] =
-            if tv.consumeChar( '.') then
-              AstEither.checkSingleChainLevelD(dotCount, tv.line, tv.col) match
-                case Left(diag) => Left(SyntaxDiag(diag.message, tv.line, tv.col))
-                case Right(())  =>
-                  getIdentifierR().flatMap { fld =>
-                    val fiOpt = resolveFieldInfo(base, fld)
-                    loop(FieldAccess(base, fld, fiOpt), dotCount + 1)
-                  }
-            else ok(base)
-          loop(lhsBase, 0)
-        _ <- expectCharR('=')
-        rhs <- parseExprR()
-        _ <- expectCharR(';')
-        stmtRes <- lhsFinal match
-          case Var(name, _) => ok(Assign(name, rhs))
-          case FieldAccess(t, f, fi, _) => ok(FieldAssign(t, f, fi.map(_.offset).getOrElse(-1), rhs))
-          case _ => syntax(Messages.unsupportedLhs)
-      yield stmtRes
+    else if tv.test("break") then parseBreakR()
+    else if tv.test("return") then parseReturnR()
+    else if tv.test("if") then parseIfR()
+    else if tv.test("while") then parseWhileR()
+    else parseAssignmentR()
 
   private def parseBlockR(): Result[Block] =
     for
@@ -150,91 +164,97 @@ final class AstParser(
       stmts <- collectUntil('}')(parseStmtR())
     yield Block(stmts)
 
-  private def parseExprR(): Result[Expr] =
-    def isBinaryOpAhead(): Boolean =
-      tv.test('+') || tv.test('-') || tv.test('*') || tv.test('/') ||
-      tv.test('%') || tv.test('&') || tv.test('|') || tv.test('>') ||
-      tv.test('<') || tv.test('=')
-    if tv.consumeChar( '(') then
-      // unary paren expr
-      if tv.test('~') || tv.test('!') then
-        for
-          op <- getOpR()
-          inner <- parseExprR()
-          _ <- expectCharR(')')
-          u <- AstEither.buildUnaryD(op, inner, method, programSymbols, tv.line, tv.col)
-        yield u
-      else
-        for
-          first <- parseExprR()
-          res <-
-            if tv.consumeChar( '?') then
-              for
-                thenE <- parseExprR()
-                _ <- expectCharR(':')
-                elseE <- parseExprR()
-                te <- AstEither.buildTernaryD(first, thenE, elseE, method, programSymbols, tv.line, tv.col)
-                _ <- expectCharR(')')
-              yield te
-            else if isBinaryOpAhead() then
-              for
-                op <- getOpR()
-                second <- parseExprR()
-                be <- buildBinaryR(first, op, second)
-                _ <- expectCharR(')')
-              yield be
+  // Helper: check if next token is a binary operator
+  private def isBinaryOpAhead(): Boolean =
+    tv.test('+') || tv.test('-') || tv.test('*') || tv.test('/') ||
+    tv.test('%') || tv.test('&') || tv.test('|') || tv.test('>') ||
+    tv.test('<') || tv.test('=')
+
+  // Helper: parse unary expression inside parentheses
+  private def parseUnaryParenR(): Result[Expr] =
+    for
+      op <- getOpR()
+      inner <- parseExprR()
+      _ <- expectCharR(')')
+      u <- AstEither.buildUnaryD(op, inner, method, programSymbols, tv.line, tv.col)
+    yield u
+
+  // Helper: parse ternary expression after seeing '?'
+  private def parseTernaryTailR(cond: Expr): Result[Expr] =
+    for
+      thenE <- parseExprR()
+      _ <- expectCharR(':')
+      elseE <- parseExprR()
+      te <- AstEither.buildTernaryD(cond, thenE, elseE, method, programSymbols, tv.line, tv.col)
+      _ <- expectCharR(')')
+    yield te
+
+  // Helper: parse binary expression tail
+  private def parseBinaryTailR(left: Expr): Result[Expr] =
+    for
+      op <- getOpR()
+      right <- parseExprR()
+      be <- buildBinaryR(left, op, right)
+      _ <- expectCharR(')')
+    yield be
+
+  // Helper: parse parenthesized expression (unary, binary, ternary, or grouped)
+  private def parseParenExprR(): Result[Expr] =
+    if tv.test('~') || tv.test('!') then parseUnaryParenR()
+    else
+      for
+        first <- parseExprR()
+        res <-
+          if tv.consumeChar('?') then parseTernaryTailR(first)
+          else if isBinaryOpAhead() then parseBinaryTailR(first)
+          else expectCharR(')').map(_ => first)
+      yield res
+
+  // Helper: parse method call on target expression
+  private def parseMethodCallR(base: Expr, methodName: String, dotCount: Int): Result[Expr] =
+    for
+      _ <- base match
+        case This(_) => AstEither.methodCallOnThisForbiddenD(tv.line, tv.col)
+        case _       => ok(())
+      args <- parseCommaSeparatedList(')')(parseExprR())
+      msEither = AstEither.resolveMethodOnExprD(base, methodName, method, programSymbols, tv.line, tv.col)
+      classNameOpt = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
+      labelName = classNameOpt.map(cn => s"${cn}_${methodName}").getOrElse(methodName)
+      retVtOpt: Option[ValueType] = msEither.toOption.map(_.getReturnSig).flatMap {
+        case assignment3.ast.high.ReturnSig.Void => None
+        case assignment3.ast.high.ReturnSig.Obj(cn) => Some(assignment3.ValueType.ofObject(cn))
+        case assignment3.ast.high.ReturnSig.Prim(t) => Some(assignment3.ValueType.ofPrimitive(t))
+      }
+      callable <- msEither match
+        case Right(ms) =>
+          classNameOpt match
+            case Some(cn) => ok(ScalaCallableMethod.forInstance(cn, ms))
+            case None     => err(TypeDiag(Messages.cannotDetermineTargetClass, tv.line, tv.col))
+        case Left(_) => ok(ScalaCallableMethod.fallback(labelName, retVtOpt, args.size + 1))
+      next = InstanceCall(base, callable, args)
+      res <- parseChainedAccessR(next, dotCount + 1)
+    yield res
+
+  // Helper: parse chain of field accesses and method calls after base expression
+  private def parseChainedAccessR(base: Expr, dotCount: Int): Result[Expr] =
+    if tv.consumeChar('.') then
+      AstEither.checkSingleChainLevelD(dotCount, tv.line, tv.col) match
+        case Left(diag) => Left(SyntaxDiag(diag.message, tv.line, tv.col))
+        case Right(()) =>
+          getIdentifierR().flatMap { ident =>
+            if tv.consumeChar('(') then parseMethodCallR(base, ident, dotCount)
             else
-              for
-                _ <- expectCharR(')')
-              yield first
-        yield res
+              val fiOpt = AstEither.resolveFieldInfoD(base, ident, method, programSymbols, tv.line, tv.col).toOption
+              parseChainedAccessR(FieldAccess(base, ident, fiOpt), dotCount + 1)
+          }
+    else ok(base)
+
+  private def parseExprR(): Result[Expr] =
+    if tv.consumeChar('(') then parseParenExprR()
     else
       for
         base0 <- parseTerminalR()
-        result <-
-          def loop(base: Expr, dotCount: Int): Result[Expr] =
-            if tv.consumeChar( '.') then
-              AstEither.checkSingleChainLevelD(dotCount, tv.line, tv.col) match
-                case Left(diag) => Left(SyntaxDiag(diag.message, tv.line, tv.col))
-                case Right(())  =>
-                  getIdentifierR().flatMap { ident =>
-                    if tv.consumeChar( '(') then
-                      // method call
-                      for
-                        // forbid calling methods on 'this'
-                        _ <- (base match
-                          case This(_) => AstEither.methodCallOnThisForbiddenD(tv.line, tv.col)
-                          case _       => ok(())
-                        )
-                        args <- parseCommaSeparatedList(')')(parseExprR())
-                        msEither = AstEither.resolveMethodOnExprD(base, ident, method, programSymbols, tv.line, tv.col)
-                        classNameOpt = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
-                        labelName = classNameOpt.map(cn => s"${cn}_${ident}").getOrElse(ident)
-                        retVtOpt: Option[ValueType] = msEither.toOption.map(_.getReturnSig).flatMap {
-                          case assignment3.ast.high.ReturnSig.Void => None
-                          case assignment3.ast.high.ReturnSig.Obj(cn) => Some(assignment3.ValueType.ofObject(cn))
-                          case assignment3.ast.high.ReturnSig.Prim(t) => Some(assignment3.ValueType.ofPrimitive(t))
-                        }
-                        callable <- (msEither match
-                          case Right(ms) =>
-                            classNameOpt match
-                              case Some(cn) => ok(new assignment3.ast.ScalaInstanceCallable(cn, ms))
-                              case None     => err(TypeDiag(Messages.cannotDetermineTargetClass, tv.line, tv.col))
-                          case Left(_) => ok(new assignment3.ast.ScalaInstanceCallableFallback(
-                              labelName,
-                              retVtOpt,
-                              args.size + 1
-                            ))
-                        )
-                        next = InstanceCall(base, callable, args)
-                        res <- loop(next, dotCount + 1)
-                      yield res
-                    else
-                      val fiOpt = AstEither.resolveFieldInfoD(base, ident, method, programSymbols, tv.line, tv.col).toOption
-                      loop(FieldAccess(base, ident, fiOpt), dotCount + 1)
-                  }
-            else ok(base)
-          loop(base0, 0)
+        result <- parseChainedAccessR(base0, 0)
       yield result
 
   private def parseTerminalR(): Result[Expr] =
@@ -263,7 +283,7 @@ final class AstParser(
                       for
                         _ <- expectCharR('(')
                         args <- parseCommaSeparatedList(')')(parseExprR())
-                      yield Call(new assignment3.ast.SymbolCallableMethod(ms), args)
+                      yield Call(ScalaCallableMethod.forSymbol(ms), args)
                     case None =>
                       tryImplicitThisField(w) match
                         case Some(implicitF) => ok(implicitF)

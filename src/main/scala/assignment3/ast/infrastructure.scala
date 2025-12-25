@@ -31,6 +31,22 @@ trait ScalaCallableMethod extends CallableMethod {
   def getReturnSig: assignment3.ast.high.ReturnSig
 }
 
+/** Factory methods for creating callable wrappers. */
+object ScalaCallableMethod:
+  import assignment3.symbol.MethodSymbol
+
+  /** Create a callable for an instance method call (includes implicit 'this' param). */
+  def forInstance(className: String, symbol: MethodSymbol): ScalaCallableMethod =
+    new ScalaInstanceCallable(className, symbol)
+
+  /** Create a callable for a static/global method call. */
+  def forSymbol(symbol: MethodSymbol): ScalaCallableMethod =
+    new SymbolCallableMethod(symbol)
+
+  /** Create a fallback callable when symbol resolution fails (permissive mode). */
+  def fallback(label: String, returnType: Option[ValueType], paramCount: Int): ScalaCallableMethod =
+    new ScalaInstanceCallableFallback(label, returnType, paramCount)
+
 final class ScalaInstanceCallable(className: String, symbol: MethodSymbol) extends ScalaCallableMethod {
   override def getName: String = s"${className}_${symbol.getName}"
   // Ensure Expr type is always a lowered primitive for codegen; map object/void to INT
@@ -65,3 +81,14 @@ final case class SimpleVarBinding(name: String, tpe: Type, address: Int) extends
   def getType: Type = tpe
   def getAddress: Int = address
 }
+
+/** Extension methods for diagnostic-first variable lookup. */
+extension (mf: MethodFrame)
+  /** Lookup variable, returning Either for diagnostic-first flow. */
+  def lookupVarE(name: String, pos: Int): Either[Diag, VarBinding] =
+    mf.lookupVar(name).toRight(ResolveDiag(assignment3.Messages.undeclaredVariable(name), pos))
+
+extension (mc: MethodContext)
+  /** Lookup variable, returning Either for diagnostic-first flow. */
+  def lookupVarE(name: String, pos: Int): Either[Diag, VarSymbol] =
+    mc.lookupVar(name).toRight(ResolveDiag(assignment3.Messages.undeclaredVariable(name), pos))
