@@ -289,80 +289,94 @@ object IdiomaticCodegen:
           base + Code.fromString(getUnopOrFail(NOT))
     }
 
-  def emitStmtD(s: id.Stmt, ctx: Ctx): Either[Diag, Code] =
-    s match
-      case id.Block(statements, _) =>
-        Result.traverseE(statements)(emitStmtD(_, ctx)).map(Code.concat)
-      case id.VarDecl(_, _, _, initOpt, _) =>
-        initOpt match
-          case Some(init) => emitExprD(init, ctx)
-          case None       => Right(Code.pushNull)
-      case id.Assign(name, value, pos) =>
-        ctx.frameOpt match
-          case Some(frame) =>
-            for
-              vb <- frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos))
-              valueCode <- emitExprD(value, ctx)
-            yield
-              val sb = new SamBuilder()
-              sb.append(valueCode).storeOffS(StackOffset(vb.getAddress))
-              Code.from(sb)
-          case None => Left(ResolveDiag(Messages.Codegen.noFrameForAssignment, pos))
-      case id.FieldAssign(target, field, offset, value, pos) =>
-        if offset < 0 then Left(ResolveDiag(Messages.Codegen.unknownField(field), pos))
-        else
-          for
-            targetCode <- emitExprD(target, ctx)
-            valueCode  <- emitExprD(value, ctx)
-          yield
-            val sb = new SamBuilder()
-            sb.append(targetCode).addFieldOff(FieldOffset(offset)).append(valueCode).storeInd()
-            Code.from(sb)
-      case id.If(cond, thenB, elseB, _) =>
+  // --- Statement emission helpers ---
+
+  private def emitBlockD(statements: List[id.Stmt], ctx: Ctx): Either[Diag, Code] =
+    Result.traverseE(statements)(emitStmtD(_, ctx)).map(Code.concat)
+
+  private def emitVarDeclD(initOpt: Option[id.Expr], ctx: Ctx): Either[Diag, Code] =
+    initOpt match
+      case Some(init) => emitExprD(init, ctx)
+      case None       => Right(Code.pushNull)
+
+  private def emitAssignD(name: String, value: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
+    ctx.frameOpt match
+      case Some(frame) =>
         for
-          condCode <- emitExprD(cond, ctx)
-          thenCode <- emitStmtD(thenB, ctx)
-          elseCode <- emitStmtD(elseB, ctx)
+          vb <- frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos))
+          valueCode <- emitExprD(value, ctx)
         yield
-          val elseLbl = new Label(); val endLbl = new Label()
           val sb = new SamBuilder()
-          sb.append(condCode).jumpIfNil(elseLbl)
-            .append(thenCode)
-            .jump(endLbl)
-            .label(elseLbl)
-            .append(elseCode)
-            .label(endLbl)
+          sb.append(valueCode).storeOffS(StackOffset(vb.getAddress))
           Code.from(sb)
-      case id.While(cond, body, _) =>
-        val endLabel = new Label()
-        val innerCtx = ctx.copy(loopEndLabels = endLabel :: ctx.loopEndLabels)
-        for
-          condCode <- emitExprD(cond, ctx)
-          bodyCode <- emitStmtD(body, innerCtx)
-        yield
-          val start = new Label(); val stop = endLabel
+      case None => Left(ResolveDiag(Messages.Codegen.noFrameForAssignment, pos))
+
+  private def emitFieldAssignD(target: id.Expr, field: String, offset: Int, value: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
+    if offset < 0 then Left(ResolveDiag(Messages.Codegen.unknownField(field), pos))
+    else
+      for
+        targetCode <- emitExprD(target, ctx)
+        valueCode  <- emitExprD(value, ctx)
+      yield
+        val sb = new SamBuilder()
+        sb.append(targetCode).addFieldOff(FieldOffset(offset)).append(valueCode).storeInd()
+        Code.from(sb)
+
+  private def emitIfD(cond: id.Expr, thenB: id.Stmt, elseB: id.Stmt, ctx: Ctx): Either[Diag, Code] =
+    for
+      condCode <- emitExprD(cond, ctx)
+      thenCode <- emitStmtD(thenB, ctx)
+      elseCode <- emitStmtD(elseB, ctx)
+    yield
+      val elseLbl = new Label(); val endLbl = new Label()
+      val sb = new SamBuilder()
+      sb.append(condCode).jumpIfNil(elseLbl)
+        .append(thenCode)
+        .jump(endLbl)
+        .label(elseLbl)
+        .append(elseCode)
+        .label(endLbl)
+      Code.from(sb)
+
+  private def emitWhileD(cond: id.Expr, body: id.Stmt, ctx: Ctx): Either[Diag, Code] =
+    val endLabel = new Label()
+    val innerCtx = ctx.copy(loopEndLabels = endLabel :: ctx.loopEndLabels)
+    for
+      condCode <- emitExprD(cond, ctx)
+      bodyCode <- emitStmtD(body, innerCtx)
+    yield
+      val start = new Label(); val stop = endLabel
+      val sb = new SamBuilder()
+      sb.label(start)
+        .append(condCode).jumpIfNil(stop)
+        .append(bodyCode)
+        .jump(start)
+        .label(stop)
+      Code.from(sb)
+
+  private def emitBreakD(pos: Int, ctx: Ctx): Either[Diag, Code] =
+    ctx.loopEndLabels match
+      case Nil       => Left(SyntaxDiag(Messages.Codegen.breakOutsideLoop, pos))
+      case head :: _ => Right(Code.from(new SamBuilder().jump(head)))
+
+  private def emitReturnD(valueOpt: Option[id.Expr], pos: Int, ctx: Ctx): Either[Diag, Code] =
+    ctx.returnLabelOpt match
+      case None => Left(ResolveDiag(Messages.Codegen.returnLabelNotFound, pos))
+      case Some(ret) =>
+        val valueCodeE = valueOpt.map(emitExprD(_, ctx)).getOrElse(Right(Code.empty))
+        valueCodeE.map { valueCode =>
           val sb = new SamBuilder()
-          sb.label(start)
-            .append(condCode).jumpIfNil(stop)
-            .append(bodyCode)
-            .jump(start)
-            .label(stop)
+          sb.append(valueCode).jump(ret)
           Code.from(sb)
-      case id.Break(pos) =>
-        if ctx.loopEndLabels.headOption.isEmpty then Left(SyntaxDiag(Messages.Codegen.breakOutsideLoop, pos))
-        else Right(Code.from(new SamBuilder().jump(ctx.loopEndLabels.head)))
-      case id.Return(valueOpt, pos) =>
-        ctx.returnLabelOpt match
-          case None => Left(ResolveDiag(Messages.Codegen.returnLabelNotFound, pos))
-          case Some(ret) =>
-            val valueCodeE: Either[Diag, Code] = valueOpt match
-              case Some(v) => emitExprD(v, ctx)
-              case None    => Right(Code.from(new SamBuilder()))
-            valueCodeE.map { valueCode =>
-              val sb = new SamBuilder()
-              sb.append(valueCode)
-              sb.jump(ret)
-              Code.from(sb)
-            }
-  // No default case: rely on exhaustiveness of `Stmt` variants. If a null
-  // is ever passed (shouldn't happen), let it fail loudly.
+        }
+
+  /** Emit code for a statement. Dispatches to specialized helpers. */
+  def emitStmtD(s: id.Stmt, ctx: Ctx): Either[Diag, Code] = s match
+    case id.Block(statements, _)                        => emitBlockD(statements, ctx)
+    case id.VarDecl(_, _, _, initOpt, _)                => emitVarDeclD(initOpt, ctx)
+    case id.Assign(name, value, pos)                    => emitAssignD(name, value, pos, ctx)
+    case id.FieldAssign(target, field, offset, value, pos) => emitFieldAssignD(target, field, offset, value, pos, ctx)
+    case id.If(cond, thenB, elseB, _)                   => emitIfD(cond, thenB, elseB, ctx)
+    case id.While(cond, body, _)                        => emitWhileD(cond, body, ctx)
+    case id.Break(pos)                                  => emitBreakD(pos, ctx)
+    case id.Return(valueOpt, pos)                       => emitReturnD(valueOpt, pos, ctx)

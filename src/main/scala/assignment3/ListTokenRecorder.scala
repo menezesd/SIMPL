@@ -1,19 +1,22 @@
 package assignment3
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Queue
 import scala.jdk.CollectionConverters._
 
-/** Simple in-memory recorder backed by a list (Scala port).
+/** Simple in-memory recorder backed by a queue (Scala port).
+  *
+  * Uses Queue instead of ListBuffer for O(1) dequeue when discarding oldest tokens,
+  * compared to O(n) for ListBuffer.remove(0).
   *
   * @param maxTokens Maximum number of tokens to store (prevents unbounded memory growth).
   *                  When limit is reached, oldest tokens are discarded.
   */
 final class ListTokenRecorder(maxTokens: Int = 100000) extends TokenRecorder {
-  private val tokens = ListBuffer.empty[String]
+  private val tokens = Queue.empty[String]
 
   override def record(token: String): Unit = {
-    if (tokens.size >= maxTokens) tokens.remove(0)
-    tokens += token
+    if (tokens.size >= maxTokens) tokens.dequeue()
+    tokens.enqueue(token)
   }
 
   override def clear(): Unit = tokens.clear()

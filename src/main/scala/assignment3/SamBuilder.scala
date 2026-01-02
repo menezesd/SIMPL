@@ -10,6 +10,8 @@ final class SamBuilder {
     case s: String => s
     case l: Label  => l.name
 
+  // Null-safe append methods for Java interoperability.
+  // Scala callers should use Code/String directly (never null).
   def append(s: String): SamBuilder = { if (s != null) sb.append(s); this }
   def append(c: Code): SamBuilder = { if (c != null) sb.append(c.toString); this }
   def line(s: String): SamBuilder = { if (s != null) sb.append(s); sb.append('\n'); this }

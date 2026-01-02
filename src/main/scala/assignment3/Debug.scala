@@ -5,10 +5,10 @@ package assignment3
   * Enable with -Dliveoak.debug=<comma-separated categories> (symbols,tokens,sam,all)
   */
 object Debug {
-  private val CATEGORIES: Set[String] = Option(System.getProperty("liveoak.debug")).map(_.trim)
+  private val CATEGORIES: Set[String] = Option(System.getProperty("liveoak.debug"))
+    .map(_.trim)
     .filter(_.nonEmpty)
-    .map(_.split(',').iterator.map(_.trim).filter(_.nonEmpty).map(_.toLowerCase).toSet)
-    .getOrElse(Set.empty[String])
+    .fold(Set.empty[String])(_.split(',').map(_.trim).filter(_.nonEmpty).map(_.toLowerCase).toSet)
 
   def enabled(cat: String): Boolean =
     CATEGORIES.nonEmpty && (CATEGORIES.contains("all") || CATEGORIES.contains(cat.toLowerCase))
