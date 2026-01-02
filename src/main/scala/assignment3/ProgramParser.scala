@@ -44,7 +44,7 @@ private final class ProgramParser private (
       className,
       Messages.invalidFieldType,
       Messages.expectedFieldListSemicolon,
-      () => { if (tv.consumeChar(')')) ok(()) else ok(()) }
+      () => { tv.consumeChar(')'); ok(()) }
     )
 
   private def parseMethodsR(className: String): Result[List[MethodNode]] =
@@ -66,8 +66,7 @@ private final class ProgramParser private (
   private def parseParamsR(ms: MethodSymbol, methodName: String): Result[List[ParamNode]] =
     val expectedUserParams = ms.expectedUserArgs()
     val params = ListBuffer.empty[ParamNode]
-    var paramIndex = 0
-    def loop(): Result[Unit] =
+    def loop(paramIndex: Int): Result[Unit] =
       if (tv.peekKind() == TokenType.WORD) then
         for
           pr <- getWordR()
@@ -97,12 +96,11 @@ private final class ProgramParser private (
             syntax(Messages.parameterMismatch(methodName, position, expectedType, formal.getName, actualType, pName))
           else ok(())
           _ = params += ParamNode(pName, pobjOpt, pTypeOpt)
-          _ = paramIndex += 1
           _ = tv.consumeChar(',')
-          _ <- loop()
+          _ <- loop(paramIndex + 1)
         yield ()
       else ok(())
-    loop().map(_ => params.toList)
+    loop(0).map(_ => params.toList)
 
   private def parseMethodBodyR(className: String, methodName: String, ms: MethodSymbol, returnSig: assignment3.ast.high.ReturnSig): Result[assignment3.ast.Block] =
     val stmtParser = new assignment3.ast.AstParser(tz, new assignment3.ast.NewMethodContext(ms, symbols), symbols, false, rules)

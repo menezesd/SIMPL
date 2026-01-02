@@ -19,13 +19,13 @@ final class TokenizerView(val tz: SamTokenizer, rules: CompilerUtils.LexicalRule
   def consumeWord(word: String): Boolean = ParserSupport.consumeWord(tz, word)
 
   def expectChar(ch: Char): Result[Unit] =
-    wrapSyntax { CompilerUtils.expectChar(tz, ch, tz.lineNo()); () }
+    CompilerUtils.expectE(tz, ch, tz.lineNo())
 
   def expectWord(word: String): Result[Unit] =
-    wrapSyntax { CompilerUtils.expectWord(tz, word, tz.lineNo()); () }
+    CompilerUtils.expectWordE(tz, word, tz.lineNo())
 
   def getIdentifier: Result[String] =
-    wrapSyntax { CompilerUtils.getIdentifier(tz, rules) }
+    CompilerUtils.getIdentifierE(tz, rules)
 
   def getWord: Result[String] =
     wrapSyntax { CompilerUtils.getWord(tz) }

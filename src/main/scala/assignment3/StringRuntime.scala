@@ -1,17 +1,28 @@
 package assignment3
 
+import assignment3.LabelTypes.RuntimeLabel
 import assignment3.Offsets.StackOffset
-
-import assignment3.{BinopType, OperatorUtils, Type}
 
 /** Shared string runtime SAM snippets (Scala port). */
 object StringRuntime {
-  private val LENGTH_LABEL  = "STR_LENGTH"
-  private val REVERSE_LABEL = "STR_REVERSE"
-  private val CONCAT_LABEL  = "STR_CONCAT"
-  private val APPEND_LABEL  = "STR_APPEND"
-  private val COMPARE_LABEL = "STR_COMPARE"
-  private val REPEAT_LABEL  = "STR_REPEAT"
+  // Use centralized labels from LabelTypes
+  private val LENGTH_LABEL  = RuntimeLabel.StringLength.value
+  private val REVERSE_LABEL = RuntimeLabel.StringReverse.value
+  private val CONCAT_LABEL  = RuntimeLabel.StringConcat.value
+  private val APPEND_LABEL  = RuntimeLabel.StringAppend.value
+  private val COMPARE_LABEL = RuntimeLabel.StringCompare.value
+  private val REPEAT_LABEL  = RuntimeLabel.StringRepeat.value
+
+  // Named constants for stack offsets used in string operations
+  // These represent positions relative to the current stack frame
+  private object StackSlots {
+    val ReturnAddress = StackOffset(-1)   // Caller's return address / first arg
+    val SecondArg     = StackOffset(-2)   // Second argument from caller
+    val ThirdArg      = StackOffset(-3)   // Third argument (for append)
+    val Local1        = StackOffset(2)    // First local variable
+    val Local2        = StackOffset(3)    // Second local variable
+    val Local3        = StackOffset(4)    // Third local variable
+  }
 
   def repeatString(firstInputType: Type, secondInputType: Type): String = {
     val sb = new SamBuilder()
@@ -57,102 +68,107 @@ object StringRuntime {
 
   /** Emit STR_REVERSE subroutine: creates reversed copy of string */
   private def emitReverseFunction(sb: SamBuilder): Unit =
+    import StackSlots._
     val reverseStartLoopLabel = new Label()
     val reverseStopLoopLabel = new Label()
     sb.label(REVERSE_LABEL)
     sb.pushImmInt(0).pushImmInt(0).pushImmInt(0)
-    sb.pushOffS(StackOffset(-1))
+    sb.pushOffS(ReturnAddress)
     sb.append(getStringLength())
-    sb.storeOffS(StackOffset(2))
-    sb.pushOffS(StackOffset(2)).pushImmInt(1).add().malloc().storeOffS(StackOffset(3))
-    sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(4))
-    sb.pushOffS(StackOffset(3)).pushOffS(StackOffset(2)).add().pushImmCh('\u0000').storeInd()
+    sb.storeOffS(Local1)
+    sb.pushOffS(Local1).pushImmInt(1).add().malloc().storeOffS(Local2)
+    sb.pushOffS(Local2).storeOffS(Local3)
+    sb.pushOffS(Local2).pushOffS(Local1).add().pushImmCh('\u0000').storeInd()
     sb.label(reverseStartLoopLabel.name)
-    sb.pushOffS(StackOffset(2)).jumpIfNil(reverseStopLoopLabel)
-    sb.pushOffS(StackOffset(3)).pushOffS(StackOffset(-1)).pushOffS(StackOffset(2)).add().pushImmInt(1).sub().pushInd().storeInd()
-    sb.pushOffS(StackOffset(3)).pushImmInt(1).add().storeOffS(StackOffset(3))
-    sb.pushOffS(StackOffset(2)).pushImmInt(1).sub().storeOffS(StackOffset(2))
+    sb.pushOffS(Local1).jumpIfNil(reverseStopLoopLabel)
+    sb.pushOffS(Local2).pushOffS(ReturnAddress).pushOffS(Local1).add().pushImmInt(1).sub().pushInd().storeInd()
+    sb.pushOffS(Local2).pushImmInt(1).add().storeOffS(Local2)
+    sb.pushOffS(Local1).pushImmInt(1).sub().storeOffS(Local1)
     sb.jump(reverseStartLoopLabel.name)
     sb.label(reverseStopLoopLabel.name)
-    sb.pushOffS(StackOffset(4)).storeOffS(StackOffset(-1)).addSp(-3).rst()
+    sb.pushOffS(Local3).storeOffS(ReturnAddress).addSp(-3).rst()
 
   /** Emit STR_CONCAT subroutine: concatenates two strings */
   private def emitConcatFunction(sb: SamBuilder): Unit =
+    import StackSlots._
     sb.label(CONCAT_LABEL)
     sb.pushImmInt(0).pushImmInt(0)
-    sb.pushOffS(StackOffset(-1))
+    sb.pushOffS(ReturnAddress)
     sb.append(getStringLength())
-    sb.pushOffS(StackOffset(-2))
+    sb.pushOffS(SecondArg)
     sb.append(getStringLength())
-    sb.add().pushImmInt(1).add().malloc().storeOffS(StackOffset(2))
-    sb.pushOffS(StackOffset(2)).storeOffS(StackOffset(3))
-    sb.pushImmInt(0).pushOffS(StackOffset(2)).pushOffS(StackOffset(-2))
+    sb.add().pushImmInt(1).add().malloc().storeOffS(Local1)
+    sb.pushOffS(Local1).storeOffS(Local2)
+    sb.pushImmInt(0).pushOffS(Local1).pushOffS(SecondArg)
     sb.append(appendStringHeap())
-    sb.storeOffS(StackOffset(2))
-    sb.pushImmInt(0).pushOffS(StackOffset(2)).pushOffS(StackOffset(-1))
+    sb.storeOffS(Local1)
+    sb.pushImmInt(0).pushOffS(Local1).pushOffS(ReturnAddress)
     sb.append(appendStringHeap())
-    sb.storeOffS(StackOffset(2))
-    sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(-2)).addSp(-2).rst()
+    sb.storeOffS(Local1)
+    sb.pushOffS(Local2).storeOffS(SecondArg).addSp(-2).rst()
 
   /** Emit STR_APPEND subroutine: appends source string to destination buffer */
   private def emitAppendFunction(sb: SamBuilder): Unit =
+    import StackSlots._
     val appendStartLoopLabel = new Label()
     val appendStopLoopLabel = new Label()
     sb.label(APPEND_LABEL)
-    sb.pushOffS(StackOffset(-2)).pushOffS(StackOffset(-1))
+    sb.pushOffS(SecondArg).pushOffS(ReturnAddress)
     sb.label(appendStartLoopLabel.name)
-    sb.pushOffS(StackOffset(3)).pushInd().jumpIfNil(appendStopLoopLabel)
-    sb.pushOffS(StackOffset(2)).pushOffS(StackOffset(3)).pushInd().storeInd()
-    sb.pushOffS(StackOffset(2)).pushImmInt(1).add().storeOffS(StackOffset(2))
-    sb.pushOffS(StackOffset(3)).pushImmInt(1).add().storeOffS(StackOffset(3))
+    sb.pushOffS(Local2).pushInd().jumpIfNil(appendStopLoopLabel)
+    sb.pushOffS(Local1).pushOffS(Local2).pushInd().storeInd()
+    sb.pushOffS(Local1).pushImmInt(1).add().storeOffS(Local1)
+    sb.pushOffS(Local2).pushImmInt(1).add().storeOffS(Local2)
     sb.jump(appendStartLoopLabel.name)
     sb.label(appendStopLoopLabel.name)
-    sb.pushOffS(StackOffset(2)).pushImmCh('\u0000').storeInd().pushOffS(StackOffset(2)).storeOffS(StackOffset(-3)).addSp(-2).rst()
+    sb.pushOffS(Local1).pushImmCh('\u0000').storeInd().pushOffS(Local1).storeOffS(ThirdArg).addSp(-2).rst()
 
   /** Emit STR_REPEAT subroutine: repeats string N times */
   private def emitRepeatFunction(sb: SamBuilder): Unit =
+    import StackSlots._
     val repeatStartLoopLabel = new Label()
     val repeatStopLoopLabel = new Label()
     val repeatInvalidParamLabel = new Label()
     val repeatReturnLabel = new Label()
     sb.label(REPEAT_LABEL)
     sb.pushImmInt(0).pushImmInt(0).pushImmInt(0)
-    sb.pushOffS(StackOffset(-2)).isNeg().branchIfTruthy(repeatInvalidParamLabel.name)
-    sb.pushOffS(StackOffset(-1))
+    sb.pushOffS(SecondArg).isNeg().branchIfTruthy(repeatInvalidParamLabel.name)
+    sb.pushOffS(ReturnAddress)
     sb.append(getStringLength())
-    sb.pushOffS(StackOffset(-2)).mul().pushImmInt(1).add().malloc().storeOffS(StackOffset(3))
-    sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(4))
+    sb.pushOffS(SecondArg).mul().pushImmInt(1).add().malloc().storeOffS(Local2)
+    sb.pushOffS(Local2).storeOffS(Local3)
     sb.label(repeatStartLoopLabel.name)
-    sb.pushOffS(StackOffset(2)).pushOffS(StackOffset(-2)).equal().branchIfTruthy(repeatStopLoopLabel)
-    sb.pushImmInt(0).pushOffS(StackOffset(3)).pushOffS(StackOffset(-1))
+    sb.pushOffS(Local1).pushOffS(SecondArg).equal().branchIfTruthy(repeatStopLoopLabel)
+    sb.pushImmInt(0).pushOffS(Local2).pushOffS(ReturnAddress)
     sb.append(appendStringHeap())
-    sb.storeOffS(StackOffset(3))
-    sb.pushOffS(StackOffset(2)).pushImmInt(1).add().storeOffS(StackOffset(2))
+    sb.storeOffS(Local2)
+    sb.pushOffS(Local1).pushImmInt(1).add().storeOffS(Local1)
     sb.jump(repeatStartLoopLabel.name)
     sb.label(repeatStopLoopLabel.name)
-    sb.pushOffS(StackOffset(4)).storeOffS(StackOffset(-2)).jump(repeatReturnLabel.name)
+    sb.pushOffS(Local3).storeOffS(SecondArg).jump(repeatReturnLabel.name)
     sb.label(repeatInvalidParamLabel.name)
-    sb.pushImmStr("\"\"").storeOffS(StackOffset(-2))
+    sb.pushImmStr("\"\"").storeOffS(SecondArg)
     sb.label(repeatReturnLabel.name)
     sb.addSp(-3).rst()
 
   /** Emit STR_COMPARE subroutine: lexicographic comparison */
   private def emitCompareFunction(sb: SamBuilder): Unit =
+    import StackSlots._
     val cmpStartLoopLabel = new Label()
     val cmpStopLoopLabel = new Label()
     sb.label(COMPARE_LABEL)
     sb.pushImmInt(0).pushImmInt(0)
     sb.label(cmpStartLoopLabel.name)
-    sb.pushOffS(StackOffset(-2)).pushOffS(StackOffset(2)).add().pushInd().isNil()
-    sb.pushOffS(StackOffset(-1)).pushOffS(StackOffset(2)).add().pushInd().isNil().and()
+    sb.pushOffS(SecondArg).pushOffS(Local1).add().pushInd().isNil()
+    sb.pushOffS(ReturnAddress).pushOffS(Local1).add().pushInd().isNil().and()
     sb.branchIfTruthy(cmpStopLoopLabel.name)
-    sb.pushOffS(StackOffset(-2)).pushOffS(StackOffset(2)).add().pushInd()
-    sb.pushOffS(StackOffset(-1)).pushOffS(StackOffset(2)).add().pushInd().cmp().storeOffS(StackOffset(3))
-    sb.pushOffS(StackOffset(3)).branchIfTruthy(cmpStopLoopLabel.name)
-    sb.pushOffS(StackOffset(2)).pushImmInt(1).add().storeOffS(StackOffset(2))
+    sb.pushOffS(SecondArg).pushOffS(Local1).add().pushInd()
+    sb.pushOffS(ReturnAddress).pushOffS(Local1).add().pushInd().cmp().storeOffS(Local2)
+    sb.pushOffS(Local2).branchIfTruthy(cmpStopLoopLabel.name)
+    sb.pushOffS(Local1).pushImmInt(1).add().storeOffS(Local1)
     sb.jump(cmpStartLoopLabel.name)
     sb.label(cmpStopLoopLabel.name)
-    sb.pushOffS(StackOffset(3)).storeOffS(StackOffset(-2)).addSp(-2).rst()
+    sb.pushOffS(Local2).storeOffS(SecondArg).addSp(-2).rst()
 
   /** Emit all shared string helper subroutines exactly once. */
   def emitAllStringFunctions(): String =

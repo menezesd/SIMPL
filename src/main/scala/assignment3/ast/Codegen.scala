@@ -1,15 +1,10 @@
 package assignment3.ast
 
-import assignment3._
-import assignment3.ast as id
-import assignment3.ast.{AstEither, Diag, ResolveDiag, SyntaxDiag, TypeDiag}
-import assignment3.ast.IdiomaticTypeUtils
-import assignment3.symbol.ProgramSymbols
-import assignment3.ast.high.ReturnSig
-import assignment3.ast.MethodFrame
-import assignment3.ast.{NewMethodContext, SymbolMethodFrame}
+import assignment3.{Code, Label, Messages, OperatorUtils, Operators, SamBuilder, StringRuntime, Type}
 import assignment3.Offsets.{FieldOffset, StackOffset}
-import scala.jdk.CollectionConverters._
+import assignment3.ast as id
+import assignment3.ast.high.ReturnSig
+import assignment3.symbol.ProgramSymbols
 
 /** Code generation using idiomatic, pattern-matching AST. */
 object IdiomaticCodegen:
@@ -142,8 +137,10 @@ object IdiomaticCodegen:
       case BinaryOp.Lt  => LT
       case BinaryOp.Gt  => GT
       case _            => EQ
-    // Use Either variant; fallback empty for truly unknown operators (shouldn't happen)
-    val opCode = OperatorUtils.getBinopE(ch).getOrElse("")
+    // Use Either variant; fail fast if operator is somehow invalid (indicates compiler bug)
+    val opCode = OperatorUtils.getBinopE(ch).getOrElse {
+      throw new AssertionError(s"Internal error: unknown binary operator '$ch'")
+    }
     leftCode + rightCode + Code.fromString(opCode)
 
   // Helper: emit the actual binary operation code
@@ -166,20 +163,18 @@ object IdiomaticCodegen:
   // Helper: emit function call
   private def emitCallD(m: id.CallableMethod, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
     val hasReturn = hasReturnValue(m)
-    Result.foldE(args, Code.returnSlot) { (acc, a) =>
-      emitExprD(a, ctx).map(acc + _)
-    }.map(_ + emitCallC(m.getName, args.size, hasReturn))
+    Result.traverseE(args)(emitExprD(_, ctx)).map { argCodes =>
+      Code.concat(List(Code.returnSlot) ++ argCodes :+ emitCallC(m.getName, args.size, hasReturn))
+    }
 
   // Helper: emit instance call
   private def emitInstanceCallD(target: id.Expr, m: id.CallableMethod, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
     val hasReturn = hasReturnValue(m)
     for
       targetCode <- emitExprD(target, ctx)
-      argsCode <- Result.foldE(args, Code.empty) { (acc, a) =>
-        emitExprD(a, ctx).map(acc + _)
-      }
+      argCodes <- Result.traverseE(args)(emitExprD(_, ctx))
     yield
-      Code.returnSlot + targetCode + argsCode + emitCallC(m.getName, args.size + 1, hasReturn)
+      Code.concat(List(Code.returnSlot, targetCode) ++ argCodes :+ emitCallC(m.getName, args.size + 1, hasReturn))
 
   // Helper: emit 'this' access
   private def emitThisD(pos: Int, ctx: Ctx): Either[Diag, Code] =
@@ -194,14 +189,12 @@ object IdiomaticCodegen:
   private def emitNewObjectD(className: String, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
     val numFields = ctx.programSymbolsOpt.flatMap(_.getClass(className)).map(_.numFields()).getOrElse(1)
     val ctorExists = ctx.programSymbolsOpt.flatMap(_.getClass(className)).exists(_.method(className).isDefined)
-    Result.foldE(args, Code.empty) { (acc, a) =>
-      emitExprD(a, ctx).map(acc + _)
-    }.map { argsCode =>
+    Result.traverseE(args)(emitExprD(_, ctx)).map { argCodes =>
       val sb = new SamBuilder()
       sb.pushImmInt(numFields).malloc()
       if ctorExists then
         sb.dup().pushImmInt(0).swap()
-        sb.append(argsCode)
+        sb.append(Code.concat(argCodes))
         sb.linkCall(s"${className}_${className}")
         val paramCount = args.size + 1
         sb.addSp(-paramCount)
@@ -283,21 +276,23 @@ object IdiomaticCodegen:
   // Helper: emit unary operation
   private def emitUnaryD(op: id.UnaryOp, expr: id.Expr, rt: Option[Type], ctx: Ctx): Either[Diag, Code] =
     import Operators._
+    // These operators are guaranteed to exist; fail fast if not (indicates compiler bug)
+    def getUnopOrFail(o: Char): String = OperatorUtils.getUnopE(o).getOrElse {
+      throw new AssertionError(s"Internal error: unknown unary operator '$o'")
+    }
     emitExprD(expr, ctx).map { base =>
       op match
         case UnaryOp.Neg =>
           if rt.exists(_ == Type.STRING) then base + Code.fromString(StringRuntime.reverseString())
-          else base + Code.fromString(OperatorUtils.getUnopE(NEG).getOrElse(""))
+          else base + Code.fromString(getUnopOrFail(NEG))
         case UnaryOp.Not =>
-          base + Code.fromString(OperatorUtils.getUnopE(NOT).getOrElse(""))
+          base + Code.fromString(getUnopOrFail(NOT))
     }
 
   def emitStmtD(s: id.Stmt, ctx: Ctx): Either[Diag, Code] =
     s match
       case id.Block(statements, _) =>
-        Result.foldE(statements, Code.empty) { (acc, st) =>
-          emitStmtD(st, ctx).map(acc + _)
-        }
+        Result.traverseE(statements)(emitStmtD(_, ctx)).map(Code.concat)
       case id.VarDecl(_, _, _, initOpt, _) =>
         initOpt match
           case Some(init) => emitExprD(init, ctx)

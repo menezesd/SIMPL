@@ -1,10 +1,6 @@
 package assignment3.ast
 
-import assignment3._
-import assignment3.TokenizerView
-import assignment3.ParserBase
-import assignment3.ast.{MethodContext, NewMethodContext}
-import assignment3.ast.SymbolVarBinding
+import assignment3.{CompilerUtils, Messages, ParserBase, TokenizerView, Type, ValueType}
 import assignment3.symbol.{MethodSymbol, VarSymbol}
 import edu.utexas.cs.sam.io.SamTokenizer
 import edu.utexas.cs.sam.io.Tokenizer.TokenType
@@ -36,8 +32,7 @@ final class AstParser(
     for {
       nmc <- method match { case n: NewMethodContext => Some(n); case _ => None }
       ms = nmc.getSymbol
-      if ms.numParameters() > 0 && ms.parameters.headOption.exists(_.getName == "this")
-      thisSym = ms.parameters.head
+      thisSym <- ms.parameters.headOption if thisSym.getName == "this"
       className <- thisSym.classTypeNameOpt
       cs <- programSymbols.getClass(className)
       fSym <- cs.field(fieldName)
@@ -56,36 +51,41 @@ final class AstParser(
     if !declarationsEnabled then ok(Nil)
     else
       val decls = ListBuffer.empty[VarDecl]
-      def parseOneGroup(): Result[Unit] =
-        for
-          rawType <- getWordR()
-          tuple <-
-            try
-              val vt = Type.parse(rawType, tv.line)
-              ok((Some(vt), Some(assignment3.ValueType.ofPrimitive(vt))))
-            catch
-              case _: TypeErrorException => ok((Some(Type.INT), Some(assignment3.ValueType.ofObject(rawType))))
-          (varTypeOpt, valueTypeOpt) = tuple
-          _ <-
-            if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType)
-            else ok(())
-          name <- getIdentifierR()
-          _ = decls += VarDecl(name, varTypeOpt, valueTypeOpt, None)
-          _ <-
-            def loop(): Result[Unit] =
-              if tv.consumeChar( ',') then
-                if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType)
-                else
-                  getIdentifierR().map { nm => decls += VarDecl(nm, varTypeOpt, valueTypeOpt, None) } match
-                    case Left(d) => Left(d)
-                    case Right(_) => loop()
-              else if tv.consumeChar( ';') then ok(())
-              else syntax(Messages.expectedVarDeclSeparator)
-            loop()
-        yield ()
-      def outer(): Result[Unit] =
-        if tv.peekKind() == TokenType.WORD then parseOneGroup().flatMap(_ => outer()) else ok(())
-      outer().map(_ => decls.toList)
+      parseVarDeclGroupsR(decls).map(_ => decls.toList)
+
+  /** Parse all variable declaration groups (e.g., "int x, y; String z;") */
+  private def parseVarDeclGroupsR(decls: ListBuffer[VarDecl]): Result[Unit] =
+    if tv.peekKind() == TokenType.WORD then
+      parseOneVarGroupR(decls).flatMap(_ => parseVarDeclGroupsR(decls))
+    else ok(())
+
+  /** Parse a single declaration group: "Type name1, name2, ...;" */
+  private def parseOneVarGroupR(decls: ListBuffer[VarDecl]): Result[Unit] =
+    for
+      rawType <- getWordR()
+      (varTypeOpt, valueTypeOpt) = Type.parseE(rawType, tv.line) match
+        case Right(vt) => (Some(vt), Some(assignment3.ValueType.ofPrimitive(vt)))
+        case Left(_)   => (Some(Type.INT), Some(assignment3.ValueType.ofObject(rawType)))
+      _ <- if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType) else ok(())
+      name <- getIdentifierR()
+      _ = decls += VarDecl(name, varTypeOpt, valueTypeOpt, None)
+      _ <- parseRemainingVarNamesR(decls, varTypeOpt, valueTypeOpt)
+    yield ()
+
+  /** Parse remaining variable names after the first: ", name2, name3" until ";" */
+  private def parseRemainingVarNamesR(
+    decls: ListBuffer[VarDecl],
+    varTypeOpt: Option[Type],
+    valueTypeOpt: Option[ValueType]
+  ): Result[Unit] =
+    if tv.consumeChar(',') then
+      if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType)
+      else getIdentifierR().flatMap { nm =>
+        decls += VarDecl(nm, varTypeOpt, valueTypeOpt, None)
+        parseRemainingVarNamesR(decls, varTypeOpt, valueTypeOpt)
+      }
+    else if tv.consumeChar(';') then ok(())
+    else syntax(Messages.expectedVarDeclSeparator)
 
   // --- Statement parsing helpers ---
 

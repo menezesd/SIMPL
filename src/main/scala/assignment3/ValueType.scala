@@ -19,12 +19,14 @@ sealed trait ValueType {
   def classNameOpt: Option[String] = objectTypeOpt.map(_.getClassName)
 
   /** Extract primitive type or throw. Prefer pattern matching or primitiveOpt. */
+  @deprecated("Use primitiveOpt or pattern matching instead", "2.0")
   def primitive: Type = this match {
     case PrimitiveType(t) => t
     case _ => throw new IllegalStateException("Not a primitive type")
   }
 
   /** Extract object type or throw. Prefer pattern matching or objectTypeOpt. */
+  @deprecated("Use objectTypeOpt or pattern matching instead", "2.0")
   def objectRef: ObjectType = this match {
     case ObjectRefType(ot) => ot
     case _ => throw new IllegalStateException("Not an object type")

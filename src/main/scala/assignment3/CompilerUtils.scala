@@ -168,5 +168,8 @@ object CompilerUtils {
     val classMatch = Option(symbols).exists(sym => sym.allClasses.exists(cls => tz.test(cls.getName)))
     if (classMatch) true else allowUnknownNames
   }
-  def parseTypeOrObjectName(raw: String, line: Int): ValueType = try ValueType.ofPrimitive(Type.parse(raw, line)) catch { case _: TypeErrorException => ValueType.ofObject(raw) }
+  def parseTypeOrObjectName(raw: String, line: Int): ValueType =
+    Type.parseE(raw, line) match
+      case Right(t) => ValueType.ofPrimitive(t)
+      case Left(_)  => ValueType.ofObject(raw)
 }

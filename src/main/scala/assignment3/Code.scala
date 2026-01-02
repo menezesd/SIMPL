@@ -20,4 +20,19 @@ object Code {
   def pushBool(b: Boolean): Code = from(new SamBuilder().pushBool(b))
   def pushNull: Code = from(new SamBuilder().pushNull())
   def returnSlot: Code = from(new SamBuilder().returnSlot())
+
+  /** Efficiently concatenate multiple Code fragments (avoids O(n²) string concatenation). */
+  def concat(codes: Iterable[Code]): Code = {
+    val sb = new StringBuilder
+    codes.foreach(c => sb.append(c.s))
+    Code(sb.toString)
+  }
+
+  /** Efficiently concatenate Code fragments with a prefix. */
+  def concat(prefix: Code, codes: Iterable[Code]): Code = {
+    val sb = new StringBuilder
+    sb.append(prefix.s)
+    codes.foreach(c => sb.append(c.s))
+    Code(sb.toString)
+  }
 }

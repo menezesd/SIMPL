@@ -74,7 +74,7 @@ object IdiomaticSemantic:
                         Some(TypeDiag(Messages.Semantic.argTypeMismatch(formal.getName), ctx.line))
                       case _ => None
                     }
-                  }.toSeq.headOption
+                  }.nextOption()
                   firstErr.map(Left(_)).getOrElse(Right(()))
               case _ => Right(())
           }

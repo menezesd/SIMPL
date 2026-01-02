@@ -37,7 +37,7 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
       try
         m.body match
           case b: id.Block =>
-            val ctx2 = id.IdiomaticCodegen.Ctx(Some(frame), Some(symbols), returnLabelOpt = Some(frame.getReturnLabel))
+            val ctx2 = id.IdiomaticCodegen.Ctx(Some(frame), Some(symbols), returnLabelOpt = frame.getReturnLabel)
             id.IdiomaticCodegen.emitStmtD(b, ctx2) match
               case Left(diag) => Left(diag)
               case Right(code) =>

@@ -10,9 +10,9 @@ final class SamBuilder {
     case s: String => s
     case l: Label  => l.name
 
-  def append(s: String): SamBuilder = { sb.append(Option(s).getOrElse("")); this }
-  def append(c: Code): SamBuilder = append(Option(c).map(_.toString).getOrElse(""))
-  def line(s: String): SamBuilder = { sb.append(Option(s).getOrElse("")).append('\n'); this }
+  def append(s: String): SamBuilder = { if (s != null) sb.append(s); this }
+  def append(c: Code): SamBuilder = { if (c != null) sb.append(c.toString); this }
+  def line(s: String): SamBuilder = { if (s != null) sb.append(s); sb.append('\n'); this }
 
   // Label definition (union type: accepts String or Label)
   def label(lbl: String | Label): SamBuilder =

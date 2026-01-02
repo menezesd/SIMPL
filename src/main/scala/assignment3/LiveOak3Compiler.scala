@@ -96,16 +96,16 @@ object LiveOak3Compiler {
   private def normalizePathUnix(path: String): String = Option(path).fold("")(_.replace('\\', '/'))
 
   private def dumpSymbols(symbols: ProgramSymbols): Unit = {
-    System.err.println("[DEBUG] Program symbols:")
+    Debug.log("symbols", () => "Program symbols:")
     for (cs <- symbols.allClasses) {
-      System.err.println(s"  class ${cs.getName} (fields=${cs.numFields()})")
+      Debug.log("symbols", () => s"  class ${cs.getName} (fields=${cs.numFields()})")
       for (ms <- cs.allMethods) {
         val ret = ms.getReturnSig match {
           case assignment3.ast.high.ReturnSig.Void => "void"
           case assignment3.ast.high.ReturnSig.Obj(cn) => cn
           case assignment3.ast.high.ReturnSig.Prim(t) => String.valueOf(t)
         }
-        System.err.println(s"    method ${ms.getName} -> $ret params=${ms.numParameters()} locals=${ms.numLocals()}")
+        Debug.log("symbols", () => s"    method ${ms.getName} -> $ret params=${ms.numParameters()} locals=${ms.numLocals()}")
       }
     }
   }
@@ -113,12 +113,11 @@ object LiveOak3Compiler {
   private def dumpRecordedTokens(ctx: CompilerContext): Unit = ctx.recorder match {
     case l: ListTokenRecorder =>
       val toks = l.snapshot()
-      System.err.println(s"[DEBUG] Recorded tokens (${toks.size}):")
+      Debug.log("tokens", () => s"Recorded tokens (${toks.size}):")
       val limit = Math.min(80, toks.size)
       val head = toks.subList(0, limit).asScala.mkString(" ")
-      System.err.print(head)
-      if (toks.size > limit) System.err.print(" ...")
-      System.err.println()
+      val suffix = if toks.size > limit then " ..." else ""
+      Debug.log("tokens", () => head + suffix)
     case _ => ()
   }
 

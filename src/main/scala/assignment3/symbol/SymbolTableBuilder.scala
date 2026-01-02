@@ -1,7 +1,6 @@
 package assignment3.symbol
 
-import assignment3._
-import assignment3.{ParserBase, TokenizerView}
+import assignment3.{CompilerUtils, Messages, ObjectRefType, ParserBase, PrimitiveType, TokenizerView, ValueType}
 import assignment3.ast.{Diag, SyntaxDiag, TypeDiag, ResolveDiag, Result}
 import edu.utexas.cs.sam.io.{SamTokenizer, Tokenizer}
 import Tokenizer.TokenType

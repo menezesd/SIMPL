@@ -22,7 +22,7 @@ trait MethodFrame {
   def returnAddressOffset(): Int
   def lookupVar(name: String): Option[VarBinding]
   def setReturnLabel(label: Label): Unit
-  def getReturnLabel: Label
+  def getReturnLabel: Option[Label]
 }
 
 // Callable abstractions (Scala canonical versions)
@@ -82,13 +82,3 @@ final case class SimpleVarBinding(name: String, tpe: Type, address: Int) extends
   def getAddress: Int = address
 }
 
-/** Extension methods for diagnostic-first variable lookup. */
-extension (mf: MethodFrame)
-  /** Lookup variable, returning Either for diagnostic-first flow. */
-  def lookupVarE(name: String, pos: Int): Either[Diag, VarBinding] =
-    mf.lookupVar(name).toRight(ResolveDiag(assignment3.Messages.undeclaredVariable(name), pos))
-
-extension (mc: MethodContext)
-  /** Lookup variable, returning Either for diagnostic-first flow. */
-  def lookupVarE(name: String, pos: Int): Either[Diag, VarSymbol] =
-    mc.lookupVar(name).toRight(ResolveDiag(assignment3.Messages.undeclaredVariable(name), pos))

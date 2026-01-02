@@ -1,13 +1,22 @@
 
 package assignment3
 
-/** Primitive types supported by LiveOak-3. */
+/** Primitive types supported by LiveOak-3.
+  *
+  * Implementation note: This is a Scala 3 enum, which means each case (INT, BOOL, STRING)
+  * is a singleton object. Reference equality (`eq`) is safe and preferred for comparisons
+  * since there is exactly one instance of each type. The `isCompatibleWith` method uses
+  * `eq` explicitly to document this singleton guarantee.
+  */
 enum Type(val typeName: String) {
   case INT extends Type("int")
   case BOOL extends Type("bool")
   case STRING extends Type("String")
 
-  /** Primitive compatibility: only identical primitive types are compatible in LO-3. */
+  /** Check if this type is compatible with another for assignment/comparison.
+    * Uses reference equality (`eq`) since enum cases are singletons.
+    * Only identical primitive types are compatible in LO-3.
+    */
   def isCompatibleWith(other: Type): Boolean = this eq other
 
   override def toString: String = typeName

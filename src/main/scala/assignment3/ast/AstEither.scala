@@ -83,58 +83,39 @@ object AstEither:
         case EQ => BinaryOp.Eq
       Right(Binary(bop, left, right, Some(Type.BOOL)))
 
-  /** Type-check and build a binary expression with diagnostic result. */
+  /** Type-check and build a binary expression with diagnostic result.
+    * Delegates to specialized helpers based on operator category.
+    */
   def buildBinaryD(left: Expr, op: Char, right: Expr, method: MethodContext, ps: ProgramSymbols, line: Int, column: Int = -1): Either[Diag, Expr] =
     val lt = IdiomaticTypeUtils.typeOf(left, method, ps)
     val rt = IdiomaticTypeUtils.typeOf(right, method, ps)
-    val bothString = lt == Type.STRING && rt == Type.STRING
-    val stringInt = (lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING)
 
-    // Pattern match on (operator, type context) for cleaner dispatch
-    (op, lt, rt) match
-      // String repeat: String * Int or Int * String
-      case (MUL, _, _) if stringInt =>
-        Right(Binary(BinaryOp.Mul, left, right, Some(Type.STRING)))
+    op match
+      // Multiplication: check for string repeat first, then arithmetic
+      case MUL =>
+        tryStringRepeat(left, right, lt, rt)
+          .map(Right(_))
+          .getOrElse(buildArithmeticD(op, left, right, lt, rt, line, column))
 
-      // String concatenation: String + String
-      case (ADD, Type.STRING, Type.STRING) =>
-        Right(Binary(BinaryOp.Add, left, right, Some(Type.STRING)))
+      // Addition: check for string concat first, then arithmetic
+      case ADD =>
+        tryStringConcat(left, right, lt, rt)
+          .map(Right(_))
+          .getOrElse(buildArithmeticD(op, left, right, lt, rt, line, column))
 
-      // String comparison: String <, >, = String
-      case (LT | GT | EQ, Type.STRING, Type.STRING) =>
-        val bop = op match { case LT => BinaryOp.Lt; case GT => BinaryOp.Gt; case _ => BinaryOp.Eq }
-        Right(Binary(bop, left, right, Some(Type.BOOL)))
+      // Other arithmetic
+      case SUB | DIV | MOD =>
+        buildArithmeticD(op, left, right, lt, rt, line, column)
 
-      // Equality on compatible types
-      case (EQ, _, _) if lt.isCompatibleWith(rt) =>
-        Right(Binary(BinaryOp.Eq, left, right, Some(Type.BOOL)))
+      // Comparison: check for string compare first, then numeric
+      case LT | GT | EQ =>
+        tryStringCompare(op, left, right, lt, rt)
+          .map(Right(_))
+          .getOrElse(buildComparisonD(op, left, right, lt, rt, line, column))
 
-      // Numeric comparison: Int <, > Int
-      case (LT | GT, Type.INT, Type.INT) =>
-        val bop = if op == LT then BinaryOp.Lt else BinaryOp.Gt
-        Right(Binary(bop, left, right, Some(Type.BOOL)))
-
-      // Logical operators: Bool & | Bool
-      case (AND | OR, Type.BOOL, Type.BOOL) =>
-        val bop = if op == AND then BinaryOp.And else BinaryOp.Or
-        Right(Binary(bop, left, right, Some(Type.BOOL)))
-
-      // Arithmetic operators: Int +, -, *, /, % Int
-      case (ADD | SUB | MUL | DIV | MOD, Type.INT, Type.INT) =>
-        val bop = op match
-          case ADD => BinaryOp.Add; case SUB => BinaryOp.Sub; case MUL => BinaryOp.Mul
-          case DIV => BinaryOp.Div; case MOD => BinaryOp.Mod
-        Right(Binary(bop, left, right, Some(Type.INT)))
-
-      // Type errors for logical/arithmetic with wrong types
-      case (AND | OR, _, _) =>
-        Left(TypeDiag(Messages.TypeCheck.logicalOpRequiresBool, line, column))
-
-      case (ADD | SUB | MUL | DIV | MOD, _, _) =>
-        Left(TypeDiag(Messages.TypeCheck.arithmeticOpRequiresInt, line, column))
-
-      case (LT | GT | EQ, _, _) =>
-        Left(TypeDiag(Messages.TypeCheck.comparisonRequiresMatchingTypes, line, column))
+      // Logical
+      case AND | OR =>
+        buildLogicalD(op, left, right, lt, rt, line, column)
 
       case _ =>
         Left(TypeDiag(Messages.TypeCheck.unsupportedOperator(op), line, column))
