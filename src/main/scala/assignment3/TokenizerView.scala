@@ -28,17 +28,18 @@ final class TokenizerView(val tz: SamTokenizer, rules: CompilerUtils.LexicalRule
     CompilerUtils.getIdentifierE(tz, rules)
 
   def getWord: Result[String] =
-    wrapSyntax { CompilerUtils.getWord(tz) }
+    if tz.peekAtKind() != TokenType.WORD then Left(SyntaxDiag("Expected word", tz.lineNo(), col))
+    else Right(CompilerUtils.getWord(tz))
 
   def getInt: Result[Int] =
-    wrapSyntax { CompilerUtils.getInt(tz) }
+    if tz.peekAtKind() != TokenType.INTEGER then Left(SyntaxDiag("Expected integer", tz.lineNo(), col))
+    else Right(CompilerUtils.getInt(tz))
 
   def getString: Result[String] =
-    wrapSyntax { CompilerUtils.getString(tz) }
+    if tz.peekAtKind() != TokenType.STRING then Left(SyntaxDiag("Expected string", tz.lineNo(), col))
+    else Right(CompilerUtils.getString(tz))
 
   def getOp: Result[Char] =
-    wrapSyntax { CompilerUtils.getOp(tz) }
-
-  private def wrapSyntax[A](body: => A): Result[A] =
-    ParserSupport.wrapSyntax(tz)(body)
+    if tz.peekAtKind() != TokenType.OPERATOR then Left(SyntaxDiag("Expected operator", tz.lineNo(), col))
+    else Right(CompilerUtils.getOp(tz))
 }

@@ -1,8 +1,10 @@
 package assignment3;
 
+import assignment3.ast.Diag;
 import edu.utexas.cs.sam.io.SamTokenizer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import scala.util.Either;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -21,10 +23,14 @@ class CompilerUtilsIdentifierTest {
     @Test
     void accepts_valid_identifiers(@TempDir Path dir) throws Exception {
         SamTokenizer tz1 = tokenizerFor(dir, "foo");
-        assertEquals("foo", CompilerUtils.getIdentifier(tz1, CompilerUtils.noRecorder()));
+        Either<Diag, String> result1 = CompilerUtils.getIdentifierE(tz1, CompilerUtils.noRecorder());
+        assertTrue(result1.isRight());
+        assertEquals("foo", result1.getOrElse(() -> ""));
 
         SamTokenizer tz2 = tokenizerFor(dir, "a1_b2");
-        assertEquals("a1_b2", CompilerUtils.getIdentifier(tz2, CompilerUtils.noRecorder()));
+        Either<Diag, String> result2 = CompilerUtils.getIdentifierE(tz2, CompilerUtils.noRecorder());
+        assertTrue(result2.isRight());
+        assertEquals("a1_b2", result2.getOrElse(() -> ""));
     }
 
     @Test
@@ -35,24 +41,33 @@ class CompilerUtilsIdentifierTest {
         };
         for (String w : reserved) {
             SamTokenizer tz = tokenizerFor(dir, w);
-            SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz, CompilerUtils.noRecorder()), w + " should be reserved");
-            assertTrue(ex.getMessage().contains("Reserved word"));
+            Either<Diag, String> result = CompilerUtils.getIdentifierE(tz, CompilerUtils.noRecorder());
+            assertTrue(result.isLeft(), w + " should be reserved");
+            Diag diag = result.swap().getOrElse(() -> null);
+            assertNotNull(diag);
+            assertTrue(diag.message().contains("Reserved word"), diag.message());
         }
     }
 
     @Test
     void rejects_when_not_a_word(@TempDir Path dir) throws Exception {
         SamTokenizer tz = tokenizerFor(dir, "1abc");
-        SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz, CompilerUtils.noRecorder()));
-        assertTrue(ex.getMessage().contains("Expected identifier"));
+        Either<Diag, String> result = CompilerUtils.getIdentifierE(tz, CompilerUtils.noRecorder());
+        assertTrue(result.isLeft());
+        Diag diag = result.swap().getOrElse(() -> null);
+        assertNotNull(diag);
+        assertTrue(diag.message().contains("Expected identifier"));
     }
 
     @Test
     void rejects_invalid_pattern_starting_underscore(@TempDir Path dir) throws Exception {
         SamTokenizer tz = tokenizerFor(dir, "_bad");
-        SyntaxErrorException ex = assertThrows(SyntaxErrorException.class, () -> CompilerUtils.getIdentifier(tz, CompilerUtils.noRecorder()));
+        Either<Diag, String> result = CompilerUtils.getIdentifierE(tz, CompilerUtils.noRecorder());
+        assertTrue(result.isLeft());
+        Diag diag = result.swap().getOrElse(() -> null);
+        assertNotNull(diag);
         // Depending on tokenizer, '_' may not be a WORD token. Accept either message.
-        String msg = ex.getMessage();
+        String msg = diag.message();
         assertTrue(msg.contains("Invalid identifier") || msg.contains("Expected identifier"), msg);
     }
 }

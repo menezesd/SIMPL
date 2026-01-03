@@ -55,28 +55,10 @@ object OperatorUtils {
   def getBinopE(op: Char): Either[String, String] =
     binopInstructions.get(op).toRight(s"Invalid binary operator: $op")
 
-  /** Legacy throwing API - prefer getUnopE for new code. */
-  @deprecated("Use getUnopE instead", "2.0")
-  def getUnop(op: Char): String =
-    getUnopE(op).getOrElse(throw TypeErrorException(s"getUnop received invalid input: $op", -1))
-
-  /** Legacy throwing API - prefer getBinopE for new code. */
-  @deprecated("Use getBinopE instead", "2.0")
-  def getBinop(op: Char): String =
-    getBinopE(op).getOrElse(throw TypeErrorException(s"getBinop received invalid input: $op", -1))
-
-  @deprecated("Use getBinopTypeE instead", "2.0")
-  def getBinopType(op: Char): BinopType = op match {
-    case ADD | SUB | MUL | DIV | MOD => BinopType.ARITHMETIC
-    case AND | OR => BinopType.BITWISE
-    case GT | LT | EQ => BinopType.COMPARISON
-    case other => throw TypeErrorException(s"categorizeBinop received invalid input: $other", -1)
-  }
-
-  def getBinopTypeE(op: Char): Either[String, BinopType] = op match {
+  /** Get binary operator category, returning Either for diagnostic-first flow. */
+  def getBinopTypeE(op: Char): Either[String, BinopType] = op match
     case ADD | SUB | MUL | DIV | MOD => Right(BinopType.ARITHMETIC)
     case AND | OR => Right(BinopType.BITWISE)
     case GT | LT | EQ => Right(BinopType.COMPARISON)
     case other => Left(s"Invalid binary operator: $other")
-  }
 }

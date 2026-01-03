@@ -39,35 +39,29 @@ trait ParserBase {
   /** Collect items until terminator character is consumed.
    *  Useful for parsing method bodies, class bodies, etc.
    */
-  protected def collectUntil[A](terminator: Char)(parseItem: => Result[A]): Result[List[A]] = {
-    val buf = scala.collection.mutable.ListBuffer.empty[A]
-    def loop(): Result[List[A]] =
-      if tv.consumeChar(terminator) then ok(buf.toList)
-      else parseItem.flatMap { item => buf += item; loop() }
-    loop()
-  }
+  protected def collectUntil[A](terminator: Char)(parseItem: => Result[A]): Result[List[A]] =
+    def loop(acc: List[A]): Result[List[A]] =
+      if tv.consumeChar(terminator) then ok(acc)
+      else parseItem.flatMap(item => loop(acc :+ item))
+    loop(Nil)
 
   /** Parse a semicolon-separated list (each item ends with semicolon).
    *  Collects until predicate returns false for next token.
    */
-  protected def parseSemicolonSeparated[A](shouldContinue: => Boolean)(parseItem: => Result[A]): Result[List[A]] = {
-    val buf = scala.collection.mutable.ListBuffer.empty[A]
-    def loop(): Result[List[A]] =
-      if !shouldContinue then ok(buf.toList)
-      else parseItem.flatMap { item => buf += item; loop() }
-    loop()
-  }
+  protected def parseSemicolonSeparated[A](shouldContinue: => Boolean)(parseItem: => Result[A]): Result[List[A]] =
+    def loop(acc: List[A]): Result[List[A]] =
+      if !shouldContinue then ok(acc)
+      else parseItem.flatMap(item => loop(acc :+ item))
+    loop(Nil)
 
   /** Parse optional element if condition is met. */
   protected def parseOptional[A](cond: => Boolean)(parse: => Result[A]): Result[Option[A]] =
     if cond then parse.map(Some(_)) else ok(None)
 
   /** Repeatedly parse while condition is true, accumulating results. */
-  protected def parseWhile[A](cond: => Boolean)(parse: => Result[A]): Result[List[A]] = {
-    val buf = scala.collection.mutable.ListBuffer.empty[A]
-    def loop(): Result[List[A]] =
-      if !cond then ok(buf.toList)
-      else parse.flatMap { item => buf += item; loop() }
-    loop()
-  }
+  protected def parseWhile[A](cond: => Boolean)(parse: => Result[A]): Result[List[A]] =
+    def loop(acc: List[A]): Result[List[A]] =
+      if !cond then ok(acc)
+      else parse.flatMap(item => loop(acc :+ item))
+    loop(Nil)
 }

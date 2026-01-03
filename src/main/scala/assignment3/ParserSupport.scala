@@ -1,9 +1,9 @@
 package assignment3
 
-import assignment3.ast.{Diag, ResolveDiag, Result, SyntaxDiag, TypeDiag}
+import assignment3.ast.{Diag, ResolveDiag, Result}
 import edu.utexas.cs.sam.io.SamTokenizer
 
-object ParserSupport {
+object ParserSupport:
   final case class At[A](value: A, line: Int, col: Int)
 
   def at[A](tz: SamTokenizer, value: A): At[A] =
@@ -13,10 +13,6 @@ object ParserSupport {
   def syntax(msg: String, tz: SamTokenizer): Diag = Diag.syntax(msg, tz)
   def typeE(msg: String, tz: SamTokenizer): Diag = Diag.typeErr(msg, tz)
   def resolveE(msg: String, tz: SamTokenizer): Diag = Diag.resolve(msg, tz)
-
-  def wrapSyntax[A](tz: SamTokenizer)(body: => A): Either[Diag, A] =
-    try Right(body)
-    catch case se: SyntaxErrorException => Left(SyntaxDiag(se.getMessage, se.line, se.column))
 
   def requireClass(symbols: assignment3.symbol.ProgramSymbols, className: String, tz: SamTokenizer): Result[assignment3.symbol.ClassSymbol] =
     symbols.getClass(className) match
@@ -47,4 +43,3 @@ object ParserSupport {
 
   def consumeWord(tz: SamTokenizer, word: String)(using CompilerUtils.RecorderContext): Boolean =
     CompilerUtils.check(tz, word)
-}

@@ -59,12 +59,10 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
       id.Result.sequenceE(cls.methods)(m => emitMethodD(local, m))
     }
 
-  private def ensureVoidReturn(local: SamBuilder, b: id.Block, returnSig: assignment3.ast.high.ReturnSig): Unit = {
+  private def ensureVoidReturn(local: SamBuilder, b: id.Block, returnSig: assignment3.ast.high.ReturnSig): Unit =
     import assignment3.ast.high.ReturnSig
-    if (returnSig == ReturnSig.Void) then
-      val stmts = b.statements
-      if (stmts.isEmpty || !stmts.last.isInstanceOf[id.Return]) local.pushImm(0)
-  }
+    if returnSig == ReturnSig.Void && !b.statements.lastOption.exists(_.isInstanceOf[id.Return]) then
+      local.pushImm(0)
 
   private def appendProgramPreamble(sb: SamBuilder, ctx: CompilerContext): Unit = {
     val mainFields = mainFieldsCount(ctx)
