@@ -219,7 +219,7 @@ final class AstParser(
       args <- parseCommaSeparatedList(')')(parseExprR())
       msEither = AstEither.resolveMethodOnExprD(base, methodName, method, programSymbols, tv.line, tv.col)
       classNameOpt = IdiomaticTypeUtils.classNameOf(base, method, programSymbols)
-      labelName = classNameOpt.map(cn => s"${cn}_${methodName}").getOrElse(methodName)
+      labelName = classNameOpt.fold(methodName)(cn => s"${cn}_${methodName}")
       retVtOpt: Option[ValueType] = msEither.toOption.map(_.getReturnSig).flatMap {
         case assignment3.ast.high.ReturnSig.Void => None
         case assignment3.ast.high.ReturnSig.Obj(cn) => Some(assignment3.ValueType.ofObject(cn))

@@ -187,7 +187,7 @@ object IdiomaticCodegen:
 
   // Helper: emit new object instantiation
   private def emitNewObjectD(className: String, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
-    val numFields = ctx.programSymbolsOpt.flatMap(_.getClass(className)).map(_.numFields()).getOrElse(1)
+    val numFields = ctx.programSymbolsOpt.flatMap(_.getClass(className)).fold(1)(_.numFields())
     val ctorExists = ctx.programSymbolsOpt.flatMap(_.getClass(className)).exists(_.method(className).isDefined)
     Result.traverseE(args)(emitExprD(_, ctx)).map { argCodes =>
       val sb = new SamBuilder()
@@ -201,10 +201,6 @@ object IdiomaticCodegen:
         sb.addSp(-1)
       Code.from(sb)
     }
-
-  // Core adapter: return Either so callers can use diagnostic flow.
-  private def emitExprCoreE(e: id.Expr, ctx: Ctx): Either[Diag, Code] =
-    emitExprD(e, ctx)
 
   private def emitCallC(label: String, paramCount: Int, hasReturn: Boolean): Code =
     val sb = new SamBuilder()
@@ -236,31 +232,7 @@ object IdiomaticCodegen:
     sb.label(falseLbl).pushBool(false).label(endLabel)
     Code.from(sb)
 
-  // Helper: string binary operations
-  // (Removed an unused helper that previously threw Exceptions for unsupported
-  // string operators. The diagnostic-first functions below return Eithers and
-  // should be used for error handling.)
-
-  // Core adapter: return Either so callers can use diagnostic flow.
-  private def emitStmtCoreE(s: id.Stmt, ctx: Ctx): Either[Diag, Code] =
-    emitStmtD(s, ctx)
-
-  // Public APIs: Code-returning preferred; String-returning wrappers for compatibility
-  // Non-diagnostic (compat) wrappers: convert Left(diag) -> Error for callers that expect exceptions.
-  @deprecated("Use emitExprD instead", "2.0")
-  def emitExprC(e: id.Expr, ctx: Ctx): Code = emitExprCoreE(e, ctx) match
-    case Right(c) => c
-    case Left(d)  => throw new Error(d.message)
-  @deprecated("Use emitStmtD instead", "2.0")
-  def emitStmtC(s: id.Stmt, ctx: Ctx): Code = emitStmtCoreE(s, ctx) match
-    case Right(c) => c
-    case Left(d)  => throw new Error(d.message)
-  @deprecated("Use emitExprD instead", "2.0")
-  def emitExpr(e: id.Expr, ctx: Ctx): String = emitExprC(e, ctx).toString
-  @deprecated("Use emitStmtD instead", "2.0")
-  def emitStmt(s: id.Stmt, ctx: Ctx): String = emitStmtC(s, ctx).toString
-
-  // Diagnostic-first APIs (Either[Diag, Code]) for safer composition
+  /** Emit code for an expression. Returns Either for diagnostic flow. */
   def emitExprD(e: id.Expr, ctx: Ctx): Either[Diag, Code] = e match
     case lit: (id.IntLit | id.BoolLit | id.StrLit | id.NullLit) => emitLiteralD(lit)
     case id.Var(name, pos) => emitVarD(name, pos, ctx)

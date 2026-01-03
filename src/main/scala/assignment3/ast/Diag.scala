@@ -11,10 +11,7 @@ enum Diag(val message: String, val line: Int, val column: Int = -1):
   case Resolve(override val message: String, override val line: Int, override val column: Int = -1)
     extends Diag(message, line, column)
 
-// Type aliases for backward compatibility with existing code
-type SyntaxDiag = Diag.Syntax
-type TypeDiag = Diag.Type
-type ResolveDiag = Diag.Resolve
+// Shorter aliases for common diagnostic constructors
 val SyntaxDiag = Diag.Syntax
 val TypeDiag = Diag.Type
 val ResolveDiag = Diag.Resolve

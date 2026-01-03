@@ -20,21 +20,23 @@ object IdiomaticSemantic:
       ctx: CheckContext,
       objMismatchMsg: String,
       primMismatchMsg: String
-  ): Either[Diag, Unit] =
-    expected match {
-      case ObjectRefType(ot) =>
-        if rhs.isInstanceOf[NullLit] then Right(())
-        else
-          TU.classNameOf(rhs, ctx.methodCtx, ctx.symbols) match
-            case Some(rhsClass) =>
-              if rhsClass == ot.getClassName then Right(())
-              else Left(TypeDiag(objMismatchMsg, ctx.line))
-            case None => Right(()) // unknown at this stage; be permissive as before
-      case PrimitiveType(pt) =>
-        val et = TU.typeOf(rhs, ctx.methodCtx, ctx.symbols)
-        if pt.isCompatibleWith(et) then Right(())
-        else Left(TypeDiag(primMismatchMsg, ctx.line))
-    }
+  ): Either[Diag, Unit] = (expected, rhs) match
+    case (ObjectRefType(_), _: NullLit) => Right(())
+    case (ObjectRefType(ot), _) =>
+      TU.classNameOf(rhs, ctx.methodCtx, ctx.symbols) match
+        case Some(rhsClass) if rhsClass != ot.getClassName => Left(TypeDiag(objMismatchMsg, ctx.line))
+        case _ => Right(()) // match or unknown - be permissive
+    case (PrimitiveType(pt), _) =>
+      Result.require(pt.isCompatibleWith(TU.typeOf(rhs, ctx.methodCtx, ctx.symbols)),
+        TypeDiag(primMismatchMsg, ctx.line))
+
+  // Helper: check that a condition expression is BOOL
+  private def requireBoolCondition(c: Expr, ctx: CheckContext, errMsg: String): Either[Diag, Unit] =
+    for
+      _ <- checkExprImpl(c, ctx)
+      _ <- Result.require(TU.typeOf(c, ctx.methodCtx, ctx.symbols) == assignment3.Type.BOOL,
+             TypeDiag(errMsg, ctx.line))
+    yield ()
 
   // Public API - creates context and delegates
   def checkExprE(e: Expr, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] =
@@ -90,42 +92,37 @@ object IdiomaticSemantic:
     case Block(stmts, _) =>
       Result.sequenceE(stmts)(st => checkStmtImpl(st, ctx))
     case If(c, t, e, _) =>
-      for {
-        _ <- checkExprImpl(c, ctx)
-        _ <- if TU.typeOf(c, ctx.methodCtx, ctx.symbols) == assignment3.Type.BOOL then Right(())
-             else Left(TypeDiag(Messages.Semantic.ifConditionMustBeBool, ctx.line))
+      for
+        _ <- requireBoolCondition(c, ctx, Messages.Semantic.ifConditionMustBeBool)
         _ <- checkStmtImpl(t, ctx)
         _ <- checkStmtImpl(e, ctx)
-      } yield ()
+      yield ()
     case While(c, b, _) =>
-      for {
-        _ <- checkExprImpl(c, ctx)
-        _ <- if TU.typeOf(c, ctx.methodCtx, ctx.symbols) == assignment3.Type.BOOL then Right(())
-             else Left(TypeDiag(Messages.Semantic.whileConditionMustBeBool, ctx.line))
+      for
+        _ <- requireBoolCondition(c, ctx, Messages.Semantic.whileConditionMustBeBool)
         _ <- checkStmtImpl(b, ctx)
-      } yield ()
+      yield ()
     case Break(_) => Right(())
     case Return(v, _) =>
       val rs = ctx.method.getReturnSig
-      v match
-        case None =>
-          rs match
-            case ReturnSig.Void => Right(())
-            case _ => Left(TypeDiag(Messages.Semantic.nonVoidMustReturnValue, ctx.line))
-        case Some(expr) =>
-          for {
+      (v, rs) match
+        case (None, ReturnSig.Void) => Right(())
+        case (None, _) => Left(TypeDiag(Messages.Semantic.nonVoidMustReturnValue, ctx.line))
+        case (Some(_), ReturnSig.Void) => Left(TypeDiag(Messages.Semantic.voidShouldNotReturn, ctx.line))
+        case (Some(expr), ReturnSig.Prim(t)) =>
+          for
             _ <- checkExprImpl(expr, ctx)
-            _ <- rs match
-              case ReturnSig.Void => Left(TypeDiag(Messages.Semantic.voidShouldNotReturn, ctx.line))
-              case ReturnSig.Prim(t) =>
-                val et = TU.typeOf(expr, ctx.methodCtx, ctx.symbols)
-                if t.isCompatibleWith(et) then Right(()) else Left(TypeDiag(Messages.Semantic.returnTypeMismatch, ctx.line))
-              case ReturnSig.Obj(cn) =>
-                if expr.isInstanceOf[NullLit] then Right(())
-                else TU.classNameOf(expr, ctx.methodCtx, ctx.symbols) match
-                  case Some(ec) => if ec == cn then Right(()) else Left(TypeDiag(Messages.Semantic.returnObjectTypeMismatch, ctx.line))
-                  case None => Right(())
-          } yield ()
+            _ <- Result.require(t.isCompatibleWith(TU.typeOf(expr, ctx.methodCtx, ctx.symbols)),
+                   TypeDiag(Messages.Semantic.returnTypeMismatch, ctx.line))
+          yield ()
+        case (Some(expr: NullLit), ReturnSig.Obj(_)) => Right(())
+        case (Some(expr), ReturnSig.Obj(cn)) =>
+          for
+            _ <- checkExprImpl(expr, ctx)
+            _ <- TU.classNameOf(expr, ctx.methodCtx, ctx.symbols) match
+              case Some(ec) if ec != cn => Left(TypeDiag(Messages.Semantic.returnObjectTypeMismatch, ctx.line))
+              case _ => Right(())
+          yield ()
     case VarDecl(name, vtypeOpt, valueTypeOpt, initOpt, _) =>
       initOpt
         .map { init =>
