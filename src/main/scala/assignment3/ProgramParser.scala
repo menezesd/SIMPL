@@ -61,6 +61,21 @@ private final class ProgramParser private (
       body <- parseMethodBodyR(className, methodName, ms, returnSig)
     yield MethodNode(className, methodName, params, returnSig, body)
 
+  /** Check if parsed parameter type matches expected formal parameter type. */
+  private def typeMatches(formalType: ValueType, parsedPrimOpt: Option[Type], parsedObjOpt: Option[String]): Boolean =
+    formalType match
+      case ObjectRefType(ot) => parsedObjOpt.contains(ot.getClassName)
+      case PrimitiveType(t) => parsedPrimOpt.contains(t)
+
+  /** Format type for error messages. */
+  private def formatType(valueType: ValueType): String = valueType match
+    case ObjectRefType(ot) => ot.getClassName
+    case PrimitiveType(t) => t.toString
+
+  /** Format parsed type (from parser) for error messages. */
+  private def formatParsedType(objOpt: Option[String], primOpt: Option[Type]): String =
+    objOpt.getOrElse(primOpt.fold("void")(_.toString))
+
   private def parseParamsR(ms: MethodSymbol, methodName: String): Result[List[ParamNode]] =
     val expectedUserParams = ms.expectedUserArgs()
     def loop(paramIndex: Int, acc: List[ParamNode]): Result[List[ParamNode]] =
@@ -77,14 +92,10 @@ private final class ProgramParser private (
               syntax(Messages.tooManyParameters(methodName, expectedUserParams, paramIndex + 1))
             else ok(())
           formal = ms.parameters(paramIndex + 1) // +1 skips implicit 'this'
-          typeOk = formal.valueType match
-            case ObjectRefType(ot) => pobjOpt.contains(ot.getClassName)
-            case PrimitiveType(t) => pTypeOpt.contains(t)
+          typeOk = typeMatches(formal.valueType, pTypeOpt, pobjOpt)
           _ <- if !typeOk || formal.getName != pName then
-            val expectedType = formal.valueType match
-              case ObjectRefType(ot) => ot.getClassName
-              case PrimitiveType(t) => t.toString
-            val actualType = pobjOpt.getOrElse(pTypeOpt.fold("void")(_.toString))
+            val expectedType = formatType(formal.valueType)
+            val actualType = formatParsedType(pobjOpt, pTypeOpt)
             syntax(Messages.parameterMismatch(methodName, paramIndex + 1, expectedType, formal.getName, actualType, pName))
           else ok(())
           _ = tv.consumeChar(',')

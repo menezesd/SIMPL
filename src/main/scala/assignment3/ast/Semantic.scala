@@ -30,6 +30,14 @@ object IdiomaticSemantic:
       Result.require(pt.isCompatibleWith(TU.typeOf(rhs, ctx.methodCtx, ctx.symbols)),
         TypeDiag(primMismatchMsg, ctx.line))
 
+  // Helper: validate parameter type match
+  private def validateParameterType(formal: assignment3.symbol.VarSymbol, argExpr: Expr, ctx: CheckContext): Option[Diag] =
+    val argType = TU.typeOf(argExpr, ctx.methodCtx, ctx.symbols)
+    formal.valueType match
+      case PrimitiveType(pt) if !pt.isCompatibleWith(argType) =>
+        Some(TypeDiag(Messages.Semantic.argTypeMismatch(formal.getName), ctx.line))
+      case _ => None
+
   // Helper: check that a condition expression is BOOL
   private def requireBoolCondition(c: Expr, ctx: CheckContext, errMsg: String): Either[Diag, Unit] =
     for
@@ -68,15 +76,9 @@ object IdiomaticSemantic:
                 val expected = ms.expectedUserArgs(); val provided = args.size
                 if expected != provided then Left(SyntaxDiag(Messages.Semantic.incorrectArgCount, ctx.line))
                 else
-                  val firstErr: Option[Diag] = (0 until provided).iterator.flatMap { i =>
-                    val formal = ms.parameters(i + 1)
-                    val argType = TU.typeOf(args(i), ctx.methodCtx, ctx.symbols)
-                    formal.valueType match {
-                      case PrimitiveType(pt) if !pt.isCompatibleWith(argType) =>
-                        Some(TypeDiag(Messages.Semantic.argTypeMismatch(formal.getName), ctx.line))
-                      case _ => None
-                    }
-                  }.nextOption()
+                  val firstErr: Option[Diag] = (0 until provided).iterator
+                    .map(i => validateParameterType(ms.parameters(i + 1), args(i), ctx))
+                    .collectFirst { case Some(diag) => diag }
                   firstErr.fold(Right(()))(Left(_))
               case _ => Right(())
           }
@@ -89,86 +91,90 @@ object IdiomaticSemantic:
     checkStmtImpl(s, CheckContext(currentMethod, programSymbols, defaultLine))
 
   private def checkStmtImpl(s: Stmt, ctx: CheckContext): Either[Diag, Unit] = s match
-    case Block(stmts, _) =>
-      Result.sequenceE(stmts)(st => checkStmtImpl(st, ctx))
-    case If(c, t, e, _) =>
-      for
-        _ <- requireBoolCondition(c, ctx, Messages.Semantic.ifConditionMustBeBool)
-        _ <- checkStmtImpl(t, ctx)
-        _ <- checkStmtImpl(e, ctx)
-      yield ()
-    case While(c, b, _) =>
-      for
-        _ <- requireBoolCondition(c, ctx, Messages.Semantic.whileConditionMustBeBool)
-        _ <- checkStmtImpl(b, ctx)
-      yield ()
+    case Block(stmts, _) => checkBlockImpl(stmts, ctx)
+    case If(c, t, e, _) => checkIfImpl(c, t, e, ctx)
+    case While(c, b, _) => checkWhileImpl(c, b, ctx)
     case Break(_) => Right(())
-    case Return(v, _) =>
-      val rs = ctx.method.getReturnSig
-      (v, rs) match
-        case (None, ReturnSig.Void) => Right(())
-        case (None, _) => Left(TypeDiag(Messages.Semantic.nonVoidMustReturnValue, ctx.line))
-        case (Some(_), ReturnSig.Void) => Left(TypeDiag(Messages.Semantic.voidShouldNotReturn, ctx.line))
-        case (Some(expr), ReturnSig.Prim(t)) =>
-          for
-            _ <- checkExprImpl(expr, ctx)
-            _ <- Result.require(t.isCompatibleWith(TU.typeOf(expr, ctx.methodCtx, ctx.symbols)),
-                   TypeDiag(Messages.Semantic.returnTypeMismatch, ctx.line))
-          yield ()
-        case (Some(expr: NullLit), ReturnSig.Obj(_)) => Right(())
-        case (Some(expr), ReturnSig.Obj(cn)) =>
-          for
-            _ <- checkExprImpl(expr, ctx)
-            _ <- TU.classNameOf(expr, ctx.methodCtx, ctx.symbols) match
-              case Some(ec) if ec != cn => Left(TypeDiag(Messages.Semantic.returnObjectTypeMismatch, ctx.line))
-              case _ => Right(())
-          yield ()
-    case VarDecl(name, vtypeOpt, valueTypeOpt, initOpt, _) =>
-      initOpt
-        .map { init =>
-          for {
-            _ <- checkExprImpl(init, ctx)
-            expectedOpt = valueTypeOpt.orElse(vtypeOpt.map(assignment3.ValueType.ofPrimitive))
-            _ <- expectedOpt
-              .map { expected =>
-                checkAssignable(expected, init, ctx,
-                  objMismatchMsg = Messages.Semantic.objAssignMismatch(name),
-                  primMismatchMsg = Messages.Semantic.primAssignMismatch(name)
-                )
-              }
-              .getOrElse(Right(()))
-          } yield ()
-        }
-        .getOrElse(Right(()))
-    case Assign(varName, value, _) =>
-      for {
-        _ <- checkExprImpl(value, ctx)
-        res <- ctx.method.lookup(varName) match
-          case Some(vs) =>
-            checkAssignable(vs.valueType, value, ctx,
-              objMismatchMsg = Messages.Semantic.objAssignMismatch(varName),
-              primMismatchMsg = Messages.Semantic.primAssignMismatch(varName)
-            )
-          case None => Right(())
-      } yield ()
-    case FieldAssign(target, fieldName, _offset, value, _) =>
-      for {
-        _ <- checkExprImpl(target, ctx)
-        _ <- checkExprImpl(value, ctx)
-        _ <- target match
-          case _: NullLit => Left(SyntaxDiag(Messages.Semantic.nullDerefFieldAssign(fieldName), ctx.line))
-          case _ => Right(())
-        _ <-
-          val classNameOpt = TU.classNameOf(target, ctx.methodCtx, ctx.symbols)
-          (for {
-            cn <- classNameOpt
-            cs <- ctx.symbols.getClass(cn)
-            fi <- cs.getFieldInfo(fieldName)
-          } yield fi) match
-            case Some(fi) =>
-              checkAssignable(fi.valueType, value, ctx,
-                objMismatchMsg = Messages.Semantic.fieldObjAssignMismatch(fieldName),
-                primMismatchMsg = Messages.Semantic.fieldPrimAssignMismatch(fieldName)
-              )
-            case None => Right(())
-      } yield ()
+    case Return(v, _) => checkReturnImpl(v, ctx)
+    case VarDecl(name, vtypeOpt, valueTypeOpt, initOpt, _) => checkVarDeclImpl(name, vtypeOpt, valueTypeOpt, initOpt, ctx)
+    case Assign(varName, value, _) => checkAssignImpl(varName, value, ctx)
+    case FieldAssign(target, fieldName, _offset, value, _) => checkFieldAssignImpl(target, fieldName, value, ctx)
+
+  private def checkBlockImpl(stmts: List[Stmt], ctx: CheckContext): Either[Diag, Unit] =
+    Result.sequenceE(stmts)(st => checkStmtImpl(st, ctx))
+
+  private def checkIfImpl(cond: Expr, thenB: Stmt, elseB: Stmt, ctx: CheckContext): Either[Diag, Unit] =
+    for
+      _ <- requireBoolCondition(cond, ctx, Messages.Semantic.ifConditionMustBeBool)
+      _ <- checkStmtImpl(thenB, ctx)
+      _ <- checkStmtImpl(elseB, ctx)
+    yield ()
+
+  private def checkWhileImpl(cond: Expr, body: Stmt, ctx: CheckContext): Either[Diag, Unit] =
+    for
+      _ <- requireBoolCondition(cond, ctx, Messages.Semantic.whileConditionMustBeBool)
+      _ <- checkStmtImpl(body, ctx)
+    yield ()
+
+  private def checkReturnImpl(valueOpt: Option[Expr], ctx: CheckContext): Either[Diag, Unit] =
+    val rs = ctx.method.getReturnSig
+    (valueOpt, rs) match
+      case (None, ReturnSig.Void) => Right(())
+      case (None, _) => Left(TypeDiag(Messages.Semantic.nonVoidMustReturnValue, ctx.line))
+      case (Some(_), ReturnSig.Void) => Left(TypeDiag(Messages.Semantic.voidShouldNotReturn, ctx.line))
+      case (Some(expr), ReturnSig.Prim(t)) =>
+        for
+          _ <- checkExprImpl(expr, ctx)
+          _ <- Result.require(t.isCompatibleWith(TU.typeOf(expr, ctx.methodCtx, ctx.symbols)),
+                 TypeDiag(Messages.Semantic.returnTypeMismatch, ctx.line))
+        yield ()
+      case (Some(expr: NullLit), ReturnSig.Obj(_)) => Right(())
+      case (Some(expr), ReturnSig.Obj(cn)) =>
+        for
+          _ <- checkExprImpl(expr, ctx)
+          _ <- TU.classNameOf(expr, ctx.methodCtx, ctx.symbols) match
+            case Some(ec) if ec != cn => Left(TypeDiag(Messages.Semantic.returnObjectTypeMismatch, ctx.line))
+            case _ => Right(())
+        yield ()
+
+  private def checkVarDeclImpl(name: String, vtypeOpt: Option[assignment3.Type], valueTypeOpt: Option[assignment3.ValueType], initOpt: Option[Expr], ctx: CheckContext): Either[Diag, Unit] =
+    initOpt.fold(Right(()))(init =>
+      for
+        _ <- checkExprImpl(init, ctx)
+        expectedOpt = valueTypeOpt.orElse(vtypeOpt.map(assignment3.ValueType.ofPrimitive))
+        _ <- expectedOpt.fold(Right(()))(expected =>
+               checkAssignable(expected, init, ctx,
+                 objMismatchMsg = Messages.Semantic.objAssignMismatch(name),
+                 primMismatchMsg = Messages.Semantic.primAssignMismatch(name)
+               ))
+      yield ()
+    )
+
+  private def checkAssignImpl(varName: String, value: Expr, ctx: CheckContext): Either[Diag, Unit] =
+    for
+      _ <- checkExprImpl(value, ctx)
+      _ <- ctx.method.lookup(varName).fold(Right(()))(vs =>
+             checkAssignable(vs.valueType, value, ctx,
+               objMismatchMsg = Messages.Semantic.objAssignMismatch(varName),
+               primMismatchMsg = Messages.Semantic.primAssignMismatch(varName)
+             ))
+    yield ()
+
+  private def checkFieldAssignImpl(target: Expr, fieldName: String, value: Expr, ctx: CheckContext): Either[Diag, Unit] =
+    for
+      _ <- checkExprImpl(target, ctx)
+      _ <- checkExprImpl(value, ctx)
+      _ <- target match
+             case _: NullLit => Left(SyntaxDiag(Messages.Semantic.nullDerefFieldAssign(fieldName), ctx.line))
+             case _ => Right(())
+      classNameOpt = TU.classNameOf(target, ctx.methodCtx, ctx.symbols)
+      _ <- (for {
+             cn <- classNameOpt
+             cs <- ctx.symbols.getClass(cn)
+             fi <- cs.getFieldInfo(fieldName)
+           } yield fi).fold(Right(()))(fi =>
+             checkAssignable(fi.valueType, value, ctx,
+               objMismatchMsg = Messages.Semantic.fieldObjAssignMismatch(fieldName),
+               primMismatchMsg = Messages.Semantic.fieldPrimAssignMismatch(fieldName)
+             ))
+    yield ()

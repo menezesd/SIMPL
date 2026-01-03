@@ -54,18 +54,26 @@ object IdiomaticCodegen:
         }
       case None => Left(ResolveDiag(Messages.Codegen.noFrameForVariable, pos))
 
+  // Helper: resolve field offset from cache or by lookup
+  private def resolveFieldOffset(
+    target: id.Expr,
+    field: String,
+    cachedInfoOpt: Option[assignment3.symbol.ClassSymbol.FieldInfo],
+    ctx: Ctx,
+    pos: Int
+  ): Either[Diag, Int] =
+    cachedInfoOpt.map(_.offset).filter(_ >= 0) match
+      case Some(off) => Right(off)
+      case None =>
+        (ctx.frameOpt, ctx.programSymbolsOpt) match
+          case (Some(smf: SymbolMethodFrame), Some(ps)) =>
+            AstEither.resolveFieldInfoD(target, field, new NewMethodContext(smf.getSymbol, ps), ps, pos).map(_.offset)
+          case _ => Left(ResolveDiag(Messages.Codegen.unknownField(field), pos))
+
   // Helper: emit field access
   private def emitFieldAccessD(target: id.Expr, field: String, fieldInfoOpt: Option[assignment3.symbol.ClassSymbol.FieldInfo], pos: Int, ctx: Ctx): Either[Diag, Code] =
-    val offE: Either[Diag, Int] =
-      fieldInfoOpt.map(_.offset) match
-        case Some(off) if off >= 0 => Right(off)
-        case _ =>
-          (ctx.frameOpt, ctx.programSymbolsOpt) match
-            case (Some(smf: SymbolMethodFrame), Some(ps)) =>
-              AstEither.resolveFieldInfoD(target, field, new NewMethodContext(smf.getSymbol, ps), ps, pos).map(_.offset)
-            case _ => Left(ResolveDiag(Messages.Codegen.unknownField(field), pos))
     for
-      off <- offE
+      off <- resolveFieldOffset(target, field, fieldInfoOpt, ctx, pos)
       base <- emitExprD(target, ctx)
     yield
       val sb = new SamBuilder()

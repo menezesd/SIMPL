@@ -4,20 +4,29 @@ import assignment3.ast.{Diag, ResolveDiag}
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 
 object ValidationStage {
+  import assignment3.ast.Result
+
   def validateEntrypointD(symbols: ProgramSymbols, entryClass: String, entryMethod: String): Either[Diag, Unit] = {
-    symbols.getMethod(entryClass, entryMethod) match
-      case None => Left(ResolveDiag(Messages.missingEntrypoint(entryClass, entryMethod), -1))
-      case Some(ms) =>
-        if (ms.expectedUserArgs() != 0) Left(ResolveDiag(Messages.entrypointNoParams(entryClass, entryMethod), entrypointErrorLine(ms)))
-        else ms.parameters.headOption match {
-          case Some(param) =>
-            param.valueType match {
-              case ObjectRefType(ot) if ot.getClassName == entryClass => Right(())
-              case _ => Left(ResolveDiag(Messages.entrypointMustBeInstance(entryClass, entryMethod), entrypointErrorLine(ms)))
-            }
-          case None => Left(ResolveDiag(Messages.entrypointMustBeInstance(entryClass, entryMethod), entrypointErrorLine(ms)))
-        }
+    for
+      ms <- symbols.getMethod(entryClass, entryMethod)
+              .toRight(ResolveDiag(Messages.missingEntrypoint(entryClass, entryMethod), -1))
+      _ <- validateSignature(ms, entryClass, entryMethod)
+    yield ()
   }
+
+  private def validateSignature(ms: MethodSymbol, entryClass: String, entryMethod: String): Either[Diag, Unit] =
+    for
+      _ <- Result.require(ms.expectedUserArgs() == 0,
+             ResolveDiag(Messages.entrypointNoParams(entryClass, entryMethod), entrypointErrorLine(ms)))
+      param <- ms.parameters.headOption
+                 .toRight(ResolveDiag(Messages.entrypointMustBeInstance(entryClass, entryMethod), entrypointErrorLine(ms)))
+      _ <- validateParamType(param, entryClass, entryMethod, ms)
+    yield ()
+
+  private def validateParamType(param: assignment3.symbol.VarSymbol, entryClass: String, entryMethod: String, ms: MethodSymbol): Either[Diag, Unit] =
+    param.valueType match
+      case ObjectRefType(ot) if ot.getClassName == entryClass => Right(())
+      case _ => Left(ResolveDiag(Messages.entrypointMustBeInstance(entryClass, entryMethod), entrypointErrorLine(ms)))
 
   private def entrypointErrorLine(ms: MethodSymbol): Int = {
     val ln = ms.getBodyStartLine()

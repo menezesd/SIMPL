@@ -4,7 +4,6 @@ import assignment3.{CompilerUtils, Messages, ParserBase, TokenizerView, Type, Va
 import assignment3.symbol.{MethodSymbol, VarSymbol}
 import edu.utexas.cs.sam.io.SamTokenizer
 import edu.utexas.cs.sam.io.Tokenizer.TokenType
-import scala.collection.mutable.ListBuffer
 
 /** Idiomatic parser producing sealed AST (Scala 3). */
 final class AstParser(
@@ -49,18 +48,16 @@ final class AstParser(
 
   private def parseVarDeclsR(): Result[List[VarDecl]] =
     if !declarationsEnabled then ok(Nil)
-    else
-      val decls = ListBuffer.empty[VarDecl]
-      parseVarDeclGroupsR(decls).map(_ => decls.toList)
+    else parseVarDeclGroupsR(Nil)
 
   /** Parse all variable declaration groups (e.g., "int x, y; String z;") */
-  private def parseVarDeclGroupsR(decls: ListBuffer[VarDecl]): Result[Unit] =
+  private def parseVarDeclGroupsR(acc: List[VarDecl]): Result[List[VarDecl]] =
     if tv.peekKind() == TokenType.WORD then
-      parseOneVarGroupR(decls).flatMap(_ => parseVarDeclGroupsR(decls))
-    else ok(())
+      parseOneVarGroupR(acc).flatMap(parseVarDeclGroupsR)
+    else ok(acc)
 
   /** Parse a single declaration group: "Type name1, name2, ...;" */
-  private def parseOneVarGroupR(decls: ListBuffer[VarDecl]): Result[Unit] =
+  private def parseOneVarGroupR(acc: List[VarDecl]): Result[List[VarDecl]] =
     for
       rawType <- getWordR()
       (varTypeOpt, valueTypeOpt) = Type.parseE(rawType, tv.line) match
@@ -68,23 +65,23 @@ final class AstParser(
         case Left(_)   => (Some(Type.INT), Some(assignment3.ValueType.ofObject(rawType)))
       _ <- if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType) else ok(())
       name <- getIdentifierR()
-      _ = decls += VarDecl(name, varTypeOpt, valueTypeOpt, None)
-      _ <- parseRemainingVarNamesR(decls, varTypeOpt, valueTypeOpt)
-    yield ()
+      newDecl = VarDecl(name, varTypeOpt, valueTypeOpt, None)
+      allDecls <- parseRemainingVarNamesR(acc :+ newDecl, varTypeOpt, valueTypeOpt)
+    yield allDecls
 
   /** Parse remaining variable names after the first: ", name2, name3" until ";" */
   private def parseRemainingVarNamesR(
-    decls: ListBuffer[VarDecl],
+    acc: List[VarDecl],
     varTypeOpt: Option[Type],
     valueTypeOpt: Option[ValueType]
-  ): Result[Unit] =
+  ): Result[List[VarDecl]] =
     if tv.consumeChar(',') then
       if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType)
       else getIdentifierR().flatMap { nm =>
-        decls += VarDecl(nm, varTypeOpt, valueTypeOpt, None)
-        parseRemainingVarNamesR(decls, varTypeOpt, valueTypeOpt)
+        val newDecl = VarDecl(nm, varTypeOpt, valueTypeOpt, None)
+        parseRemainingVarNamesR(acc :+ newDecl, varTypeOpt, valueTypeOpt)
       }
-    else if tv.consumeChar(';') then ok(())
+    else if tv.consumeChar(';') then ok(acc)
     else syntax(Messages.expectedVarDeclSeparator)
 
   // --- Statement parsing helpers ---

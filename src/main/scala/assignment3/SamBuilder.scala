@@ -59,16 +59,7 @@ final class SamBuilder {
   def returnSlot(): SamBuilder = pushImmInt(0) // Placeholder for return value
   def pushImmCh(c: Char): SamBuilder = {
     // Emit single-quoted char with escapes understood by SaM (e.g., '\\0', '\\n', '\\t', '\\'', '\\\\')
-    val esc = c match {
-      case '\\' => "\\\\"
-      case '\''  => "\\'"
-      case '\n' => "\\n"
-      case '\t' => "\\t"
-      case '\r' => "\\r"
-      case '\u0000' => "\\0"
-      case other => other.toString
-    }
-    instr("PUSHIMMCH", s"'${esc}'")
+    instr("PUSHIMMCH", s"'${c.escapeForSam}'")
   }
   def pushOff(off: Int): SamBuilder = instr("PUSHOFF", off)
   def storeOff(off: Int): SamBuilder = instr("STOREOFF", off)
@@ -106,3 +97,14 @@ final class SamBuilder {
   def stop(): SamBuilder = instr("STOP")
   override def toString: String = sb.toString
 }
+
+/** Extension method for character escaping in SaM assembly format. */
+extension (c: Char)
+  def escapeForSam: String = c match
+    case '\\' => "\\\\"
+    case '\'' => "\\'"
+    case '\n' => "\\n"
+    case '\t' => "\\t"
+    case '\r' => "\\r"
+    case '\u0000' => "\\0"
+    case other => other.toString
