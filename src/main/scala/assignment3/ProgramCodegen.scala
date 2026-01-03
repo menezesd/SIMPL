@@ -77,6 +77,6 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
 
   private def mainFieldsCount(ctx: CompilerContext): Int = {
     val mainClsOpt = ctx.symbols.flatMap(sym => sym.getClass(LiveOak3Compiler.ENTRY_CLASS))
-    mainClsOpt.map(_.numFields()).getOrElse(0)
+    mainClsOpt.fold(0)(_.numFields())
   }
 }

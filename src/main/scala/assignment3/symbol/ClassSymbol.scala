@@ -13,8 +13,12 @@ final case class ClassSymbol(
   private lazy val fieldOffsetMap: Map[String, Int] =
     fieldOrder.iterator.zipWithIndex.toMap
 
+  // Cached field map for O(1) lookup
+  private lazy val fieldMap: Map[String, VarSymbol] =
+    fields.iterator.map(f => f.getName -> f).toMap
+
   def getName: String = name
-  def field(n: String): Option[VarSymbol] = fields.find(_.getName == n)
+  def field(n: String): Option[VarSymbol] = fieldMap.get(n)
   def method(n: String): Option[MethodSymbol] = methods.get(n)
   def allFields: List[VarSymbol] = fields.toList
   def allMethods: List[MethodSymbol] = methods.values.toList

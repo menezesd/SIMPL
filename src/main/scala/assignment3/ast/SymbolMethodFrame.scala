@@ -2,14 +2,16 @@ package assignment3.ast
 
 import assignment3.{Label, Type}
 import assignment3.symbol.{MethodSymbol, VarSymbol}
-import scala.collection.mutable
+
 /** Frame backed by new MethodSymbol plus its vars (Scala port). */
 final class SymbolMethodFrame(val symbol: MethodSymbol) extends MethodFrame {
-  private val vars = mutable.HashMap.empty[String, VarBinding]
+  private val vars: Map[String, VarBinding] = {
+    val builder = Map.newBuilder[String, VarBinding]
+    symbol.parameters.foreach(p => builder += p.getName -> new SymbolVarBinding(p, symbol))
+    symbol.locals.foreach(l => builder += l.getName -> new SymbolVarBinding(l, symbol))
+    builder.result()
+  }
   private var returnLabel: Option[Label] = None
-  // Populate
-  symbol.parameters.foreach(p => vars += p.getName -> new SymbolVarBinding(p, symbol))
-  symbol.locals.foreach(l => vars += l.getName -> new SymbolVarBinding(l, symbol))
 
   def getName: String = symbol.getName
   def getReturnType: Type = assignment3.ast.CodegenTypes.loweredReturn(symbol)

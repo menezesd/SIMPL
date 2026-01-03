@@ -335,7 +335,7 @@ object IdiomaticCodegen:
     ctx.returnLabelOpt match
       case None => Left(ResolveDiag(Messages.Codegen.returnLabelNotFound, pos))
       case Some(ret) =>
-        val valueCodeE = valueOpt.map(emitExprD(_, ctx)).getOrElse(Right(Code.empty))
+        val valueCodeE = valueOpt.fold(Right(Code.empty))(emitExprD(_, ctx))
         valueCodeE.map { valueCode =>
           val sb = new SamBuilder()
           sb.append(valueCode).jump(ret)

@@ -13,6 +13,10 @@ final case class MethodSymbol(
   returnTypeLine: Int = -1,
   returnTypeColumn: Int = -1
 ) {
+  // Cached variable map for O(1) lookup
+  private lazy val allVarsMap: Map[String, VarSymbol] =
+    (parameters ++ locals).iterator.map(v => v.getName -> v).toMap
+
   def getName: String = name
 
   def getReturnSig: ReturnSig = returnValueTypeOpt match {
@@ -30,8 +34,7 @@ final case class MethodSymbol(
   def getReturnTypeLine(): Int = returnTypeLine
   def getReturnTypeColumn(): Int = returnTypeColumn
 
-  def lookup(ident: String): Option[VarSymbol] =
-    (parameters ++ locals).find(_.getName == ident)
+  def lookup(ident: String): Option[VarSymbol] = allVarsMap.get(ident)
 
   override def toString: String = {
     val ret = getReturnSig match {

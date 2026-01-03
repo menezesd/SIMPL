@@ -23,8 +23,12 @@ enum Type(val typeName: String) {
 }
 
 object Type:
+  // Cached type map for O(1) lookup
+  private lazy val typeMap: Map[String, Type] =
+    values.iterator.map(t => t.typeName -> t).toMap
+
   def fromString(typeString: String): Option[Type] =
-    Option(typeString).flatMap(s => values.find(_.typeName == s))
+    Option(typeString).flatMap(typeMap.get)
 
   /** Parse type string, returning Either for diagnostic-first flow. */
   def parseE(typeString: String, line: Int): Either[String, Type] =

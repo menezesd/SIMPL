@@ -122,7 +122,7 @@ final class AstParser(
         method.lookupVar(firstIdent) match
           case Some(_: VarSymbol) if method.isInstanceOf[NewMethodContext] => ok(Var(firstIdent))
           case _ if method.isInstanceOf[NewMethodContext] =>
-            tryImplicitThisField(firstIdent).map(ok(_)).getOrElse(syntax(Messages.undeclaredVariable(firstIdent)))
+            tryImplicitThisField(firstIdent).fold(syntax(Messages.undeclaredVariable(firstIdent)))(ok(_))
           case _ => syntax(Messages.undeclaredVariable(firstIdent))
       lhsFinal <- parseLhsChainR(lhsBase)
       _ <- expectCharR('=')
@@ -130,7 +130,7 @@ final class AstParser(
       _ <- expectCharR(';')
       stmtRes <- lhsFinal match
         case Var(name, _) => ok(Assign(name, rhs))
-        case FieldAccess(t, f, fi, _) => ok(FieldAssign(t, f, fi.map(_.offset).getOrElse(-1), rhs))
+        case FieldAccess(t, f, fi, _) => ok(FieldAssign(t, f, fi.fold(-1)(_.offset), rhs))
         case _ => syntax(Messages.unsupportedLhs)
     yield stmtRes
 

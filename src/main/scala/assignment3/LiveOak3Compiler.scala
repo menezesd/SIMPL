@@ -76,6 +76,7 @@ object LiveOak3Compiler {
   def compileEitherD(fileName: String): Either[Diag, String] =
     compileD(fileName).toEither
 
+  @deprecated("Use compileEitherD or compileD instead for diagnostic-first error handling", "3.0")
   @static def compiler(fileName: String): String = {
     try {
       compileEitherD(fileName) match

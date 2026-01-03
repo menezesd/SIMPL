@@ -77,7 +77,7 @@ object IdiomaticSemantic:
                       case _ => None
                     }
                   }.nextOption()
-                  firstErr.map(Left(_)).getOrElse(Right(()))
+                  firstErr.fold(Right(()))(Left(_))
               case _ => Right(())
           }
     case FieldAccess(target, field, _, _) =>
