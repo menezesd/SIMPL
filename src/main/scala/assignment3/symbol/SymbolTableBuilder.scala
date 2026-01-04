@@ -1,6 +1,6 @@
 package assignment3.symbol
 
-import assignment3.{CompilerUtils, Messages, ObjectRefType, ParserBase, PrimitiveType, TokenizerView, ValueType}
+import assignment3.{CompilerUtils, Messages, ObjectRefType, Offsets, ParserBase, PrimitiveType, TokenizerView, ValueType}
 import assignment3.ast.{Diag, SyntaxDiag, TypeDiag, ResolveDiag, Result}
 import edu.utexas.cs.sam.io.{SamTokenizer, Tokenizer}
 import Tokenizer.TokenType
@@ -10,8 +10,6 @@ object SymbolTableBuilder {
   /** Constants for symbol table construction. */
   private object SymbolConstants {
     val ThisParameterIndex = 0
-    val UnknownLine = -1
-    val UnknownColumn = -1
     val ThisParameterName = "this"
   }
 
@@ -41,8 +39,7 @@ object SymbolTableBuilder {
       tv.isTypeWord(
         ProgramSymbols(knownClasses.map(c => c.name -> c).toMap),
         currentClassName,
-        allowUnknown = true,
-        excludeStmtStarters = true
+        CompilerUtils.TypeCheckConfig.AllowUnknown
       )
 
     private def parseClasses(acc: Vector[ClassSymbol]): Result[Vector[ClassSymbol]] =
@@ -117,8 +114,8 @@ object SymbolTableBuilder {
           ValueType.ofObject(className),
           true,
           SymbolConstants.ThisParameterIndex,
-          SymbolConstants.UnknownLine,
-          SymbolConstants.UnknownColumn
+          Offsets.SourceLocation.UnknownLine,
+          Offsets.SourceLocation.UnknownColumn
         )))
         _ <- expectCharR(')')
         _ <- expectCharR('{')

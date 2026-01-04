@@ -1,6 +1,6 @@
 package assignment3.ast
 
-import assignment3.{BinaryOpMapping, Code, Label, Messages, OperatorUtils, Operators, ParserSupport, SamBuilder, StringRuntime, Type}
+import assignment3.{BinaryOpMapping, Code, Label, Messages, Offsets, OperatorUtils, Operators, ParserSupport, SamBuilder, StringRuntime, Type}
 import assignment3.Offsets.{FieldOffset, StackOffset}
 import assignment3.ast as id
 import assignment3.ast.high.ReturnSig
@@ -72,7 +72,7 @@ object IdiomaticCodegen:
     case id.BoolLit(v, _) => Right(Code.pushBool(v))
     case id.StrLit(v, _)  => Right(Code.from(new SamBuilder().pushImmStr(Code.escapeStringLiteral(v))))
     case id.NullLit(_)    => Right(Code.pushNull)
-    case _ => Left(SyntaxDiag("Not a literal expression", -1))
+    case _ => Left(SyntaxDiag("Not a literal expression", Offsets.SourceLocation.UnknownLine))
 
   // Helper: emit variable access
   private def emitVarD(name: String, pos: Int, ctx: Ctx): Either[Diag, Code] =

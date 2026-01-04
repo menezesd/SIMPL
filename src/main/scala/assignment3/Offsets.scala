@@ -86,8 +86,12 @@ object Offsets {
     def format: String = if column >= 0 then s"$line:$column" else s"$line"
 
   object SourceLocation:
-    val unknown: SourceLocation = SourceLocation(-1, -1)
-    def fromLine(line: Int): SourceLocation = SourceLocation(line, -1)
+    /** Constant for unknown/unavailable source positions. */
+    val UnknownLine = -1
+    val UnknownColumn = -1
+
+    val unknown: SourceLocation = SourceLocation(UnknownLine, UnknownColumn)
+    def fromLine(line: Int): SourceLocation = SourceLocation(line, UnknownColumn)
 
     /** Create from tokenizer position */
     def from(tz: edu.utexas.cs.sam.io.SamTokenizer): SourceLocation =

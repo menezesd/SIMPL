@@ -1,62 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.LiveOak3CompilerTest" tests="56" skipped="0" failures="0" errors="0" timestamp="2026-01-04T01:20:08" hostname="axiom" time="1.907">
+<testsuite name="assignment3.LiveOak3CompilerTest" tests="56" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:34:24" hostname="axiom" time="2.347">
   <properties/>
-  <testcase name="should fail to compile test_0.lo" classname="assignment3.LiveOak3CompilerTest" time="0.151"/>
-  <testcase name="should fail to compile test_1.lo" classname="assignment3.LiveOak3CompilerTest" time="0.005"/>
-  <testcase name="should fail to compile test_2.lo" classname="assignment3.LiveOak3CompilerTest" time="0.121"/>
-  <testcase name="should fail to compile test_3.lo" classname="assignment3.LiveOak3CompilerTest" time="0.031"/>
+  <testcase name="should fail to compile test_0.lo" classname="assignment3.LiveOak3CompilerTest" time="0.115"/>
+  <testcase name="should fail to compile test_1.lo" classname="assignment3.LiveOak3CompilerTest" time="0.003"/>
+  <testcase name="should fail to compile test_2.lo" classname="assignment3.LiveOak3CompilerTest" time="0.089"/>
+  <testcase name="should fail to compile test_3.lo" classname="assignment3.LiveOak3CompilerTest" time="0.027"/>
   <testcase name="should fail to compile test_4.lo" classname="assignment3.LiveOak3CompilerTest" time="0.004"/>
-  <testcase name="should fail to compile test_5.lo" classname="assignment3.LiveOak3CompilerTest" time="0.027"/>
+  <testcase name="should fail to compile test_5.lo" classname="assignment3.LiveOak3CompilerTest" time="0.023"/>
   <testcase name="should fail to compile test_6.lo" classname="assignment3.LiveOak3CompilerTest" time="0.003"/>
-  <testcase name="should fail to compile test_7.lo" classname="assignment3.LiveOak3CompilerTest" time="0.006"/>
+  <testcase name="should fail to compile test_7.lo" classname="assignment3.LiveOak3CompilerTest" time="0.004"/>
   <testcase name="should fail to compile test_8.lo" classname="assignment3.LiveOak3CompilerTest" time="0.004"/>
-  <testcase name="should fail to compile test_9.lo" classname="assignment3.LiveOak3CompilerTest" time="0.004"/>
-  <testcase name="should allow forward-declared class usage" classname="assignment3.LiveOak3CompilerTest" time="0.088"/>
-  <testcase name="should fail: unknown type as return type" classname="assignment3.LiveOak3CompilerTest" time="0.005"/>
-  <testcase name="should fail to compile test_10.lo" classname="assignment3.LiveOak3CompilerTest" time="0.054"/>
-  <testcase name="should fail to compile test_11.lo" classname="assignment3.LiveOak3CompilerTest" time="0.005"/>
+  <testcase name="should fail to compile test_9.lo" classname="assignment3.LiveOak3CompilerTest" time="0.003"/>
+  <testcase name="should allow forward-declared class usage" classname="assignment3.LiveOak3CompilerTest" time="0.095"/>
+  <testcase name="should fail: unknown type as return type" classname="assignment3.LiveOak3CompilerTest" time="0.003"/>
+  <testcase name="should fail to compile test_10.lo" classname="assignment3.LiveOak3CompilerTest" time="0.049"/>
+  <testcase name="should fail to compile test_11.lo" classname="assignment3.LiveOak3CompilerTest" time="0.004"/>
   <testcase name="should fail to compile test_12.lo" classname="assignment3.LiveOak3CompilerTest" time="0.005"/>
-  <testcase name="should fail to compile test_13.lo" classname="assignment3.LiveOak3CompilerTest" time="0.006"/>
-  <testcase name="should fail to compile test_14.lo" classname="assignment3.LiveOak3CompilerTest" time="0.036"/>
-  <testcase name="should return 10" classname="assignment3.LiveOak3CompilerTest" time="0.046"/>
-  <testcase name="should return 6" classname="assignment3.LiveOak3CompilerTest" time="0.062"/>
-  <testcase name="should return 2" classname="assignment3.LiveOak3CompilerTest" time="0.078"/>
-  <testcase name="should return 48" classname="assignment3.LiveOak3CompilerTest" time="0.021"/>
-  <testcase name="should return 10" classname="assignment3.LiveOak3CompilerTest" time="0.022"/>
-  <testcase name="should return 1" classname="assignment3.LiveOak3CompilerTest" time="0.034"/>
-  <testcase name="should return 1" classname="assignment3.LiveOak3CompilerTest" time="0.017"/>
-  <testcase name="should return 7" classname="assignment3.LiveOak3CompilerTest" time="0.017"/>
-  <testcase name="should return 4" classname="assignment3.LiveOak3CompilerTest" time="0.018"/>
-  <testcase name="should return 7" classname="assignment3.LiveOak3CompilerTest" time="0.036"/>
-  <testcase name="should return 16" classname="assignment3.LiveOak3CompilerTest" time="0.025"/>
-  <testcase name="should return 4" classname="assignment3.LiveOak3CompilerTest" time="0.024"/>
-  <testcase name="should return 0" classname="assignment3.LiveOak3CompilerTest" time="0.02"/>
-  <testcase name="should return 70" classname="assignment3.LiveOak3CompilerTest" time="0.013"/>
-  <testcase name="should return 20" classname="assignment3.LiveOak3CompilerTest" time="0.023"/>
-  <testcase name="should return 14" classname="assignment3.LiveOak3CompilerTest" time="0.117"/>
-  <testcase name="should return 4" classname="assignment3.LiveOak3CompilerTest" time="0.031"/>
-  <testcase name="should return 92" classname="assignment3.LiveOak3CompilerTest" time="0.114"/>
-  <testcase name="should return 956" classname="assignment3.LiveOak3CompilerTest" time="0.043"/>
-  <testcase name="should return 56" classname="assignment3.LiveOak3CompilerTest" time="0.019"/>
-  <testcase name="should return 99" classname="assignment3.LiveOak3CompilerTest" time="0.1"/>
-  <testcase name="should return 10" classname="assignment3.LiveOak3CompilerTest" time="0.019"/>
-  <testcase name="should return 9" classname="assignment3.LiveOak3CompilerTest" time="0.019"/>
-  <testcase name="should return 36" classname="assignment3.LiveOak3CompilerTest" time="0.018"/>
-  <testcase name="should return 12" classname="assignment3.LiveOak3CompilerTest" time="0.016"/>
-  <testcase name="should return 17" classname="assignment3.LiveOak3CompilerTest" time="0.035"/>
-  <testcase name="should return 71" classname="assignment3.LiveOak3CompilerTest" time="0.019"/>
-  <testcase name="should return 38" classname="assignment3.LiveOak3CompilerTest" time="0.082"/>
-  <testcase name="should return 'zYxzYx'" classname="assignment3.LiveOak3CompilerTest" time="0.027"/>
-  <testcase name="should return 53441" classname="assignment3.LiveOak3CompilerTest" time="0.016"/>
-  <testcase name="should return 296" classname="assignment3.LiveOak3CompilerTest" time="0.031"/>
-  <testcase name="should return 55" classname="assignment3.LiveOak3CompilerTest" time="0.021"/>
-  <testcase name="should return 1" classname="assignment3.LiveOak3CompilerTest" time="0.019"/>
-  <testcase name="should return -1" classname="assignment3.LiveOak3CompilerTest" time="0.014"/>
-  <testcase name="should return 36" classname="assignment3.LiveOak3CompilerTest" time="0.022"/>
-  <testcase name="should fold nested arithmetic and modulo" classname="assignment3.LiveOak3CompilerTest" time="0.007"/>
-  <testcase name="should fail: unknown type in field" classname="assignment3.LiveOak3CompilerTest" time="0.006"/>
-  <testcase name="should fail: unknown type in local variable" classname="assignment3.LiveOak3CompilerTest" time="0.004"/>
-  <testcase name="should fail: unknown type in parameter" classname="assignment3.LiveOak3CompilerTest" time="0.003"/>
+  <testcase name="should fail to compile test_13.lo" classname="assignment3.LiveOak3CompilerTest" time="0.005"/>
+  <testcase name="should fail to compile test_14.lo" classname="assignment3.LiveOak3CompilerTest" time="0.033"/>
+  <testcase name="should return 10" classname="assignment3.LiveOak3CompilerTest" time="0.051"/>
+  <testcase name="should return 6" classname="assignment3.LiveOak3CompilerTest" time="0.079"/>
+  <testcase name="should return 2" classname="assignment3.LiveOak3CompilerTest" time="0.088"/>
+  <testcase name="should return 48" classname="assignment3.LiveOak3CompilerTest" time="0.023"/>
+  <testcase name="should return 10" classname="assignment3.LiveOak3CompilerTest" time="0.028"/>
+  <testcase name="should return 1" classname="assignment3.LiveOak3CompilerTest" time="0.051"/>
+  <testcase name="should return 1" classname="assignment3.LiveOak3CompilerTest" time="0.025"/>
+  <testcase name="should return 7" classname="assignment3.LiveOak3CompilerTest" time="0.027"/>
+  <testcase name="should return 4" classname="assignment3.LiveOak3CompilerTest" time="0.025"/>
+  <testcase name="should return 7" classname="assignment3.LiveOak3CompilerTest" time="0.055"/>
+  <testcase name="should return 16" classname="assignment3.LiveOak3CompilerTest" time="0.03"/>
+  <testcase name="should return 4" classname="assignment3.LiveOak3CompilerTest" time="0.026"/>
+  <testcase name="should return 0" classname="assignment3.LiveOak3CompilerTest" time="0.042"/>
+  <testcase name="should return 70" classname="assignment3.LiveOak3CompilerTest" time="0.028"/>
+  <testcase name="should return 20" classname="assignment3.LiveOak3CompilerTest" time="0.035"/>
+  <testcase name="should return 14" classname="assignment3.LiveOak3CompilerTest" time="0.142"/>
+  <testcase name="should return 4" classname="assignment3.LiveOak3CompilerTest" time="0.036"/>
+  <testcase name="should return 92" classname="assignment3.LiveOak3CompilerTest" time="0.138"/>
+  <testcase name="should return 956" classname="assignment3.LiveOak3CompilerTest" time="0.069"/>
+  <testcase name="should return 56" classname="assignment3.LiveOak3CompilerTest" time="0.028"/>
+  <testcase name="should return 99" classname="assignment3.LiveOak3CompilerTest" time="0.147"/>
+  <testcase name="should return 10" classname="assignment3.LiveOak3CompilerTest" time="0.023"/>
+  <testcase name="should return 9" classname="assignment3.LiveOak3CompilerTest" time="0.026"/>
+  <testcase name="should return 36" classname="assignment3.LiveOak3CompilerTest" time="0.026"/>
+  <testcase name="should return 12" classname="assignment3.LiveOak3CompilerTest" time="0.032"/>
+  <testcase name="should return 17" classname="assignment3.LiveOak3CompilerTest" time="0.058"/>
+  <testcase name="should return 71" classname="assignment3.LiveOak3CompilerTest" time="0.036"/>
+  <testcase name="should return 38" classname="assignment3.LiveOak3CompilerTest" time="0.114"/>
+  <testcase name="should return 'zYxzYx'" classname="assignment3.LiveOak3CompilerTest" time="0.045"/>
+  <testcase name="should return 53441" classname="assignment3.LiveOak3CompilerTest" time="0.026"/>
+  <testcase name="should return 296" classname="assignment3.LiveOak3CompilerTest" time="0.052"/>
+  <testcase name="should return 55" classname="assignment3.LiveOak3CompilerTest" time="0.031"/>
+  <testcase name="should return 1" classname="assignment3.LiveOak3CompilerTest" time="0.03"/>
+  <testcase name="should return -1" classname="assignment3.LiveOak3CompilerTest" time="0.022"/>
+  <testcase name="should return 36" classname="assignment3.LiveOak3CompilerTest" time="0.036"/>
+  <testcase name="should fold nested arithmetic and modulo" classname="assignment3.LiveOak3CompilerTest" time="0.014"/>
+  <testcase name="should fail: unknown type in field" classname="assignment3.LiveOak3CompilerTest" time="0.007"/>
+  <testcase name="should fail: unknown type in local variable" classname="assignment3.LiveOak3CompilerTest" time="0.007"/>
+  <testcase name="should fail: unknown type in parameter" classname="assignment3.LiveOak3CompilerTest" time="0.006"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

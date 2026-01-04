@@ -13,7 +13,7 @@ private object ProgramCodegen {
   def emitD(program: ProgramNode, ctx: CompilerContext): Either[Diag, Code] =
     ctx.symbols match
       case Some(symbols) => new ProgramCodegen(symbols, ctx).generateD(program)
-      case None => Left(ResolveDiag("CompilerContext.symbols is not set", -1))
+      case None => Left(ResolveDiag("CompilerContext.symbols is not set", Offsets.SourceLocation.UnknownLine))
 }
 
 private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext) {
@@ -45,11 +45,11 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
                 import assignment3.ast.high.ReturnSig
                 ensureVoidReturn(local, b, m.returnSig)
                 Right(())
-          case other => Left(SyntaxDiag(s"Unknown method body type: ${other.getClass.getName}", -1))
+          case other => Left(SyntaxDiag(s"Unknown method body type: ${other.getClass.getName}", Offsets.SourceLocation.UnknownLine))
       catch
         case NonFatal(e) =>
           val detail = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
-          Left(SyntaxDiag(s"Body codegen failed: $detail", -1))
+          Left(SyntaxDiag(s"Body codegen failed: $detail", Offsets.SourceLocation.UnknownLine))
       finally MethodEmit.end(local, frame, cleanup)
     }
   }
