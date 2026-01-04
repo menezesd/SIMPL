@@ -47,6 +47,12 @@ object IdiomaticCodegen:
         case (Some(smf: SymbolMethodFrame), Some(ps)) => f(smf, ps)
         case _ => fallback
 
+    /** Execute function with method frame if available, otherwise return diagnostic error. */
+    def withFrame[A](pos: Int, noFrameMsg: String)(f: MethodFrame => Result[A]): Result[A] =
+      ctx.frameOpt match
+        case Some(frame) => f(frame)
+        case None => Left(ResolveDiag(noFrameMsg, pos))
+
     /** Execute function with symbol context if available, otherwise return diagnostic. */
     def withSymbolContextE[A](f: (SymbolMethodFrame, ProgramSymbols) => Either[Diag, A],
                               mkDiag: => Diag): Either[Diag, A] =
@@ -70,12 +76,11 @@ object IdiomaticCodegen:
 
   // Helper: emit variable access
   private def emitVarD(name: String, pos: Int, ctx: Ctx): Either[Diag, Code] =
-    ctx.frameOpt match
-      case Some(frame) =>
-        frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos)).map { vb =>
-          Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
-        }
-      case None => Left(ResolveDiag(Messages.Codegen.noFrameForVariable, pos))
+    ctx.withFrame(pos, Messages.Codegen.noFrameForVariable) { frame =>
+      frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos)).map { vb =>
+        Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
+      }
+    }
 
   // Helper: resolve field offset from cache or by lookup
   private def resolveFieldOffset(
@@ -249,12 +254,11 @@ object IdiomaticCodegen:
 
   // Helper: emit 'this' access
   private def emitThisD(pos: Int, ctx: Ctx): Either[Diag, Code] =
-    ctx.frameOpt match
-      case Some(frame) =>
-        frame.lookupVar("this").toRight(ResolveDiag(Messages.Codegen.thisNotFound, pos)).map { vb =>
-          Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
-        }
-      case None => Left(ResolveDiag(Messages.Codegen.noFrameForThis, pos))
+    ctx.withFrame(pos, Messages.Codegen.noFrameForThis) { frame =>
+      frame.lookupVar("this").toRight(ResolveDiag(Messages.Codegen.thisNotFound, pos)).map { vb =>
+        Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
+      }
+    }
 
   // Helper: emit new object instantiation
   private def emitNewObjectD(className: String, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
@@ -357,16 +361,15 @@ object IdiomaticCodegen:
       case None       => Right(Code.pushNull)
 
   private def emitAssignD(name: String, value: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
-    ctx.frameOpt match
-      case Some(frame) =>
-        for
-          vb <- frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos))
-          valueCode <- emitExprD(value, ctx)
-        yield
-          val sb = new SamBuilder()
-          sb.append(valueCode).storeOffS(StackOffset(vb.getAddress))
-          Code.from(sb)
-      case None => Left(ResolveDiag(Messages.Codegen.noFrameForAssignment, pos))
+    ctx.withFrame(pos, Messages.Codegen.noFrameForAssignment) { frame =>
+      for
+        vb <- frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos))
+        valueCode <- emitExprD(value, ctx)
+      yield
+        val sb = new SamBuilder()
+        sb.append(valueCode).storeOffS(StackOffset(vb.getAddress))
+        Code.from(sb)
+    }
 
   private def emitFieldAssignD(target: id.Expr, field: String, offset: Int, value: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
     if offset < 0 then Left(ResolveDiag(Messages.Codegen.unknownField(field), pos))

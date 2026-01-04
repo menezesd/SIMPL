@@ -12,8 +12,14 @@ final class TokenizerView(val tz: SamTokenizer, rules: CompilerUtils.LexicalRule
   def peekKind(): TokenType = tz.peekAtKind()
   def test(word: String): Boolean = tz.test(word)
   def test(ch: Char): Boolean = tz.test(ch)
+  def isTypeWord(symbols: assignment3.symbol.ProgramSymbols, currentClassName: String, config: CompilerUtils.TypeCheckConfig): Boolean =
+    CompilerUtils.isTypeWord(tz, symbols, currentClassName, config)
+
+  /** Deprecated overload with boolean parameters - use TypeCheckConfig instead. */
+  @deprecated("Use TypeCheckConfig instead of boolean parameters", "3.0")
   def isTypeWord(symbols: assignment3.symbol.ProgramSymbols, currentClassName: String, allowUnknown: Boolean, excludeStmtStarters: Boolean): Boolean =
-    CompilerUtils.isTypeWord(tz, symbols, currentClassName, allowUnknown, excludeStmtStarters, rules)
+    val config = CompilerUtils.TypeCheckConfig(allowUnknown, excludeStmtStarters)
+    isTypeWord(symbols, currentClassName, config)
 
   def consumeChar(ch: Char): Boolean = ParserSupport.consumeChar(tz, ch)
   def consumeWord(word: String): Boolean = ParserSupport.consumeWord(tz, word)

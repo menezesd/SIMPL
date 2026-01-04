@@ -23,13 +23,12 @@ private object TokenClassifier:
     tz: SamTokenizer,
     symbols: assignment3.symbol.ProgramSymbols,
     currentClassName: String,
-    allowUnknownNames: Boolean,
-    excludeStmtStarters: Boolean,
+    config: CompilerUtils.TypeCheckConfig,
     rules: CompilerUtils.LexicalRules
   ): Boolean =
     // Early exits
     if tz.peekAtKind != TokenType.WORD then return false
-    if excludeStmtStarters && rules.statementStarters.exists(tz.test) then return false
+    if config.excludeStmtStarters && rules.statementStarters.exists(tz.test) then return false
 
     // Positive classifications
     if isPrimitiveType(tz) then return true
@@ -37,7 +36,7 @@ private object TokenClassifier:
     if isKnownClass(tz, symbols) then return true
 
     // Fallback: allow unknown names if permitted
-    allowUnknownNames
+    config.allowUnknownNames
 
 object CompilerUtils {
   final case class RecorderContext(recorder: Option[TokenRecorder])
@@ -61,6 +60,22 @@ object CompilerUtils {
       Set("class", "if", "else", "while", "return", "break", "true", "false", "null", "new", "this", "int", "bool", "String", "void"),
       Set("return", "if", "else", "while", "class", "new", "this", "true", "false", "null", "void")
     )
+  }
+
+  /** Configuration for type word classification behavior. */
+  final case class TypeCheckConfig(
+    allowUnknownNames: Boolean,
+    excludeStmtStarters: Boolean
+  )
+  object TypeCheckConfig {
+    /** Accept unknown class names, exclude statement starters (symbol table building). */
+    val AllowUnknown: TypeCheckConfig = TypeCheckConfig(allowUnknownNames = true, excludeStmtStarters = true)
+
+    /** Strict mode: only known types, exclude statement starters (parsing). */
+    val Strict: TypeCheckConfig = TypeCheckConfig(allowUnknownNames = false, excludeStmtStarters = true)
+
+    /** Permissive mode: allow unknown, don't exclude statement starters. */
+    val Permissive: TypeCheckConfig = TypeCheckConfig(allowUnknownNames = true, excludeStmtStarters = false)
   }
 
   def clearTokens()(using ctx: RecorderContext): Unit = ctx.recorder.foreach(_.clear())
@@ -141,7 +156,17 @@ object CompilerUtils {
   def skipToken(f: SamTokenizer)(using RecorderContext): Unit = { f.skipToken(); rec(".") }
   def column(f: SamTokenizer): Int = TokenizerOps.column(f)
 
-  /** Java-compatible overload with default LexicalRules. */
+  /** Overload with config object for type checking behavior. */
+  def isTypeWord(
+    tz: SamTokenizer,
+    symbols: assignment3.symbol.ProgramSymbols,
+    currentClassName: String,
+    config: TypeCheckConfig
+  ): Boolean =
+    TokenClassifier.isTypeWord(tz, symbols, currentClassName, config, LexicalRules.Default)
+
+  /** Java-compatible overload with boolean parameters (deprecated - use TypeCheckConfig). */
+  @deprecated("Use TypeCheckConfig instead of boolean parameters for clarity", "3.0")
   def isTypeWord(
     tz: SamTokenizer,
     symbols: assignment3.symbol.ProgramSymbols,
@@ -149,18 +174,8 @@ object CompilerUtils {
     allowUnknownNames: Boolean,
     excludeStmtStarters: Boolean
   ): Boolean =
-    isTypeWord(tz, symbols, currentClassName, allowUnknownNames, excludeStmtStarters, LexicalRules.Default)
-
-  /** Scala 3 version with using clause for custom LexicalRules. */
-  def isTypeWord(
-    tz: SamTokenizer,
-    symbols: assignment3.symbol.ProgramSymbols,
-    currentClassName: String,
-    allowUnknownNames: Boolean,
-    excludeStmtStarters: Boolean,
-    rules: LexicalRules
-  ): Boolean =
-    TokenClassifier.isTypeWord(tz, symbols, currentClassName, allowUnknownNames, excludeStmtStarters, rules)
+    val config = TypeCheckConfig(allowUnknownNames, excludeStmtStarters)
+    TokenClassifier.isTypeWord(tz, symbols, currentClassName, config, LexicalRules.Default)
 
   def parseTypeOrObjectName(raw: String, line: Int): ValueType =
     Type.parseE(raw, line) match
