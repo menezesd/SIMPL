@@ -35,6 +35,19 @@ object Code:
     codes.foreach(c => sb.append(c.s))
     Code(sb.toString)
 
+  /** Escape a string literal for SaM string instructions. */
+  def escapeStringLiteral(s: String): String =
+    val escaped = s.flatMap {
+      case '\n' => "\\n"
+      case '\t' => "\\t"
+      case '\r' => "\\r"
+      case '\\' => "\\\\"
+      case '\"' => "\\\""
+      case c if c.isControl => f"\\u$c%04x"
+      case c => c.toString
+    }
+    s"\"$escaped\""
+
   /** Extension methods for fluent Code composition. */
   extension (code: Code)
     /** Check if this code fragment is empty. */
@@ -52,3 +65,12 @@ object Code:
     /** Apply a transformation if condition is true. */
     inline def when(cond: Boolean)(f: Code => Code): Code =
       if cond then f(code) else code
+
+    /** Surround this code with before and after fragments. */
+    inline def surroundWith(before: Code, after: Code): Code =
+      Code(before.s + code.s + after.s)
+
+    /** Repeat this code fragment n times. */
+    def repeatN(n: Int): Code =
+      if n <= 0 then Code.empty
+      else Code.concat(List.fill(n)(code))

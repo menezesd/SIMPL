@@ -196,6 +196,13 @@ object Result:
   def requireNonEmpty[A](items: Iterable[A], ifEmpty: => Diag): Result[Unit] =
     if items.nonEmpty then Right(()) else Left(ifEmpty)
 
+  /** Require a single element from a collection. */
+  def requireSingleElement[A](items: Iterable[A], onEmpty: => Diag, onMultiple: => Diag): Result[A] =
+    items.toList match
+      case single :: Nil => Right(single)
+      case Nil => Left(onEmpty)
+      case _ => Left(onMultiple)
+
   /** Chain validations with early exit. */
   def validateChain[A](value: A)(validators: (A => Result[Unit])*): Result[A] =
     validators.foldLeft[Result[Unit]](Right(())) { (acc, validator) =>

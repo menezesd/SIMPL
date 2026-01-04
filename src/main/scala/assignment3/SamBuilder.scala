@@ -2,6 +2,17 @@ package assignment3
 
 import assignment3.Offsets.{FieldOffset, StackOffset}
 
+/** Constants for SaM calling convention and stack management. */
+object CallConvention:
+  /** Cleanup for return slot when callee doesn't return a value. */
+  val ReturnSlotCleanup = -1
+
+  /** Calculate stack cleanup after call (pops arguments). */
+  inline def argCleanup(count: Int): Int = -count
+
+  /** Combined cleanup: arguments + return slot. */
+  inline def voidCallCleanup(argCount: Int): Int = argCleanup(argCount) + ReturnSlotCleanup
+
 final class SamBuilder {
   private val sb = new StringBuilder
 
@@ -44,8 +55,8 @@ final class SamBuilder {
   // Higher-level call helper: handles LINK/JSR/UNLINK + arg cleanup and optional return-slot drop
   def call(lbl: String | Label, argCount: Int, returns: Boolean): SamBuilder = {
     linkCall(lbl)
-    addSp(-argCount)
-    if (!returns) addSp(-1)
+    addSp(CallConvention.argCleanup(argCount))
+    if (!returns) addSp(CallConvention.ReturnSlotCleanup)
     this
   }
   // Common instruction helpers
@@ -95,6 +106,17 @@ final class SamBuilder {
   def unlink(): SamBuilder = instr("UNLINK")
   def rst(): SamBuilder = instr("RST")
   def stop(): SamBuilder = instr("STOP")
+
+  /** Extension methods for common code generation patterns. */
+  def emitNullCheck(onNull: Label | String): SamBuilder =
+    instr("ISNIL").jumpc(onNull)
+
+  def emitBooleanNot(): SamBuilder =
+    pushImmInt(1).add().pushImmInt(2).mod()
+
+  def emitZeroCheck(onZero: Label | String): SamBuilder =
+    dup().jumpIfNil(onZero)
+
   override def toString: String = sb.toString
 }
 

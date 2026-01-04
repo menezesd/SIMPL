@@ -85,3 +85,13 @@ object Diag:
 
   def resolveAt[A](msg: String, at: assignment3.ParserSupport.At[_]): Resolve =
     Resolve(msg, at.line, at.col)
+
+  /** Common diagnostic builders for frequently-used patterns. */
+  def missingSymbol(kind: String, name: String, line: Int, col: Int = -1): Resolve =
+    Resolve(s"Missing $kind symbol: $name", line, col)
+
+  def typeMismatch(expected: String, actual: String, line: Int, col: Int = -1): Type =
+    Type(s"Type mismatch: expected $expected, got $actual", line, col)
+
+  def unexpectedToken(expected: String, actual: String, line: Int, col: Int = -1): Syntax =
+    Syntax(s"Expected $expected but found $actual", line, col)

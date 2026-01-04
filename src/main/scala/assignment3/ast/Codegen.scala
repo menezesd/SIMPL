@@ -8,6 +8,14 @@ import assignment3.symbol.ProgramSymbols
 
 /** Code generation using idiomatic, pattern-matching AST. */
 object IdiomaticCodegen:
+  /** Constants for code generation. */
+  private object CodegenConstants:
+    /** Default field count when class symbol is unavailable. */
+    val DefaultFieldCount = 1
+
+    /** Return slot position (always 0 in SaM calling convention). */
+    val ReturnSlotPosition = 0
+
   /**
    * Code generation context threaded through emit functions.
    *
@@ -56,7 +64,7 @@ object IdiomaticCodegen:
   private def emitLiteralD(e: id.Expr): Either[Diag, Code] = e match
     case id.IntLit(v, _)  => Right(Code.pushInt(v))
     case id.BoolLit(v, _) => Right(Code.pushBool(v))
-    case id.StrLit(v, _)  => Right(Code.from(new SamBuilder().pushImmStr(s"\"${v}\"")))
+    case id.StrLit(v, _)  => Right(Code.from(new SamBuilder().pushImmStr(Code.escapeStringLiteral(v))))
     case id.NullLit(_)    => Right(Code.pushNull)
     case _ => Left(SyntaxDiag("Not a literal expression", -1))
 
@@ -250,13 +258,13 @@ object IdiomaticCodegen:
 
   // Helper: emit new object instantiation
   private def emitNewObjectD(className: String, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
-    val numFields = ctx.programSymbolsOpt.flatMap(_.getClass(className)).fold(1)(_.numFields())
+    val numFields = ctx.programSymbolsOpt.flatMap(_.getClass(className)).fold(CodegenConstants.DefaultFieldCount)(_.numFields())
     val ctorExists = ctx.programSymbolsOpt.flatMap(_.getClass(className)).exists(_.method(className).isDefined)
     Result.traverseE(args)(emitExprD(_, ctx)).map { argCodes =>
       val sb = new SamBuilder()
       sb.pushImmInt(numFields).malloc()
       if ctorExists then
-        sb.dup().pushImmInt(0).swap()
+        sb.dup().pushImmInt(CodegenConstants.ReturnSlotPosition).swap()
         sb.append(Code.concat(argCodes))
         sb.linkCall(s"${className}_${className}")
         val paramCount = args.size + 1

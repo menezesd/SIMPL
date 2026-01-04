@@ -35,6 +35,12 @@ object StringRuntime {
     val TwoArgs     = -2  // Full 2-argument cleanup
   }
 
+  // String operation constants
+  private object StringConstants:
+    val NullTerminator = '\u0000'
+    val MinimumBufferSize = 1  // Space for null terminator
+    val InvalidRepeatDefault = "\"\""  // Empty string for negative repeat count
+
   def repeatString(firstInputType: Type, secondInputType: Type): String = {
     val sb = new SamBuilder()
   if (firstInputType == Type.STRING) sb.swap()
