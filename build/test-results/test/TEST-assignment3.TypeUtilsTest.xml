@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.TypeUtilsTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:46:36" hostname="axiom" time="0.024">
+<testsuite name="assignment3.TypeUtilsTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:51:53" hostname="axiom" time="0.028">
   <properties/>
-  <testcase name="testTypeOfNullLit()" classname="assignment3.TypeUtilsTest" time="0.002"/>
+  <testcase name="testTypeOfNullLit()" classname="assignment3.TypeUtilsTest" time="0.001"/>
   <testcase name="testTypeOfTernaryWithResultType()" classname="assignment3.TypeUtilsTest" time="0.001"/>
   <testcase name="testTypeOfBinaryWithResultType()" classname="assignment3.TypeUtilsTest" time="0.001"/>
   <testcase name="testTypeOfIntLit()" classname="assignment3.TypeUtilsTest" time="0.001"/>
-  <testcase name="testTypeOfUnaryNegInt()" classname="assignment3.TypeUtilsTest" time="0.001"/>
-  <testcase name="testClassNameOfNewObject()" classname="assignment3.TypeUtilsTest" time="0.001"/>
-  <testcase name="testTypeOfStrLit()" classname="assignment3.TypeUtilsTest" time="0.0"/>
-  <testcase name="testTypeOfBoolLit()" classname="assignment3.TypeUtilsTest" time="0.001"/>
+  <testcase name="testTypeOfUnaryNegInt()" classname="assignment3.TypeUtilsTest" time="0.0"/>
+  <testcase name="testClassNameOfNewObject()" classname="assignment3.TypeUtilsTest" time="0.002"/>
+  <testcase name="testTypeOfStrLit()" classname="assignment3.TypeUtilsTest" time="0.001"/>
+  <testcase name="testTypeOfBoolLit()" classname="assignment3.TypeUtilsTest" time="0.003"/>
   <testcase name="testTypeOfUnaryNegString()" classname="assignment3.TypeUtilsTest" time="0.001"/>
-  <testcase name="testTypeOfUnaryNot()" classname="assignment3.TypeUtilsTest" time="0.0"/>
+  <testcase name="testTypeOfUnaryNot()" classname="assignment3.TypeUtilsTest" time="0.001"/>
   <testcase name="testTypeOfVarBool()" classname="assignment3.TypeUtilsTest" time="0.001"/>
   <testcase name="testTypeOfVar()" classname="assignment3.TypeUtilsTest" time="0.001"/>
   <testcase name="testClassNameOfIntLitIsNone()" classname="assignment3.TypeUtilsTest" time="0.001"/>
-  <testcase name="testClassNameOfVarWithObjectType()" classname="assignment3.TypeUtilsTest" time="0.002"/>
-  <testcase name="testTypeOfThis()" classname="assignment3.TypeUtilsTest" time="0.0"/>
+  <testcase name="testClassNameOfVarWithObjectType()" classname="assignment3.TypeUtilsTest" time="0.001"/>
+  <testcase name="testTypeOfThis()" classname="assignment3.TypeUtilsTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

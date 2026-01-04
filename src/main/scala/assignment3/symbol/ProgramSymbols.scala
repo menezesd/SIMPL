@@ -1,5 +1,6 @@
 package assignment3.symbol
 
+import assignment3.LiveOak3Compiler
 import scala.collection.immutable.Map
 
 /** Immutable program symbol table. */
@@ -11,7 +12,7 @@ final case class ProgramSymbols(classes: Map[String, ClassSymbol]) {
   def getMethod(className: String, methodName: String): Option[MethodSymbol] =
     getClass(className).flatMap(_.method(methodName))
 
-  def getEntrypoint(): Option[MethodSymbol] = getMethod("Main", "main")
+  def getEntrypoint(): Option[MethodSymbol] = getMethod(LiveOak3Compiler.ENTRY_CLASS, LiveOak3Compiler.ENTRY_METHOD)
 }
 
 object ProgramSymbols {

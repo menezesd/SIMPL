@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.OperatorUtilsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:46:36" hostname="axiom" time="0.016">
+<testsuite name="assignment3.OperatorUtilsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:51:53" hostname="axiom" time="0.023">
   <properties/>
-  <testcase name="unaryNotEmitsAddOneModTwo()" classname="assignment3.OperatorUtilsTest" time="0.002"/>
+  <testcase name="unaryNotEmitsAddOneModTwo()" classname="assignment3.OperatorUtilsTest" time="0.003"/>
   <testcase name="unaryNegEmitsTimesWithMinusOne()" classname="assignment3.OperatorUtilsTest" time="0.003"/>
-  <testcase name="binopAdd()" classname="assignment3.OperatorUtilsTest" time="0.002"/>
-  <testcase name="binopCmp()" classname="assignment3.OperatorUtilsTest" time="0.003"/>
+  <testcase name="binopAdd()" classname="assignment3.OperatorUtilsTest" time="0.003"/>
+  <testcase name="binopCmp()" classname="assignment3.OperatorUtilsTest" time="0.004"/>
   <testcase name="binopMul()" classname="assignment3.OperatorUtilsTest" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>

@@ -1,6 +1,6 @@
 package assignment3.symbol
 
-import assignment3.{CompilerUtils, Messages, ObjectRefType, Offsets, ParserBase, PrimitiveType, TokenizerView, ValueType}
+import assignment3.{CompilerUtils, LiveOak3Compiler, Messages, ObjectRefType, Offsets, ParserBase, PrimitiveType, TokenizerView, ValueType}
 import assignment3.ast.{Diag, SyntaxDiag, TypeDiag, ResolveDiag, Result}
 import edu.utexas.cs.sam.io.{SamTokenizer, Tokenizer}
 import Tokenizer.TokenType
@@ -107,7 +107,7 @@ object SymbolTableBuilder {
         name <- getIdentifierR()
         methodRet = assignment3.ast.high.ReturnSigUtils.toValueTypeOpt(returnSig)
         _ <- expectCharR('(')
-        _ <- if (className == "Main" && name == "main" && tv.peekKind() == TokenType.WORD)
+        _ <- if (className == LiveOak3Compiler.ENTRY_CLASS && name == LiveOak3Compiler.ENTRY_METHOD && tv.peekKind() == TokenType.WORD)
           syntax(Messages.mainNoParams) else ok(())
         params <- parseParams(knownClasses, className, Vector(VarSymbol(
           SymbolConstants.ThisParameterName,

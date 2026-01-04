@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.ValidationStageTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:46:36" hostname="axiom" time="0.008">
+<testsuite name="assignment3.ValidationStageTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:51:53" hostname="axiom" time="0.009">
   <properties/>
   <testcase name="testRejectsNonInstance()" classname="assignment3.ValidationStageTest" time="0.002"/>
   <testcase name="testRejectsUserParams()" classname="assignment3.ValidationStageTest" time="0.002"/>
-  <testcase name="testAcceptsValidEntrypoint()" classname="assignment3.ValidationStageTest" time="0.0"/>
-  <testcase name="testMissingEntrypoint()" classname="assignment3.ValidationStageTest" time="0.001"/>
+  <testcase name="testAcceptsValidEntrypoint()" classname="assignment3.ValidationStageTest" time="0.001"/>
+  <testcase name="testMissingEntrypoint()" classname="assignment3.ValidationStageTest" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
