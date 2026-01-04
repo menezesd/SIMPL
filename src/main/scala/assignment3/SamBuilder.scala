@@ -108,3 +108,23 @@ extension (c: Char)
     case '\r' => "\\r"
     case '\u0000' => "\\0"
     case other => other.toString
+
+/** Fluent API for building SAM code with functional style. */
+object CodeBuilder:
+  /** Build SAM code using a builder function. */
+  inline def build(f: SamBuilder => Unit): Code =
+    val sb = new SamBuilder()
+    f(sb)
+    Code.from(sb)
+
+  /** Build SAM code and return as String. */
+  inline def buildString(f: SamBuilder => Unit): String =
+    val sb = new SamBuilder()
+    f(sb)
+    sb.toString
+
+  /** Build SAM code from a sequence of operations. */
+  inline def sequence(ops: (SamBuilder => Unit)*): Code =
+    val sb = new SamBuilder()
+    ops.foreach(_(sb))
+    Code.from(sb)

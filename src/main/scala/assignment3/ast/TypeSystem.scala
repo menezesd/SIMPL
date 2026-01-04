@@ -46,6 +46,7 @@ object TypeSystem:
 
   /** Check if an expression type is compatible with an expected ValueType. */
   def isAssignable(expected: ValueType, actual: Expr, ctx: NewMethodContext, symbols: ProgramSymbols): Boolean =
-    expected match
-      case ObjectRefType(_) => actual.isInstanceOf[NullLit] || classNameOf(actual, ctx, symbols).exists(_ == expected.classNameOpt.get)
-      case PrimitiveType(pt) => pt.isCompatibleWith(typeOf(actual, ctx, symbols))
+    (expected, actual) match
+      case (ObjectRefType(_), _: NullLit) => true
+      case (ObjectRefType(_), _) => classNameOf(actual, ctx, symbols).exists(_ == expected.classNameOpt.get)
+      case (PrimitiveType(pt), _) => pt.isCompatibleWith(typeOf(actual, ctx, symbols))

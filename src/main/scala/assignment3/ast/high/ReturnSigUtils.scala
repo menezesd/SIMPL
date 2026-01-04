@@ -8,7 +8,7 @@ object ReturnSigUtils {
     else {
       val vt = CompilerUtils.parseTypeOrObjectName(rawType, line)
       vt match {
-        case ObjectRefType(ot) => ReturnSig.Obj(ot.getClassName)
+        case ObjectRefType(cn) => ReturnSig.Obj(cn)
         case PrimitiveType(t) => ReturnSig.Prim(t)
       }
     }

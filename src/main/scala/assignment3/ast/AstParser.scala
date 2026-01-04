@@ -116,9 +116,9 @@ final class AstParser(
     for
       firstIdent <- getIdentifierR()
       lhsBase <-
-        method.lookupVar(firstIdent) match
-          case Some(_: VarSymbol) if method.isInstanceOf[NewMethodContext] => ok(Var(firstIdent))
-          case _ if method.isInstanceOf[NewMethodContext] =>
+        (method, method.lookupVar(firstIdent)) match
+          case (_: NewMethodContext, Some(_: VarSymbol)) => ok(Var(firstIdent))
+          case (nmc: NewMethodContext, _) =>
             tryImplicitThisField(firstIdent).fold(syntax(Messages.undeclaredVariable(firstIdent)))(ok(_))
           case _ => syntax(Messages.undeclaredVariable(firstIdent))
       lhsFinal <- parseLhsChainR(lhsBase)
@@ -272,8 +272,8 @@ final class AstParser(
                 args <- parseCommaSeparatedList(')')(parseExprR())
               yield NewObject(cls, args)
             case _ =>
-              method.lookupVar(w) match
-                case Some(vs: assignment3.symbol.VarSymbol) if method.isInstanceOf[NewMethodContext] => ok(Var(vs.getName))
+              (method, method.lookupVar(w)) match
+                case (_: NewMethodContext, Some(vs: assignment3.symbol.VarSymbol)) => ok(Var(vs.getName))
                 case _ =>
                   method.lookupMethodGlobal(w) match
                     case Some(ms: assignment3.symbol.MethodSymbol) =>

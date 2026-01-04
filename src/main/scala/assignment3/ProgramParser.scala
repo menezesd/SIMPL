@@ -64,12 +64,12 @@ private final class ProgramParser private (
   /** Check if parsed parameter type matches expected formal parameter type. */
   private def typeMatches(formalType: ValueType, parsedPrimOpt: Option[Type], parsedObjOpt: Option[String]): Boolean =
     formalType match
-      case ObjectRefType(ot) => parsedObjOpt.contains(ot.getClassName)
+      case ObjectRefType(cn) => parsedObjOpt.contains(cn)
       case PrimitiveType(t) => parsedPrimOpt.contains(t)
 
   /** Format type for error messages. */
   private def formatType(valueType: ValueType): String = valueType match
-    case ObjectRefType(ot) => ot.getClassName
+    case ObjectRefType(cn) => cn
     case PrimitiveType(t) => t.toString
 
   /** Format parsed type (from parser) for error messages. */
@@ -85,7 +85,7 @@ private final class ProgramParser private (
           vt = CompilerUtils.parseTypeOrObjectName(pr, tv.line)
           (pTypeOpt, pobjOpt) = vt match
             case PrimitiveType(t) => (Some(t), None)
-            case ObjectRefType(ot) => (None, Some(ot.getClassName))
+            case ObjectRefType(cn) => (None, Some(cn))
           pName <- getIdentifierR()
           _ <-
             if paramIndex >= expectedUserParams then

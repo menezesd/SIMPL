@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.StringRuntimeTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2025-09-27T01:36:34" hostname="codespaces-d006b6" time="0.018">
+<testsuite name="assignment3.StringRuntimeTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-04T01:20:10" hostname="axiom" time="0.047">
   <properties/>
-  <testcase name="concat_two_strings()" classname="assignment3.StringRuntimeTest" time="0.005"/>
-  <testcase name="repeat_string_both_orders()" classname="assignment3.StringRuntimeTest" time="0.005"/>
-  <testcase name="compare_strings_lt_gt_eq()" classname="assignment3.StringRuntimeTest" time="0.006"/>
+  <testcase name="concat_two_strings()" classname="assignment3.StringRuntimeTest" time="0.006"/>
+  <testcase name="repeat_string_both_orders()" classname="assignment3.StringRuntimeTest" time="0.013"/>
+  <testcase name="compare_strings_lt_gt_eq()" classname="assignment3.StringRuntimeTest" time="0.024"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

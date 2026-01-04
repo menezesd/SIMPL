@@ -25,7 +25,7 @@ object ValidationStage {
 
   private def validateParamType(param: assignment3.symbol.VarSymbol, entryClass: String, entryMethod: String, ms: MethodSymbol): Either[Diag, Unit] =
     param.valueType match
-      case ObjectRefType(ot) if ot.getClassName == entryClass => Right(())
+      case ObjectRefType(cn) if cn == entryClass => Right(())
       case _ => Left(ResolveDiag(Messages.entrypointMustBeInstance(entryClass, entryMethod), entrypointErrorLine(ms)))
 
   private def entrypointErrorLine(ms: MethodSymbol): Int = {

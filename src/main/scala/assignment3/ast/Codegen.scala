@@ -80,28 +80,50 @@ object IdiomaticCodegen:
       sb.append(base).addFieldOff(FieldOffset(off)).pushInd()
       Code.from(sb)
 
+  // Binary operation categories for clearer dispatch
+  private enum BinaryOpCategory:
+    case ShortCircuit, String, Numeric
+
+  private def categorizeBinaryOp(op: id.BinaryOp, lt: Type, rt: Type): BinaryOpCategory =
+    if (op == BinaryOp.And || op == BinaryOp.Or) && lt == Type.BOOL && rt == Type.BOOL then
+      BinaryOpCategory.ShortCircuit
+    else if lt == Type.STRING || rt == Type.STRING then
+      BinaryOpCategory.String
+    else
+      BinaryOpCategory.Numeric
+
   // Helper: emit binary operation
   private def emitBinaryD(op: id.BinaryOp, left: id.Expr, right: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
     val lt = typeOf(left, ctx); val rt = typeOf(right, ctx)
-    // Handle boolean short-circuit for And/Or first
-    if (op == BinaryOp.And || op == BinaryOp.Or) && lt == Type.BOOL && rt == Type.BOOL then
-      for
-        leftCode  <- emitExprD(left, ctx)
-        rightCode <- emitExprD(right, ctx)
-      yield
-        val sb = new SamBuilder()
-        if op == BinaryOp.And then emitShortCircuitAndC(leftCode, rightCode, sb)
-        else emitShortCircuitOrC(leftCode, rightCode, sb)
-    else
-      // Diagnose unsupported operators (string and numeric)
-      val stringy = lt == Type.STRING || rt == Type.STRING
-      checkBinaryOpSupported(op, lt, rt, stringy, pos) match
-        case Some(d) => Left(d)
-        case None =>
-          for
-            leftCode  <- emitExprD(left, ctx)
-            rightCode <- emitExprD(right, ctx)
-          yield emitBinaryOpCode(op, leftCode, rightCode, lt, rt, stringy)
+    categorizeBinaryOp(op, lt, rt) match
+      case BinaryOpCategory.ShortCircuit =>
+        emitShortCircuitBinaryD(op, left, right, ctx)
+      case BinaryOpCategory.String =>
+        checkBinaryOpSupported(op, lt, rt, stringy = true, pos) match
+          case Some(d) => Left(d)
+          case None =>
+            for
+              leftCode  <- emitExprD(left, ctx)
+              rightCode <- emitExprD(right, ctx)
+            yield emitStringOp(op, leftCode, rightCode, lt, rt)
+      case BinaryOpCategory.Numeric =>
+        checkBinaryOpSupported(op, lt, rt, stringy = false, pos) match
+          case Some(d) => Left(d)
+          case None =>
+            for
+              leftCode  <- emitExprD(left, ctx)
+              rightCode <- emitExprD(right, ctx)
+            yield emitNumericOp(op, leftCode, rightCode)
+
+  // Helper: emit short-circuit binary operations (And/Or)
+  private def emitShortCircuitBinaryD(op: id.BinaryOp, left: id.Expr, right: id.Expr, ctx: Ctx): Either[Diag, Code] =
+    for
+      leftCode  <- emitExprD(left, ctx)
+      rightCode <- emitExprD(right, ctx)
+    yield
+      val sb = new SamBuilder()
+      if op == BinaryOp.And then emitShortCircuitAndC(leftCode, rightCode, sb)
+      else emitShortCircuitOrC(leftCode, rightCode, sb)
 
   // Helper: check if binary operation is supported, return diagnostic if not
   private def checkBinaryOpSupported(op: id.BinaryOp, lt: Type, rt: Type, stringy: Boolean, pos: Int): Option[Diag] =
@@ -150,11 +172,6 @@ object IdiomaticCodegen:
       throw new AssertionError(s"Internal error: unknown binary operator '$ch'")
     }
     leftCode + rightCode + Code.fromString(opCode)
-
-  // Helper: emit the actual binary operation code
-  private def emitBinaryOpCode(op: id.BinaryOp, leftCode: Code, rightCode: Code, lt: Type, rt: Type, stringy: Boolean): Code =
-    if stringy then emitStringOp(op, leftCode, rightCode, lt, rt)
-    else emitNumericOp(op, leftCode, rightCode)
 
   // Helper: emit ternary expression
   private def emitTernaryD(cond: id.Expr, thenExpr: id.Expr, elseExpr: id.Expr, ctx: Ctx): Either[Diag, Code] =

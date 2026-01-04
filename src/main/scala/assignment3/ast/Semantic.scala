@@ -22,9 +22,9 @@ object IdiomaticSemantic:
       primMismatchMsg: String
   ): Either[Diag, Unit] = (expected, rhs) match
     case (ObjectRefType(_), _: NullLit) => Right(())
-    case (ObjectRefType(ot), _) =>
+    case (ObjectRefType(cn), _) =>
       TU.classNameOf(rhs, ctx.methodCtx, ctx.symbols) match
-        case Some(rhsClass) if rhsClass != ot.getClassName => Left(TypeDiag(objMismatchMsg, ctx.line))
+        case Some(rhsClass) if rhsClass != cn => Left(TypeDiag(objMismatchMsg, ctx.line))
         case _ => Right(()) // match or unknown - be permissive
     case (PrimitiveType(pt), _) =>
       Result.require(pt.isCompatibleWith(TU.typeOf(rhs, ctx.methodCtx, ctx.symbols)),

@@ -48,7 +48,7 @@ object IdiomaticTypeUtils:
   def classNameOf(e: Expr, method: assignment3.ast.MethodContext, programSymbols: assignment3.symbol.ProgramSymbols): Option[String] = e match
     case NewObject(cn, _, _) => Some(cn)
     case FieldAccess(_, _, fi, _) =>
-      fi.map(_.valueType).collect { case ObjectRefType(ot) => ot.getClassName }
+      fi.map(_.valueType).collect { case ObjectRefType(cn) => cn }
     case InstanceCall(_, m, _, _) => returnClassName(m)
     case Call(m, _, _) => returnClassName(m)
     case Var(name, _) =>

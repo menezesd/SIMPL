@@ -37,5 +37,5 @@ final case class ClassSymbol(
 object ClassSymbol:
   final case class FieldInfo(offset: Int, valueType: ValueType, symbol: VarSymbol):
     def objectType(): Option[assignment3.ObjectType] = valueType match
-      case ObjectRefType(ot) => Some(ot)
+      case ObjectRefType(cn) => Some(assignment3.ObjectType(cn))
       case _ => None

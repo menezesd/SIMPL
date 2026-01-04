@@ -12,6 +12,9 @@ object CompilerUtils {
   def noRecorder(): RecorderContext = RecorderContext(None)
   def withRecorder(recorder: TokenRecorder): RecorderContext = RecorderContext(Some(recorder))
 
+  /** Type alias for context function with RecorderContext. */
+  type WithRecorder[A] = RecorderContext ?=> A
+
   final case class LexicalRules(
     identifierPattern: Regex,
     reservedWords: Set[String],

@@ -61,7 +61,11 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
 
   private def ensureVoidReturn(local: SamBuilder, b: id.Block, returnSig: assignment3.ast.high.ReturnSig): Unit =
     import assignment3.ast.high.ReturnSig
-    if returnSig == ReturnSig.Void && !b.statements.lastOption.exists(_.isInstanceOf[id.Return]) then
+    val hasReturnStmt = b.statements.lastOption.exists {
+      case _: id.Return => true
+      case _ => false
+    }
+    if returnSig == ReturnSig.Void && !hasReturnStmt then
       local.pushImm(0)
 
   private def appendProgramPreamble(sb: SamBuilder, ctx: CompilerContext): Unit = {

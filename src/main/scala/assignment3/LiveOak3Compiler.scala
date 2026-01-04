@@ -25,18 +25,20 @@ object LiveOak3Compiler {
 
   // Diagnostic-first API: returns CompilationResult
   def compileD(fileName: String): CompilationResult = {
-    val ctx = new CompilerContext()
-    given CompilerUtils.RecorderContext = CompilerUtils.RecorderContext(Some(ctx.recorder))
+    val initialCtx = CompilerContext()
+    given CompilerUtils.RecorderContext = CompilerUtils.RecorderContext(Some(initialCtx.recorder))
     try {
       val resultEither =
         for
           _ <- unit(logStage(CompilationStage.Symbols, "build symbols"))
-          symbols <- buildSymbolsD(fileName, ctx)
+          symbols <- buildSymbolsD(fileName)(using summon[CompilerUtils.RecorderContext])
+          ctx = initialCtx.withSymbols(symbols)
+          _ <- unit(if (Debug.enabled("symbols")) dumpSymbols(symbols))
           _ <- unit(logStage(CompilationStage.Validate, "validate entrypoint"))
           _ <- ValidationStage.validateEntrypointD(symbols, ENTRY_CLASS, ENTRY_METHOD)
           _ <- unit(logStage(CompilationStage.Parse, "parse program"))
           program <- parseProgramD(fileName, symbols)
-          _ <- unit(if (Debug.enabled("tokens")) dumpRecordedTokens(ctx))
+          _ <- unit(if (Debug.enabled("tokens")) dumpRecordedTokens(initialCtx))
           _ <- unit(logStage(CompilationStage.Codegen, "emit code"))
           code <- emitCodeD(program, ctx)
         yield
@@ -46,7 +48,7 @@ object LiveOak3Compiler {
       resultEither match
         case Right(out) => CompilationResult.success(out)
         case Left(diag) => CompilationResult.failure(diag)
-    } finally { cleanup(ctx) }
+    } finally { cleanup(initialCtx) }
   }
 
   private def cleanup(ctx: CompilerContext): Unit = ctx.recorder.clear()
@@ -54,14 +56,10 @@ object LiveOak3Compiler {
   // legacy throwing variant removed; use ValidationStage.validateEntrypointD instead when you
   // need a diagnostic result.
 
-  private def buildSymbolsD(fileName: String, ctx: CompilerContext)(using CompilerUtils.RecorderContext): Either[Diag, ProgramSymbols] = {
+  private def buildSymbolsD(fileName: String)(using CompilerUtils.RecorderContext): Either[Diag, ProgramSymbols] = {
     val pass1 = new SamTokenizer(fileName, SamTokenizer.TokenizerOptions.PROCESS_STRINGS)
     val stb = new SymbolTableBuilder()
-    stb.buildD(pass1).map { symbols =>
-      ctx.symbols = symbols
-      if (Debug.enabled("symbols")) dumpSymbols(symbols)
-      symbols
-    }
+    stb.buildD(pass1)
   }
 
   private def parseProgramD(fileName: String, symbols: ProgramSymbols)(using CompilerUtils.RecorderContext): Either[Diag, assignment3.ast.high.ProgramNode] =

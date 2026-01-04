@@ -68,7 +68,7 @@ final class ScalaInstanceCallableFallback(label: String, ret: Option[ValueType],
   }
   override def getReturnSig: assignment3.ast.high.ReturnSig = ret match {
     case None => assignment3.ast.high.ReturnSig.Void
-    case Some(ObjectRefType(ot)) => assignment3.ast.high.ReturnSig.Obj(ot.getClassName)
+    case Some(ObjectRefType(cn)) => assignment3.ast.high.ReturnSig.Obj(cn)
     case Some(PrimitiveType(t)) => assignment3.ast.high.ReturnSig.Prim(t)
   }
   override def getParamCount: Int = count

@@ -94,3 +94,21 @@ object Result:
   /** Ensure a condition on the result value. */
   def ensure[A](result: Result[A])(pred: A => Boolean, ifFalse: => Diag): Result[A] =
     result.flatMap(a => if pred(a) then Right(a) else Left(ifFalse))
+
+  /** Extension methods for Option to Result conversions. */
+  extension [A](opt: Option[A])
+    /** Convert Option to Result with a diagnostic for None. */
+    inline def toResult(onNone: => Diag): Result[A] = opt.toRight(onNone)
+
+    /** Convert Option to Result with a lazy diagnostic constructor. */
+    inline def toResultWith(mkDiag: => Diag): Result[A] = opt.toRight(mkDiag)
+
+  /** Extension methods for Either[String, A] to Diag conversions. */
+  extension [A](either: Either[String, A])
+    /** Convert Either[String, A] to Result[A] with line/column info. */
+    def toResultAt(line: Int, col: Int = -1): Result[A] =
+      either.left.map(msg => SyntaxDiag(msg, line, col))
+
+    /** Convert Either[String, A] to Result[A] with a Diag constructor. */
+    def toResultWith(mkDiag: String => Diag): Result[A] =
+      either.left.map(mkDiag)

@@ -163,22 +163,22 @@ object SymbolTableBuilder {
 
       def checkField(cls: ClassSymbol, f: VarSymbol): Result[Unit] =
         f.valueType match {
-          case ObjectRefType(ot) if !program.existsClass(ot.getClassName) =>
-            err(TypeDiag(Messages.unknownFieldType(cls.getName, f.getName, ot.getClassName), f.getLine, f.getColumn))
+          case ObjectRefType(cn) if !program.existsClass(cn) =>
+            err(TypeDiag(Messages.unknownFieldType(cls.getName, f.getName, cn), f.getLine, f.getColumn))
           case _ => ok(())
         }
 
       def checkParam(cls: ClassSymbol, m: MethodSymbol, p: VarSymbol): Result[Unit] =
         p.valueType match {
-          case ObjectRefType(ot) if !program.existsClass(ot.getClassName) =>
-            err(TypeDiag(Messages.unknownParamType(cls.getName, m.getName, p.getName, ot.getClassName), p.getLine, p.getColumn))
+          case ObjectRefType(cn) if !program.existsClass(cn) =>
+            err(TypeDiag(Messages.unknownParamType(cls.getName, m.getName, p.getName, cn), p.getLine, p.getColumn))
           case _ => ok(())
         }
 
       def checkLocal(cls: ClassSymbol, m: MethodSymbol, v: VarSymbol): Result[Unit] =
         v.valueType match {
-          case ObjectRefType(ot) if !program.existsClass(ot.getClassName) =>
-            err(TypeDiag(Messages.unknownLocalType(cls.getName, m.getName, v.getName, ot.getClassName), v.getLine, v.getColumn))
+          case ObjectRefType(cn) if !program.existsClass(cn) =>
+            err(TypeDiag(Messages.unknownLocalType(cls.getName, m.getName, v.getName, cn), v.getLine, v.getColumn))
           case _ => ok(())
         }
 

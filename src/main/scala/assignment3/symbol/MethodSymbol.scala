@@ -21,7 +21,7 @@ final case class MethodSymbol(
 
   def getReturnSig: ReturnSig = returnValueTypeOpt match {
     case None => ReturnSig.Void
-    case Some(ObjectRefType(ot)) => ReturnSig.Obj(ot.getClassName)
+    case Some(ObjectRefType(cn)) => ReturnSig.Obj(cn)
     case Some(PrimitiveType(t)) => ReturnSig.Prim(t)
   }
 

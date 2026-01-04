@@ -24,11 +24,14 @@ final case class VarSymbol(
   }
 
   def objectTypeOpt: Option[ObjectType] = valueType match {
-    case ObjectRefType(ot) => Some(ot)
+    case ObjectRefType(cn) => Some(ObjectType(cn))
     case _ => None
   }
 
-  def classTypeNameOpt: Option[String] = objectTypeOpt.map(_.getClassName)
+  def classTypeNameOpt: Option[String] = valueType match {
+    case ObjectRefType(cn) => Some(cn)
+    case _ => None
+  }
 
   /** Stack frame offset based on calling convention. */
   def stackAddress(totalParams: Int): Int =
@@ -37,7 +40,7 @@ final case class VarSymbol(
   override def toString: String = {
     val typeRepr = valueType match {
       case PrimitiveType(t) => t.toString
-      case ObjectRefType(ot) => s"obj:${ot.getClassName}"
+      case ObjectRefType(cn) => s"obj:$cn"
     }
     val loc = if (parameter) s"param@$index" else s"local@$index"
     s"VarSymbol{$name:$typeRepr,$loc}"
