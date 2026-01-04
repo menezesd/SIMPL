@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.CodegenTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:41:18" hostname="axiom" time="0.077">
+<testsuite name="assignment3.CodegenTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:46:36" hostname="axiom" time="0.048">
   <properties/>
-  <testcase name="testEmitThisWithoutFrame()" classname="assignment3.CodegenTest" time="0.002"/>
-  <testcase name="testEmitBoolLitTrue()" classname="assignment3.CodegenTest" time="0.003"/>
+  <testcase name="testEmitThisWithoutFrame()" classname="assignment3.CodegenTest" time="0.001"/>
+  <testcase name="testEmitBoolLitTrue()" classname="assignment3.CodegenTest" time="0.002"/>
   <testcase name="testEmitBlockEmpty()" classname="assignment3.CodegenTest" time="0.002"/>
-  <testcase name="testEmitBoolLitFalse()" classname="assignment3.CodegenTest" time="0.003"/>
-  <testcase name="testEmitVarDeclWithoutInit()" classname="assignment3.CodegenTest" time="0.006"/>
-  <testcase name="testEmitBreakInsideLoop()" classname="assignment3.CodegenTest" time="0.005"/>
-  <testcase name="testEmitReturnWithLabel()" classname="assignment3.CodegenTest" time="0.003"/>
-  <testcase name="testEmitVarWithFrame()" classname="assignment3.CodegenTest" time="0.002"/>
-  <testcase name="testEmitVarDeclWithInit()" classname="assignment3.CodegenTest" time="0.004"/>
-  <testcase name="testEmitVarWithoutFrame()" classname="assignment3.CodegenTest" time="0.001"/>
-  <testcase name="testEmitReturnWithoutLabel()" classname="assignment3.CodegenTest" time="0.002"/>
-  <testcase name="testEmitNullLit()" classname="assignment3.CodegenTest" time="0.004"/>
-  <testcase name="testEmitIntLit()" classname="assignment3.CodegenTest" time="0.004"/>
+  <testcase name="testEmitBoolLitFalse()" classname="assignment3.CodegenTest" time="0.001"/>
+  <testcase name="testEmitVarDeclWithoutInit()" classname="assignment3.CodegenTest" time="0.003"/>
+  <testcase name="testEmitBreakInsideLoop()" classname="assignment3.CodegenTest" time="0.003"/>
+  <testcase name="testEmitReturnWithLabel()" classname="assignment3.CodegenTest" time="0.001"/>
+  <testcase name="testEmitVarWithFrame()" classname="assignment3.CodegenTest" time="0.001"/>
+  <testcase name="testEmitVarDeclWithInit()" classname="assignment3.CodegenTest" time="0.003"/>
+  <testcase name="testEmitVarWithoutFrame()" classname="assignment3.CodegenTest" time="0.002"/>
+  <testcase name="testEmitReturnWithoutLabel()" classname="assignment3.CodegenTest" time="0.001"/>
+  <testcase name="testEmitNullLit()" classname="assignment3.CodegenTest" time="0.003"/>
+  <testcase name="testEmitIntLit()" classname="assignment3.CodegenTest" time="0.003"/>
   <testcase name="testEmitBreakOutsideLoop()" classname="assignment3.CodegenTest" time="0.002"/>
-  <testcase name="testEmitStrLit()" classname="assignment3.CodegenTest" time="0.004"/>
+  <testcase name="testEmitStrLit()" classname="assignment3.CodegenTest" time="0.003"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

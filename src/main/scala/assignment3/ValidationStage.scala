@@ -5,11 +5,12 @@ import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 
 object ValidationStage {
   import assignment3.ast.Result
+  import assignment3.ast.Result.toResult
 
   def validateEntrypointD(symbols: ProgramSymbols, entryClass: String, entryMethod: String): Either[Diag, Unit] = {
     for
       ms <- symbols.getMethod(entryClass, entryMethod)
-              .toRight(ResolveDiag(Messages.missingEntrypoint(entryClass, entryMethod), -1))
+              .toResult(ResolveDiag(Messages.missingEntrypoint(entryClass, entryMethod), -1))
       _ <- validateSignature(ms, entryClass, entryMethod)
     yield ()
   }
@@ -19,7 +20,7 @@ object ValidationStage {
       _ <- Result.require(ms.expectedUserArgs() == 0,
              ResolveDiag(Messages.entrypointNoParams(entryClass, entryMethod), entrypointErrorLine(ms)))
       param <- ms.parameters.headOption
-                 .toRight(ResolveDiag(Messages.entrypointMustBeInstance(entryClass, entryMethod), entrypointErrorLine(ms)))
+                 .toResult(ResolveDiag(Messages.entrypointMustBeInstance(entryClass, entryMethod), entrypointErrorLine(ms)))
       _ <- validateParamType(param, entryClass, entryMethod, ms)
     yield ()
 

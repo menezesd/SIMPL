@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.SemanticTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:41:18" hostname="axiom" time="0.092">
+<testsuite name="assignment3.SemanticTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:46:36" hostname="axiom" time="0.051">
   <properties/>
-  <testcase name="testCheckVar()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckIfWithNonBoolCondition()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckBreak()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckUnary()" classname="assignment3.SemanticTest" time="0.005"/>
-  <testcase name="testCheckWhileWithNonBoolCondition()" classname="assignment3.SemanticTest" time="0.003"/>
+  <testcase name="testCheckVar()" classname="assignment3.SemanticTest" time="0.001"/>
+  <testcase name="testCheckIfWithNonBoolCondition()" classname="assignment3.SemanticTest" time="0.001"/>
+  <testcase name="testCheckBreak()" classname="assignment3.SemanticTest" time="0.001"/>
+  <testcase name="testCheckUnary()" classname="assignment3.SemanticTest" time="0.004"/>
+  <testcase name="testCheckWhileWithNonBoolCondition()" classname="assignment3.SemanticTest" time="0.002"/>
   <testcase name="testCheckNullLit()" classname="assignment3.SemanticTest" time="0.001"/>
-  <testcase name="testCheckReturnWithValueForVoid()" classname="assignment3.SemanticTest" time="0.002"/>
+  <testcase name="testCheckReturnWithValueForVoid()" classname="assignment3.SemanticTest" time="0.001"/>
   <testcase name="testCheckTernary()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckBinary()" classname="assignment3.SemanticTest" time="0.001"/>
-  <testcase name="testCheckReturnWithoutValueForVoid()" classname="assignment3.SemanticTest" time="0.003"/>
-  <testcase name="testCheckIntLit()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckReturnTypeMismatch()" classname="assignment3.SemanticTest" time="0.003"/>
-  <testcase name="testCheckStrLit()" classname="assignment3.SemanticTest" time="0.001"/>
-  <testcase name="testCheckWhileWithBoolCondition()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckFieldAssignOnNull()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckFieldAccessOnNull()" classname="assignment3.SemanticTest" time="0.002"/>
+  <testcase name="testCheckBinary()" classname="assignment3.SemanticTest" time="0.0"/>
+  <testcase name="testCheckReturnWithoutValueForVoid()" classname="assignment3.SemanticTest" time="0.001"/>
+  <testcase name="testCheckIntLit()" classname="assignment3.SemanticTest" time="0.0"/>
+  <testcase name="testCheckReturnTypeMismatch()" classname="assignment3.SemanticTest" time="0.001"/>
+  <testcase name="testCheckStrLit()" classname="assignment3.SemanticTest" time="0.0"/>
+  <testcase name="testCheckWhileWithBoolCondition()" classname="assignment3.SemanticTest" time="0.001"/>
+  <testcase name="testCheckFieldAssignOnNull()" classname="assignment3.SemanticTest" time="0.001"/>
+  <testcase name="testCheckFieldAccessOnNull()" classname="assignment3.SemanticTest" time="0.001"/>
   <testcase name="testCheckInstanceCallOnNull()" classname="assignment3.SemanticTest" time="0.001"/>
   <testcase name="testCheckInstanceCallOnThis()" classname="assignment3.SemanticTest" time="0.001"/>
   <testcase name="testCheckBoolLit()" classname="assignment3.SemanticTest" time="0.001"/>
-  <testcase name="testCheckBlockStmt()" classname="assignment3.SemanticTest" time="0.002"/>
+  <testcase name="testCheckBlockStmt()" classname="assignment3.SemanticTest" time="0.001"/>
   <testcase name="testCheckIfWithBoolCondition()" classname="assignment3.SemanticTest" time="0.002"/>
-  <testcase name="testCheckReturnWithValueForNonVoid()" classname="assignment3.SemanticTest" time="0.002"/>
+  <testcase name="testCheckReturnWithValueForNonVoid()" classname="assignment3.SemanticTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

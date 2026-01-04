@@ -4,6 +4,7 @@ import assignment3.{BinaryOpMapping, Code, CodeBuilder, Label, Messages, Offsets
 import assignment3.Offsets.{FieldOffset, StackOffset}
 import assignment3.ast as id
 import assignment3.ast.high.ReturnSig
+import assignment3.ast.Result.toResult
 import assignment3.symbol.ProgramSymbols
 
 /** Code generation using idiomatic, pattern-matching AST. */
@@ -77,7 +78,7 @@ object IdiomaticCodegen:
   // Helper: emit variable access
   private def emitVarD(name: String, pos: Int, ctx: Ctx): Either[Diag, Code] =
     ctx.withFrame(pos, Messages.Codegen.noFrameForVariable) { frame =>
-      frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos)).map { vb =>
+      frame.lookupVar(name).toResult(ResolveDiag(Messages.undeclaredVariable(name), pos)).map { vb =>
         CodeBuilder.build(_.pushOffS(StackOffset(vb.getAddress)))
       }
     }
@@ -256,7 +257,7 @@ object IdiomaticCodegen:
   // Helper: emit 'this' access
   private def emitThisD(pos: Int, ctx: Ctx): Either[Diag, Code] =
     ctx.withFrame(pos, Messages.Codegen.noFrameForThis) { frame =>
-      frame.lookupVar("this").toRight(ResolveDiag(Messages.Codegen.thisNotFound, pos)).map { vb =>
+      frame.lookupVar("this").toResult(ResolveDiag(Messages.Codegen.thisNotFound, pos)).map { vb =>
         CodeBuilder.build(_.pushOffS(StackOffset(vb.getAddress)))
       }
     }
@@ -362,7 +363,7 @@ object IdiomaticCodegen:
   private def emitAssignD(name: String, value: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
     ctx.withFrame(pos, Messages.Codegen.noFrameForAssignment) { frame =>
       for
-        vb <- frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos))
+        vb <- frame.lookupVar(name).toResult(ResolveDiag(Messages.undeclaredVariable(name), pos))
         valueCode <- emitExprD(value, ctx)
       yield
         CodeBuilder.build { sb =>

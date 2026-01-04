@@ -1,30 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.ResultTest" tests="24" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:41:18" hostname="axiom" time="0.15">
+<testsuite name="assignment3.ResultTest" tests="24" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:46:36" hostname="axiom" time="0.096">
   <properties/>
-  <testcase name="testSequenceEAllSuccess()" classname="assignment3.ResultTest" time="0.005"/>
-  <testcase name="testEnsureFailure()" classname="assignment3.ResultTest" time="0.007"/>
-  <testcase name="testZipWithError()" classname="assignment3.ResultTest" time="0.006"/>
+  <testcase name="testSequenceEAllSuccess()" classname="assignment3.ResultTest" time="0.003"/>
+  <testcase name="testEnsureFailure()" classname="assignment3.ResultTest" time="0.006"/>
+  <testcase name="testZipWithError()" classname="assignment3.ResultTest" time="0.005"/>
   <testcase name="testTraverseEAllSuccess()" classname="assignment3.ResultTest" time="0.005"/>
-  <testcase name="testErr()" classname="assignment3.ResultTest" time="0.002"/>
-  <testcase name="testZip()" classname="assignment3.ResultTest" time="0.004"/>
-  <testcase name="testFoldEShortCircuits()" classname="assignment3.ResultTest" time="0.008"/>
-  <testcase name="testFoldE()" classname="assignment3.ResultTest" time="0.006"/>
+  <testcase name="testErr()" classname="assignment3.ResultTest" time="0.001"/>
+  <testcase name="testZip()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testFoldEShortCircuits()" classname="assignment3.ResultTest" time="0.004"/>
+  <testcase name="testFoldE()" classname="assignment3.ResultTest" time="0.004"/>
   <testcase name="testToOpt()" classname="assignment3.ResultTest" time="0.002"/>
-  <testcase name="testUnit()" classname="assignment3.ResultTest" time="0.005"/>
-  <testcase name="testZip3()" classname="assignment3.ResultTest" time="0.007"/>
-  <testcase name="testOk()" classname="assignment3.ResultTest" time="0.003"/>
-  <testcase name="testRequireFalse()" classname="assignment3.ResultTest" time="0.004"/>
-  <testcase name="testTraverseEShortCircuits()" classname="assignment3.ResultTest" time="0.003"/>
-  <testcase name="testRequireTrue()" classname="assignment3.ResultTest" time="0.003"/>
-  <testcase name="testValidateAllSuccess()" classname="assignment3.ResultTest" time="0.005"/>
+  <testcase name="testUnit()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testZip3()" classname="assignment3.ResultTest" time="0.004"/>
+  <testcase name="testOk()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testRequireFalse()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testTraverseEShortCircuits()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testRequireTrue()" classname="assignment3.ResultTest" time="0.001"/>
+  <testcase name="testValidateAllSuccess()" classname="assignment3.ResultTest" time="0.003"/>
   <testcase name="testSequenceEShortCircuits()" classname="assignment3.ResultTest" time="0.004"/>
-  <testcase name="testValidateAllFailure()" classname="assignment3.ResultTest" time="0.005"/>
-  <testcase name="testRecover()" classname="assignment3.ResultTest" time="0.004"/>
-  <testcase name="testEnsureSuccess()" classname="assignment3.ResultTest" time="0.004"/>
-  <testcase name="testMapErr()" classname="assignment3.ResultTest" time="0.006"/>
-  <testcase name="testOrElseResult()" classname="assignment3.ResultTest" time="0.003"/>
-  <testcase name="testFromOptionNone()" classname="assignment3.ResultTest" time="0.003"/>
-  <testcase name="testFromOptionSome()" classname="assignment3.ResultTest" time="0.005"/>
+  <testcase name="testValidateAllFailure()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testRecover()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testEnsureSuccess()" classname="assignment3.ResultTest" time="0.003"/>
+  <testcase name="testMapErr()" classname="assignment3.ResultTest" time="0.005"/>
+  <testcase name="testOrElseResult()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testFromOptionNone()" classname="assignment3.ResultTest" time="0.002"/>
+  <testcase name="testFromOptionSome()" classname="assignment3.ResultTest" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

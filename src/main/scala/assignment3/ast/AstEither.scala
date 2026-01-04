@@ -5,18 +5,19 @@ import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 
 object AstEither:
   import Operators._
+  import Result.toResult
 
   /** Resolve the class name of an expression as Either[Diag, String]. */
   def resolveClassNameD(e: Expr, method: MethodContext, ps: ProgramSymbols, line: Int, column: Int = -1): Either[Diag, String] =
     IdiomaticTypeUtils.classNameOf(e, method, ps)
-      .toRight(TypeDiag(Messages.TypeCheck.unableToResolveClass, line, column))
+      .toResult(TypeDiag(Messages.TypeCheck.unableToResolveClass, line, column))
 
   /** Resolve a method symbol on the class of an expression, or produce a Diag error. */
   def resolveMethodOnExprD(e: Expr, methodName: String, method: MethodContext, ps: ProgramSymbols, line: Int, column: Int = -1): Either[Diag, MethodSymbol] =
     for
       cn <- resolveClassNameD(e, method, ps, line, column)
-      cs <- ps.getClass(cn).toRight(ResolveDiag(Messages.TypeCheck.unknownClass(cn), line, column))
-      ms <- cs.method(methodName).toRight(ResolveDiag(Messages.TypeCheck.unknownMethod(cn, methodName), line, column))
+      cs <- ps.getClass(cn).toResult(ResolveDiag(Messages.TypeCheck.unknownClass(cn), line, column))
+      ms <- cs.method(methodName).toResult(ResolveDiag(Messages.TypeCheck.unknownMethod(cn, methodName), line, column))
     yield ms
 
   /** Resolve field info on a target expression. */

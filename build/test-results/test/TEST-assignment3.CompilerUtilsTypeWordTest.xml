@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.CompilerUtilsTypeWordTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:41:13" hostname="axiom" time="0.224">
+<testsuite name="assignment3.CompilerUtilsTypeWordTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:46:34" hostname="axiom" time="0.061">
   <properties/>
-  <testcase name="isTypeWord: excludes statement starters when requested" classname="assignment3.CompilerUtilsTypeWordTest" time="0.07"/>
-  <testcase name="isTypeWord: recognizes class names including current class" classname="assignment3.CompilerUtilsTypeWordTest" time="0.138"/>
-  <testcase name="isTypeWord: recognizes primitive types" classname="assignment3.CompilerUtilsTypeWordTest" time="0.005"/>
+  <testcase name="isTypeWord: excludes statement starters when requested" classname="assignment3.CompilerUtilsTypeWordTest" time="0.013"/>
+  <testcase name="isTypeWord: recognizes class names including current class" classname="assignment3.CompilerUtilsTypeWordTest" time="0.044"/>
+  <testcase name="isTypeWord: recognizes primitive types" classname="assignment3.CompilerUtilsTypeWordTest" time="0.002"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>
