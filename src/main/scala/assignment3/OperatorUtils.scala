@@ -63,21 +63,21 @@ object OperatorUtils {
 
   // Lazy-initialized instruction cache for better performance
   private lazy val unopInstructions: Map[Char, String] = Map(
-    NEG -> new SamBuilder().pushImm(-1).mul().toString,
-    NOT -> new SamBuilder().pushImm(1).add().pushImm(2).mod().toString
+    NEG -> CodeBuilder.buildString(_.pushImm(-1).mul()),
+    NOT -> CodeBuilder.buildString(sb => sb.pushImm(1).add().pushImm(2).mod())
   )
 
   private lazy val binopInstructions: Map[Char, String] = Map(
-    ADD -> new SamBuilder().add().toString,
-    SUB -> new SamBuilder().sub().toString,
-    MUL -> new SamBuilder().mul().toString,
-    DIV -> new SamBuilder().div().toString,
-    MOD -> new SamBuilder().mod().toString,
-    AND -> new SamBuilder().andB().toString,
-    OR  -> new SamBuilder().orB().toString,
-    GT  -> new SamBuilder().greater().toString,
-    LT  -> new SamBuilder().less().toString,
-    EQ  -> new SamBuilder().equal().toString
+    ADD -> CodeBuilder.buildString(_.add()),
+    SUB -> CodeBuilder.buildString(_.sub()),
+    MUL -> CodeBuilder.buildString(_.mul()),
+    DIV -> CodeBuilder.buildString(_.div()),
+    MOD -> CodeBuilder.buildString(_.mod()),
+    AND -> CodeBuilder.buildString(_.andB()),
+    OR  -> CodeBuilder.buildString(_.orB()),
+    GT  -> CodeBuilder.buildString(_.greater()),
+    LT  -> CodeBuilder.buildString(_.less()),
+    EQ  -> CodeBuilder.buildString(_.equal())
   )
 
   /** Get unary operator code, returning Either for diagnostic-first flow. */

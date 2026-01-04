@@ -1,6 +1,6 @@
 package assignment3.ast
 
-import assignment3.{BinaryOpMapping, Code, Label, Messages, Offsets, OperatorUtils, Operators, ParserSupport, SamBuilder, StringRuntime, Type}
+import assignment3.{BinaryOpMapping, Code, CodeBuilder, Label, Messages, Offsets, OperatorUtils, Operators, ParserSupport, SamBuilder, StringRuntime, Type}
 import assignment3.Offsets.{FieldOffset, StackOffset}
 import assignment3.ast as id
 import assignment3.ast.high.ReturnSig
@@ -70,7 +70,7 @@ object IdiomaticCodegen:
   private def emitLiteralD(e: id.Expr): Either[Diag, Code] = e match
     case id.IntLit(v, _)  => Right(Code.pushInt(v))
     case id.BoolLit(v, _) => Right(Code.pushBool(v))
-    case id.StrLit(v, _)  => Right(Code.from(new SamBuilder().pushImmStr(Code.escapeStringLiteral(v))))
+    case id.StrLit(v, _)  => Right(CodeBuilder.build(_.pushImmStr(Code.escapeStringLiteral(v))))
     case id.NullLit(_)    => Right(Code.pushNull)
     case _ => Left(SyntaxDiag("Not a literal expression", Offsets.SourceLocation.UnknownLine))
 
@@ -78,7 +78,7 @@ object IdiomaticCodegen:
   private def emitVarD(name: String, pos: Int, ctx: Ctx): Either[Diag, Code] =
     ctx.withFrame(pos, Messages.Codegen.noFrameForVariable) { frame =>
       frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos)).map { vb =>
-        Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
+        CodeBuilder.build(_.pushOffS(StackOffset(vb.getAddress)))
       }
     }
 
@@ -104,9 +104,9 @@ object IdiomaticCodegen:
       off <- resolveFieldOffset(target, field, fieldInfoOpt, ctx, pos)
       base <- emitExprD(target, ctx)
     yield
-      val sb = new SamBuilder()
-      sb.append(base).addFieldOff(FieldOffset(off)).pushInd()
-      Code.from(sb)
+      CodeBuilder.build { sb =>
+        sb.append(base).addFieldOff(FieldOffset(off)).pushInd()
+      }
 
   // Binary operation categories for clearer dispatch
   private enum BinaryOpCategory:
@@ -171,9 +171,10 @@ object IdiomaticCodegen:
       leftCode  <- emitExprD(left, ctx)
       rightCode <- emitExprD(right, ctx)
     yield
-      val sb = new SamBuilder()
-      if op == BinaryOp.And then emitShortCircuitAndC(leftCode, rightCode, sb)
-      else emitShortCircuitOrC(leftCode, rightCode, sb)
+      CodeBuilder.build { sb =>
+        if op == BinaryOp.And then emitShortCircuitAndC(leftCode, rightCode, sb)
+        else emitShortCircuitOrC(leftCode, rightCode, sb)
+      }
 
   /** Operation constraint: defines validation rules for binary operations. */
   private case class OpConstraint(
@@ -232,9 +233,9 @@ object IdiomaticCodegen:
       elseCode <- emitExprD(elseExpr, ctx)
     yield
       val falseLabel = Label(); val endLabel = Label()
-      val sb = new SamBuilder()
-      sb.append(condCode).jumpIfNil(falseLabel).append(thenCode).jump(endLabel).label(falseLabel).append(elseCode).label(endLabel)
-      Code.from(sb)
+      CodeBuilder.build { sb =>
+        sb.append(condCode).jumpIfNil(falseLabel).append(thenCode).jump(endLabel).label(falseLabel).append(elseCode).label(endLabel)
+      }
 
   // Helper: emit function call
   private def emitCallD(m: id.CallableMethod, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
@@ -256,7 +257,7 @@ object IdiomaticCodegen:
   private def emitThisD(pos: Int, ctx: Ctx): Either[Diag, Code] =
     ctx.withFrame(pos, Messages.Codegen.noFrameForThis) { frame =>
       frame.lookupVar("this").toRight(ResolveDiag(Messages.Codegen.thisNotFound, pos)).map { vb =>
-        Code.from(new SamBuilder().pushOffS(StackOffset(vb.getAddress)))
+        CodeBuilder.build(_.pushOffS(StackOffset(vb.getAddress)))
       }
     }
 
@@ -266,22 +267,20 @@ object IdiomaticCodegen:
     val numFields = classOpt.fold(CodegenConstants.DefaultFieldCount)(_.numFields())
     val ctorExists = classOpt.exists(ParserSupport.SymbolLookup.hasConstructor)
     Result.traverseE(args)(emitExprD(_, ctx)).map { argCodes =>
-      val sb = new SamBuilder()
-      sb.pushImmInt(numFields).malloc()
-      if ctorExists then
-        sb.dup().pushImmInt(CodegenConstants.ReturnSlotPosition).swap()
-        sb.append(Code.concat(argCodes))
-        sb.linkCall(s"${className}_${className}")
-        val paramCount = args.size + 1
-        sb.addSp(-paramCount)
-        sb.addSp(-1)
-      Code.from(sb)
+      CodeBuilder.build { sb =>
+        sb.pushImmInt(numFields).malloc()
+        if ctorExists then
+          sb.dup().pushImmInt(CodegenConstants.ReturnSlotPosition).swap()
+          sb.append(Code.concat(argCodes))
+          sb.linkCall(s"${className}_${className}")
+          val paramCount = args.size + 1
+          sb.addSp(-paramCount)
+          sb.addSp(-1)
+      }
     }
 
   private def emitCallC(label: String, paramCount: Int, hasReturn: Boolean): Code =
-    val sb = new SamBuilder()
-    sb.call(label, paramCount, hasReturn)
-    Code.from(sb)
+    CodeBuilder.build(_.call(label, paramCount, hasReturn))
 
   // Centralized helper: does this callable produce a return value to keep on TOS?
   private def hasReturnValue(m: id.CallableMethod): Boolean = m match
@@ -366,9 +365,9 @@ object IdiomaticCodegen:
         vb <- frame.lookupVar(name).toRight(ResolveDiag(Messages.undeclaredVariable(name), pos))
         valueCode <- emitExprD(value, ctx)
       yield
-        val sb = new SamBuilder()
-        sb.append(valueCode).storeOffS(StackOffset(vb.getAddress))
-        Code.from(sb)
+        CodeBuilder.build { sb =>
+          sb.append(valueCode).storeOffS(StackOffset(vb.getAddress))
+        }
     }
 
   private def emitFieldAssignD(target: id.Expr, field: String, offset: Int, value: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
@@ -378,9 +377,9 @@ object IdiomaticCodegen:
         targetCode <- emitExprD(target, ctx)
         valueCode  <- emitExprD(value, ctx)
       yield
-        val sb = new SamBuilder()
-        sb.append(targetCode).addFieldOff(FieldOffset(offset)).append(valueCode).storeInd()
-        Code.from(sb)
+        CodeBuilder.build { sb =>
+          sb.append(targetCode).addFieldOff(FieldOffset(offset)).append(valueCode).storeInd()
+        }
 
   private def emitIfD(cond: id.Expr, thenB: id.Stmt, elseB: id.Stmt, ctx: Ctx): Either[Diag, Code] =
     for
@@ -389,14 +388,14 @@ object IdiomaticCodegen:
       elseCode <- emitStmtD(elseB, ctx)
     yield
       val elseLbl = Label(); val endLbl = Label()
-      val sb = new SamBuilder()
-      sb.append(condCode).jumpIfNil(elseLbl)
-        .append(thenCode)
-        .jump(endLbl)
-        .label(elseLbl)
-        .append(elseCode)
-        .label(endLbl)
-      Code.from(sb)
+      CodeBuilder.build { sb =>
+        sb.append(condCode).jumpIfNil(elseLbl)
+          .append(thenCode)
+          .jump(endLbl)
+          .label(elseLbl)
+          .append(elseCode)
+          .label(endLbl)
+      }
 
   private def emitWhileD(cond: id.Expr, body: id.Stmt, ctx: Ctx): Either[Diag, Code] =
     val endLabel = Label()
@@ -406,18 +405,18 @@ object IdiomaticCodegen:
       bodyCode <- emitStmtD(body, innerCtx)
     yield
       val start = Label(); val stop = endLabel
-      val sb = new SamBuilder()
-      sb.label(start)
-        .append(condCode).jumpIfNil(stop)
-        .append(bodyCode)
-        .jump(start)
-        .label(stop)
-      Code.from(sb)
+      CodeBuilder.build { sb =>
+        sb.label(start)
+          .append(condCode).jumpIfNil(stop)
+          .append(bodyCode)
+          .jump(start)
+          .label(stop)
+      }
 
   private def emitBreakD(pos: Int, ctx: Ctx): Either[Diag, Code] =
     ctx.loopEndLabels match
       case Nil       => Left(SyntaxDiag(Messages.Codegen.breakOutsideLoop, pos))
-      case head :: _ => Right(Code.from(new SamBuilder().jump(head)))
+      case head :: _ => Right(CodeBuilder.build(_.jump(head)))
 
   private def emitReturnD(valueOpt: Option[id.Expr], pos: Int, ctx: Ctx): Either[Diag, Code] =
     ctx.returnLabelOpt match
@@ -425,9 +424,9 @@ object IdiomaticCodegen:
       case Some(ret) =>
         val valueCodeE = valueOpt.fold(Right(Code.empty))(emitExprD(_, ctx))
         valueCodeE.map { valueCode =>
-          val sb = new SamBuilder()
-          sb.append(valueCode).jump(ret)
-          Code.from(sb)
+          CodeBuilder.build { sb =>
+            sb.append(valueCode).jump(ret)
+          }
         }
 
   /** Emit code for a statement. Dispatches to specialized helpers. */

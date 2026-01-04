@@ -41,13 +41,11 @@ object StringRuntime {
     val MinimumBufferSize = 1  // Space for null terminator
     val InvalidRepeatDefault = "\"\""  // Empty string for negative repeat count
 
-  def repeatString(firstInputType: Type, secondInputType: Type): String = {
-    val sb = new SamBuilder()
-  if (firstInputType == Type.STRING) sb.swap()
-    sb.linkCall(REPEAT_LABEL)
-      .addSp(ArgCleanup.RepeatArgs)
-    sb.toString
-  }
+  def repeatString(firstInputType: Type, secondInputType: Type): String =
+    CodeBuilder.buildString { sb =>
+      if (firstInputType == Type.STRING) sb.swap()
+      sb.linkCall(REPEAT_LABEL).addSp(ArgCleanup.RepeatArgs)
+    }
 
   // Java-friendly wrappers: avoid referencing Scala enum constants in Java tests
   def repeatStringSI(): String = repeatString(Type.STRING, Type.INT) // first is String, second is Int
@@ -61,11 +59,8 @@ object StringRuntime {
   def concatStringC(): Code = Code.fromString(concatString())
   def compareStringC(op: Char): Code = Code.fromString(compareString(op))
 
-  def getStringLength(): String = {
-    val sb = new SamBuilder()
-    sb.jsr(LENGTH_LABEL)
-    sb.toString
-  }
+  def getStringLength(): String =
+    CodeBuilder.buildString(_.jsr(LENGTH_LABEL))
 
   // --- Individual runtime function emitters ---
 
@@ -201,36 +196,26 @@ object StringRuntime {
   /** Code-returning variant of emitAllStringFunctions (preferred for composition). */
   def emitAllStringFunctionsC(): Code = Code.fromString(emitAllStringFunctions())
 
-  def reverseString(): String = {
-    val sb = new SamBuilder()
-  sb.linkCall(REVERSE_LABEL)
-    sb.toString
-  }
+  def reverseString(): String =
+    CodeBuilder.buildString(_.linkCall(REVERSE_LABEL))
 
-  def appendStringHeap(): String = {
-    val sb = new SamBuilder()
-  sb.linkCall(APPEND_LABEL).addSp(ArgCleanup.AppendCall)
-    sb.toString
-  }
+  def appendStringHeap(): String =
+    CodeBuilder.buildString(_.linkCall(APPEND_LABEL).addSp(ArgCleanup.AppendCall))
 
-  def concatString(): String = {
-    val sb = new SamBuilder()
-  sb.linkCall(CONCAT_LABEL).addSp(ArgCleanup.ConcatArgs)
-    sb.toString
-  }
+  def concatString(): String =
+    CodeBuilder.buildString(_.linkCall(CONCAT_LABEL).addSp(ArgCleanup.ConcatArgs))
 
-  def compareString(op: Char): String = {
+  def compareString(op: Char): String =
     // Maintain signature for existing Java tests, but avoid throwing.
     // If an invalid operator is passed, emit code that leaves 'false' on stack.
     val isComparison = OperatorUtils.getBinopTypeE(op).exists(_ == BinopType.COMPARISON)
-    val sb = new SamBuilder()
-    sb.linkCall(COMPARE_LABEL).addSp(ArgCleanup.CompareArgs)
-    op match
-      case '<' if isComparison => sb.pushImmInt(1)
-      case '>' if isComparison => sb.pushImmInt(-1)
-      case '=' if isComparison => sb.pushImmInt(0)
-      case _ => sb.pushImmInt(0) // invalid op => always false
-    sb.equal()
-    sb.toString
-  }
+    CodeBuilder.buildString { sb =>
+      sb.linkCall(COMPARE_LABEL).addSp(ArgCleanup.CompareArgs)
+      op match
+        case '<' if isComparison => sb.pushImmInt(1)
+        case '>' if isComparison => sb.pushImmInt(-1)
+        case '=' if isComparison => sb.pushImmInt(0)
+        case _ => sb.pushImmInt(0) // invalid op => always false
+      sb.equal()
+    }
 }

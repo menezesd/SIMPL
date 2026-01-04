@@ -17,10 +17,10 @@ object Code:
   inline def from(sb: SamBuilder): Code = Code(sb.toString)
 
   // Convenience factories for common single-value patterns
-  def pushInt(n: Int): Code = from(new SamBuilder().pushImmInt(n))
-  def pushBool(b: Boolean): Code = from(new SamBuilder().pushBool(b))
-  def pushNull: Code = from(new SamBuilder().pushNull())
-  def returnSlot: Code = from(new SamBuilder().returnSlot())
+  def pushInt(n: Int): Code = CodeBuilder.build(_.pushImmInt(n))
+  def pushBool(b: Boolean): Code = CodeBuilder.build(_.pushBool(b))
+  def pushNull: Code = CodeBuilder.build(_.pushNull())
+  def returnSlot: Code = CodeBuilder.build(_.returnSlot())
 
   /** Efficiently concatenate multiple Code fragments (avoids O(n²) string concatenation). */
   def concat(codes: Iterable[Code]): Code =
