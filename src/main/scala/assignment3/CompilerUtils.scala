@@ -36,6 +36,21 @@ object CompilerUtils {
 
   // --- Either-returning variants (preferred for new code) ---
 
+  /** Generic expectation framework for token types. */
+  private def expectTokenType[A](
+    f: SamTokenizer,
+    expectedKind: TokenType,
+    errorMsg: String,
+    extract: SamTokenizer => A,
+    record: A => String,
+    line: Int
+  )(using RecorderContext): Either[Diag, A] =
+    if f.peekAtKind != expectedKind then Left(SyntaxDiag(errorMsg, line, column(f)))
+    else
+      val v = extract(f)
+      rec(record(v))
+      Right(v)
+
   def expectE(f: SamTokenizer, expected: Char, line: Int)(using RecorderContext): Either[Diag, Unit] =
     if (!f.check(expected)) Left(SyntaxDiag(s"Expected '$expected'", line, column(f)))
     else { rec(expected.toString); Right(()) }
@@ -45,16 +60,13 @@ object CompilerUtils {
     else { rec(expected); Right(()) }
 
   def expectIdentifierE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, String] =
-    if (f.peekAtKind != TokenType.WORD) Left(SyntaxDiag("Expected identifier", line, column(f)))
-    else { val w = f.getWord; rec(w); Right(w) }
+    expectTokenType(f, TokenType.WORD, "Expected identifier", _.getWord, identity, line)
 
   def expectIntE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, Int] =
-    if (f.peekAtKind != TokenType.INTEGER) Left(SyntaxDiag("Expected integer", line, column(f)))
-    else { val v = f.getInt; rec(v.toString); Right(v) }
+    expectTokenType(f, TokenType.INTEGER, "Expected integer", _.getInt, _.toString, line)
 
   def expectStringE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, String] =
-    if (f.peekAtKind != TokenType.STRING) Left(SyntaxDiag("Expected string literal", line, column(f)))
-    else { val s = f.getString; rec(s"\"$s\""); Right(s) }
+    expectTokenType(f, TokenType.STRING, "Expected string literal", _.getString, s => s"\"$s\"", line)
 
   def expectWordE(f: SamTokenizer, expected: String, line: Int)(using RecorderContext): Either[Diag, Unit] =
     if (f.peekAtKind != TokenType.WORD) Left(SyntaxDiag(s"Expected '$expected'", line, column(f)))
@@ -77,8 +89,7 @@ object CompilerUtils {
     }
 
   def expectOperatorE(f: SamTokenizer, line: Int)(using RecorderContext): Either[Diag, Char] =
-    if (f.peekAtKind != TokenType.OPERATOR) Left(SyntaxDiag("Expected operator", line, column(f)))
-    else { val op = f.getOp; rec(op.toString); Right(op) }
+    expectTokenType(f, TokenType.OPERATOR, "Expected operator", _.getOp, _.toString, line)
 
   // --- Non-throwing utility methods ---
 
@@ -94,6 +105,8 @@ object CompilerUtils {
   def getOp(f: SamTokenizer)(using RecorderContext): Char = { val o = f.getOp; rec(o.toString); o }
   def skipToken(f: SamTokenizer)(using RecorderContext): Unit = { f.skipToken(); rec(".") }
   def column(f: SamTokenizer): Int = TokenizerOps.column(f)
+
+  /** Java-compatible overload with default LexicalRules. */
   def isTypeWord(
     tz: SamTokenizer,
     symbols: assignment3.symbol.ProgramSymbols,
@@ -103,6 +116,7 @@ object CompilerUtils {
   ): Boolean =
     isTypeWord(tz, symbols, currentClassName, allowUnknownNames, excludeStmtStarters, LexicalRules.Default)
 
+  /** Scala 3 version with using clause for custom LexicalRules. */
   def isTypeWord(
     tz: SamTokenizer,
     symbols: assignment3.symbol.ProgramSymbols,

@@ -66,7 +66,7 @@ final class AstParser(
       _ <- if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType) else ok(())
       name <- getIdentifierR()
       newDecl = VarDecl(name, varTypeOpt, valueTypeOpt, None)
-      allDecls <- parseRemainingVarNamesR(acc :+ newDecl, varTypeOpt, valueTypeOpt)
+      allDecls <- parseRemainingVarNamesR(newDecl :: acc, varTypeOpt, valueTypeOpt)
     yield allDecls
 
   /** Parse remaining variable names after the first: ", name2, name3" until ";" */
@@ -79,9 +79,9 @@ final class AstParser(
       if tv.peekKind() != TokenType.WORD then syntax(Messages.expectedVarNameAfterType)
       else getIdentifierR().flatMap { nm =>
         val newDecl = VarDecl(nm, varTypeOpt, valueTypeOpt, None)
-        parseRemainingVarNamesR(acc :+ newDecl, varTypeOpt, valueTypeOpt)
+        parseRemainingVarNamesR(newDecl :: acc, varTypeOpt, valueTypeOpt)
       }
-    else if tv.consumeChar(';') then ok(acc)
+    else if tv.consumeChar(';') then ok(acc.reverse)
     else syntax(Messages.expectedVarDeclSeparator)
 
   // --- Statement parsing helpers ---

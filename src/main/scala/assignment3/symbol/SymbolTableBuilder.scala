@@ -7,6 +7,14 @@ import Tokenizer.TokenType
 
 /** Immutable first-pass symbol table builder. */
 object SymbolTableBuilder {
+  /** Constants for symbol table construction. */
+  private object SymbolConstants {
+    val ThisParameterIndex = 0
+    val UnknownLine = -1
+    val UnknownColumn = -1
+    val ThisParameterName = "this"
+  }
+
   def buildD(
     tokenizer: SamTokenizer,
     rules: CompilerUtils.LexicalRules = CompilerUtils.LexicalRules.Default
@@ -104,7 +112,14 @@ object SymbolTableBuilder {
         _ <- expectCharR('(')
         _ <- if (className == "Main" && name == "main" && tv.peekKind() == TokenType.WORD)
           syntax(Messages.mainNoParams) else ok(())
-        params <- parseParams(knownClasses, className, Vector(VarSymbol("this", ValueType.ofObject(className), true, 0, -1, -1)))
+        params <- parseParams(knownClasses, className, Vector(VarSymbol(
+          SymbolConstants.ThisParameterName,
+          ValueType.ofObject(className),
+          true,
+          SymbolConstants.ThisParameterIndex,
+          SymbolConstants.UnknownLine,
+          SymbolConstants.UnknownColumn
+        )))
         _ <- expectCharR(')')
         _ <- expectCharR('{')
         bodyStart = tv.line
@@ -147,44 +162,42 @@ object SymbolTableBuilder {
         }
       yield result
 
-    private def skipBodyRemainder(): Result[Unit] = {
-      @scala.annotation.tailrec
-      def loop(depth: Int): Result[Unit] =
-        if (depth == 0) ok(())
-        else if (tv.peekKind() == TokenType.EOF) Left(SyntaxDiag(Messages.unbalancedBraces, tv.line, tv.col))
-        else if (tv.consumeChar('{')) loop(depth + 1)
-        else if (tv.consumeChar('}')) loop(depth - 1)
-        else { CompilerUtils.skipToken(tv.tz); loop(depth) }
-      loop(1)
-    }
+    private def skipBodyRemainder(): Result[Unit] =
+      skipBalancedBraces(Messages.unbalancedBraces)
 
     private def validateTypes(program: ProgramSymbols): Result[Unit] = {
       import assignment3.ast.high.ReturnSig
 
+      /** Generic validation for object references that must exist in the program. */
+      def validateObjectRef(className: String, line: Int, col: Int)(mkError: String => String): Result[Unit] =
+        if !program.existsClass(className) then
+          err(TypeDiag(mkError(className), line, col))
+        else ok(())
+
       def checkField(cls: ClassSymbol, f: VarSymbol): Result[Unit] =
         f.valueType match {
-          case ObjectRefType(cn) if !program.existsClass(cn) =>
-            err(TypeDiag(Messages.unknownFieldType(cls.getName, f.getName, cn), f.getLine, f.getColumn))
+          case ObjectRefType(cn) =>
+            validateObjectRef(cn, f.getLine, f.getColumn)(Messages.unknownFieldType(cls.getName, f.getName, _))
           case _ => ok(())
         }
 
       def checkParam(cls: ClassSymbol, m: MethodSymbol, p: VarSymbol): Result[Unit] =
         p.valueType match {
-          case ObjectRefType(cn) if !program.existsClass(cn) =>
-            err(TypeDiag(Messages.unknownParamType(cls.getName, m.getName, p.getName, cn), p.getLine, p.getColumn))
+          case ObjectRefType(cn) =>
+            validateObjectRef(cn, p.getLine, p.getColumn)(Messages.unknownParamType(cls.getName, m.getName, p.getName, _))
           case _ => ok(())
         }
 
       def checkLocal(cls: ClassSymbol, m: MethodSymbol, v: VarSymbol): Result[Unit] =
         v.valueType match {
-          case ObjectRefType(cn) if !program.existsClass(cn) =>
-            err(TypeDiag(Messages.unknownLocalType(cls.getName, m.getName, v.getName, cn), v.getLine, v.getColumn))
+          case ObjectRefType(cn) =>
+            validateObjectRef(cn, v.getLine, v.getColumn)(Messages.unknownLocalType(cls.getName, m.getName, v.getName, _))
           case _ => ok(())
         }
 
       def checkMethodReturn(cls: ClassSymbol, m: MethodSymbol): Result[Unit] = m.getReturnSig match {
-        case ReturnSig.Obj(cn) if !program.existsClass(cn) =>
-          err(TypeDiag(Messages.unknownReturnType(cls.getName, m.getName, cn), m.getReturnTypeLine(), m.getReturnTypeColumn()))
+        case ReturnSig.Obj(cn) =>
+          validateObjectRef(cn, m.getReturnTypeLine(), m.getReturnTypeColumn())(Messages.unknownReturnType(cls.getName, m.getName, _))
         case _ => ok(())
       }
 

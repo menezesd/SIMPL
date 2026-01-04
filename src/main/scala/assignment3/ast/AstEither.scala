@@ -1,6 +1,6 @@
 package assignment3.ast
 
-import assignment3.{Messages, Operators, Type}
+import assignment3.{BinaryOpMapping, Messages, Operators, Type}
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 
 object AstEither:
@@ -29,26 +29,25 @@ object AstEither:
 
   // --- Binary expression helpers ---
 
+  /** Unified helper for string operations. */
+  private def tryStringOp(cond: Boolean, op: BinaryOp, left: Expr, right: Expr, resultType: Type): Option[Expr] =
+    if cond then Some(Binary(op, left, right, Some(resultType))) else None
+
   /** Try to build a string repeat expression: String * Int or Int * String */
   private def tryStringRepeat(left: Expr, right: Expr, lt: Type, rt: Type): Option[Expr] =
-    if (lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING) then
-      Some(Binary(BinaryOp.Mul, left, right, Some(Type.STRING)))
-    else None
+    tryStringOp((lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING),
+                BinaryOp.Mul, left, right, Type.STRING)
 
   /** Try to build a string concatenation: String + String */
   private def tryStringConcat(left: Expr, right: Expr, lt: Type, rt: Type): Option[Expr] =
-    if lt == Type.STRING && rt == Type.STRING then
-      Some(Binary(BinaryOp.Add, left, right, Some(Type.STRING)))
-    else None
+    tryStringOp(lt == Type.STRING && rt == Type.STRING,
+                BinaryOp.Add, left, right, Type.STRING)
 
   /** Try to build a string comparison: String < > = String */
   private def tryStringCompare(op: Char, left: Expr, right: Expr, lt: Type, rt: Type): Option[Expr] =
     if lt == Type.STRING && rt == Type.STRING then
-      val bop = op match
-        case LT => BinaryOp.Lt
-        case GT => BinaryOp.Gt
-        case EQ => BinaryOp.Eq
-      Some(Binary(bop, left, right, Some(Type.BOOL)))
+      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Eq)
+      tryStringOp(true, bop, left, right, Type.BOOL)
     else None
 
   /** Build logical expression: & or | with BOOL operands */
@@ -64,12 +63,7 @@ object AstEither:
     if lt != Type.INT || rt != Type.INT then
       Left(TypeDiag(Messages.TypeCheck.arithmeticOpRequiresInt, line, column))
     else
-      val bop = op match
-        case ADD => BinaryOp.Add
-        case SUB => BinaryOp.Sub
-        case MUL => BinaryOp.Mul
-        case DIV => BinaryOp.Div
-        case MOD => BinaryOp.Mod
+      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Add) // fallback should not occur
       Right(Binary(bop, left, right, Some(Type.INT)))
 
   /** Build comparison expression: < > = with compatible types */
@@ -77,10 +71,7 @@ object AstEither:
     if !lt.isCompatibleWith(rt) then
       Left(TypeDiag(Messages.TypeCheck.comparisonRequiresMatchingTypes, line, column))
     else
-      val bop = op match
-        case LT => BinaryOp.Lt
-        case GT => BinaryOp.Gt
-        case EQ => BinaryOp.Eq
+      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Eq) // fallback should not occur
       Right(Binary(bop, left, right, Some(Type.BOOL)))
 
   /** Type-check and build a binary expression with diagnostic result.

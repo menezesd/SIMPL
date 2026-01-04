@@ -122,12 +122,20 @@ object Messages {
     val returnTypeMismatch = "Return type mismatch"
     val returnObjectTypeMismatch = "Return object type mismatch"
 
-    def nullDerefFieldAccess(field: String): String = s"Null dereference in field access '$field'"
-    def nullDerefFieldAssign(field: String): String = s"Null dereference in field assignment '$field'"
+    // Message builders for related errors
+    private def nullDerefMsg(operation: String, target: String): String =
+      s"Null dereference in $operation '$target'"
+
+    private def assignMismatchMsg(isObject: Boolean, targetType: String, name: String): String =
+      if isObject then s"Object assignment type mismatch for $targetType '$name'"
+      else s"Type mismatch ${if targetType == "field" then "assigning to" else "in assignment to"} '$name'"
+
+    def nullDerefFieldAccess(field: String): String = nullDerefMsg("field access", field)
+    def nullDerefFieldAssign(field: String): String = nullDerefMsg("field assignment", field)
     def argTypeMismatch(param: String): String = s"Argument type mismatch for parameter '$param'"
-    def objAssignMismatch(name: String): String = s"Object assignment type mismatch for variable '$name'"
-    def primAssignMismatch(name: String): String = s"Type mismatch in assignment to '$name'"
-    def fieldObjAssignMismatch(field: String): String = s"Object assignment type mismatch for field '$field'"
-    def fieldPrimAssignMismatch(field: String): String = s"Type mismatch assigning to field '$field'"
+    def objAssignMismatch(name: String): String = assignMismatchMsg(true, "variable", name)
+    def primAssignMismatch(name: String): String = assignMismatchMsg(false, "variable", name)
+    def fieldObjAssignMismatch(field: String): String = assignMismatchMsg(true, "field", field)
+    def fieldPrimAssignMismatch(field: String): String = assignMismatchMsg(false, "field", field)
   }
 }

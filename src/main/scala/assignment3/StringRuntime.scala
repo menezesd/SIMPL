@@ -24,11 +24,22 @@ object StringRuntime {
     val Local3        = StackOffset(4)    // Third local variable
   }
 
+  // Stack cleanup constants (argument count to pop after runtime calls)
+  private object ArgCleanup {
+    val RepeatArgs  = -1  // REPEAT takes 2 args, leaves 1 result (net: cleanup 1)
+    val ConcatArgs  = -1  // CONCAT takes 2 args, leaves 1 result (net: cleanup 1)
+    val AppendArgs  = -2  // APPEND takes 3 args, leaves 1 result (net: cleanup 2)
+    val CompareArgs = -1  // COMPARE takes 2 args, leaves 1 result (net: cleanup 1)
+    val AppendCall  = -2  // Internal APPEND call cleanup
+    val ThreeArgs   = -3  // Full 3-argument cleanup for complex operations
+    val TwoArgs     = -2  // Full 2-argument cleanup
+  }
+
   def repeatString(firstInputType: Type, secondInputType: Type): String = {
     val sb = new SamBuilder()
   if (firstInputType == Type.STRING) sb.swap()
     sb.linkCall(REPEAT_LABEL)
-      .addSp(-1)
+      .addSp(ArgCleanup.RepeatArgs)
     sb.toString
   }
 
@@ -54,8 +65,8 @@ object StringRuntime {
 
   /** Emit STR_LENGTH subroutine: counts characters until null terminator */
   private def emitLengthFunction(sb: SamBuilder): Unit =
-    val startCountLabel = new Label()
-    val stopCountLabel = new Label()
+    val startCountLabel = Label()
+    val stopCountLabel = Label()
     sb.label(LENGTH_LABEL)
     sb.swap().dup()
     sb.label(startCountLabel.name)
@@ -69,8 +80,8 @@ object StringRuntime {
   /** Emit STR_REVERSE subroutine: creates reversed copy of string */
   private def emitReverseFunction(sb: SamBuilder): Unit =
     import StackSlots._
-    val reverseStartLoopLabel = new Label()
-    val reverseStopLoopLabel = new Label()
+    val reverseStartLoopLabel = Label()
+    val reverseStopLoopLabel = Label()
     sb.label(REVERSE_LABEL)
     sb.pushImmInt(0).pushImmInt(0).pushImmInt(0)
     sb.pushOffS(ReturnAddress)
@@ -86,7 +97,7 @@ object StringRuntime {
     sb.pushOffS(Local1).pushImmInt(1).sub().storeOffS(Local1)
     sb.jump(reverseStartLoopLabel.name)
     sb.label(reverseStopLoopLabel.name)
-    sb.pushOffS(Local3).storeOffS(ReturnAddress).addSp(-3).rst()
+    sb.pushOffS(Local3).storeOffS(ReturnAddress).addSp(ArgCleanup.ThreeArgs).rst()
 
   /** Emit STR_CONCAT subroutine: concatenates two strings */
   private def emitConcatFunction(sb: SamBuilder): Unit =
@@ -105,13 +116,13 @@ object StringRuntime {
     sb.pushImmInt(0).pushOffS(Local1).pushOffS(ReturnAddress)
     sb.append(appendStringHeap())
     sb.storeOffS(Local1)
-    sb.pushOffS(Local2).storeOffS(SecondArg).addSp(-2).rst()
+    sb.pushOffS(Local2).storeOffS(SecondArg).addSp(ArgCleanup.TwoArgs).rst()
 
   /** Emit STR_APPEND subroutine: appends source string to destination buffer */
   private def emitAppendFunction(sb: SamBuilder): Unit =
     import StackSlots._
-    val appendStartLoopLabel = new Label()
-    val appendStopLoopLabel = new Label()
+    val appendStartLoopLabel = Label()
+    val appendStopLoopLabel = Label()
     sb.label(APPEND_LABEL)
     sb.pushOffS(SecondArg).pushOffS(ReturnAddress)
     sb.label(appendStartLoopLabel.name)
@@ -121,15 +132,15 @@ object StringRuntime {
     sb.pushOffS(Local2).pushImmInt(1).add().storeOffS(Local2)
     sb.jump(appendStartLoopLabel.name)
     sb.label(appendStopLoopLabel.name)
-    sb.pushOffS(Local1).pushImmCh('\u0000').storeInd().pushOffS(Local1).storeOffS(ThirdArg).addSp(-2).rst()
+    sb.pushOffS(Local1).pushImmCh('\u0000').storeInd().pushOffS(Local1).storeOffS(ThirdArg).addSp(ArgCleanup.TwoArgs).rst()
 
   /** Emit STR_REPEAT subroutine: repeats string N times */
   private def emitRepeatFunction(sb: SamBuilder): Unit =
     import StackSlots._
-    val repeatStartLoopLabel = new Label()
-    val repeatStopLoopLabel = new Label()
-    val repeatInvalidParamLabel = new Label()
-    val repeatReturnLabel = new Label()
+    val repeatStartLoopLabel = Label()
+    val repeatStopLoopLabel = Label()
+    val repeatInvalidParamLabel = Label()
+    val repeatReturnLabel = Label()
     sb.label(REPEAT_LABEL)
     sb.pushImmInt(0).pushImmInt(0).pushImmInt(0)
     sb.pushOffS(SecondArg).isNeg().branchIfTruthy(repeatInvalidParamLabel.name)
@@ -149,13 +160,13 @@ object StringRuntime {
     sb.label(repeatInvalidParamLabel.name)
     sb.pushImmStr("\"\"").storeOffS(SecondArg)
     sb.label(repeatReturnLabel.name)
-    sb.addSp(-3).rst()
+    sb.addSp(ArgCleanup.ThreeArgs).rst()
 
   /** Emit STR_COMPARE subroutine: lexicographic comparison */
   private def emitCompareFunction(sb: SamBuilder): Unit =
     import StackSlots._
-    val cmpStartLoopLabel = new Label()
-    val cmpStopLoopLabel = new Label()
+    val cmpStartLoopLabel = Label()
+    val cmpStopLoopLabel = Label()
     sb.label(COMPARE_LABEL)
     sb.pushImmInt(0).pushImmInt(0)
     sb.label(cmpStartLoopLabel.name)
@@ -168,7 +179,7 @@ object StringRuntime {
     sb.pushOffS(Local1).pushImmInt(1).add().storeOffS(Local1)
     sb.jump(cmpStartLoopLabel.name)
     sb.label(cmpStopLoopLabel.name)
-    sb.pushOffS(Local2).storeOffS(SecondArg).addSp(-2).rst()
+    sb.pushOffS(Local2).storeOffS(SecondArg).addSp(ArgCleanup.TwoArgs).rst()
 
   /** Emit all shared string helper subroutines exactly once. */
   def emitAllStringFunctions(): String =
@@ -192,13 +203,13 @@ object StringRuntime {
 
   def appendStringHeap(): String = {
     val sb = new SamBuilder()
-  sb.linkCall(APPEND_LABEL).addSp(-2)
+  sb.linkCall(APPEND_LABEL).addSp(ArgCleanup.AppendCall)
     sb.toString
   }
 
   def concatString(): String = {
     val sb = new SamBuilder()
-  sb.linkCall(CONCAT_LABEL).addSp(-1)
+  sb.linkCall(CONCAT_LABEL).addSp(ArgCleanup.ConcatArgs)
     sb.toString
   }
 
@@ -207,7 +218,7 @@ object StringRuntime {
     // If an invalid operator is passed, emit code that leaves 'false' on stack.
     val isComparison = OperatorUtils.getBinopTypeE(op).exists(_ == BinopType.COMPARISON)
     val sb = new SamBuilder()
-    sb.linkCall(COMPARE_LABEL).addSp(-1)
+    sb.linkCall(COMPARE_LABEL).addSp(ArgCleanup.CompareArgs)
     op match
       case '<' if isComparison => sb.pushImmInt(1)
       case '>' if isComparison => sb.pushImmInt(-1)

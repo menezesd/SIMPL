@@ -41,9 +41,35 @@ object Offsets {
   object StackOffset {
     def apply(n: Int): StackOffset = n
     extension (s: StackOffset) inline def value: Int = s
+
     // Conventional slots for readability; these are relative to FBR within a frame
     inline def returnSlot: StackOffset = 0      // Return value slot (above 'this')
     inline def thisSlot: StackOffset = -1       // Implicit receiver ('this')
+
+    // Stack frame layout constants
+    /** Base offset for local variables (after return address slot at 0). */
+    inline def FirstLocalBase: Int = 2
+
+    // Common argument and local slot helpers
+    /** Get argument slot (1-indexed: arg1 = -2, arg2 = -3, etc.) */
+    inline def arg(n: Int): StackOffset = -(n + 1)
+
+    /** Get local variable slot (0-indexed: local0 = 1, local1 = 2, etc.) */
+    inline def local(n: Int): StackOffset = n + 1
+
+    /** Compute parameter offset for SaM calling convention. */
+    inline def parameterOffset(index: Int, totalParams: Int): StackOffset = -(totalParams - index)
+
+    /** Compute local variable offset for SaM calling convention. */
+    inline def localOffset(index: Int): StackOffset = FirstLocalBase + index
+
+    // Specific slot aliases for common patterns
+    inline def firstArg: StackOffset = -2       // First explicit argument (after 'this')
+    inline def secondArg: StackOffset = -3      // Second argument
+    inline def thirdArg: StackOffset = -4       // Third argument
+    inline def firstLocal: StackOffset = 1      // First local variable
+    inline def secondLocal: StackOffset = 2     // Second local variable
+    inline def thirdLocal: StackOffset = 3      // Third local variable
   }
 
   opaque type FieldOffset = Int

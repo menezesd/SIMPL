@@ -35,10 +35,28 @@ enum ValueType:
     case Primitive(t) => t.toString
     case ObjectRef(cn) => s"obj:$cn"
 
+  /** Extract both primitive and object type as a tuple for convenience. */
+  def toPrimitiveAndObject: (Option[Type], Option[String]) =
+    (primitiveOpt, classNameOpt)
+
+  /** Check if this type matches parsed type information. */
+  def matches(parsedPrimOpt: Option[Type], parsedObjOpt: Option[String]): Boolean = this match
+    case ObjectRef(cn) => parsedObjOpt.contains(cn)
+    case Primitive(t) => parsedPrimOpt.contains(t)
+
+  /** Format as user-friendly string for error messages (without obj: prefix). */
+  def formatForError: String = this match
+    case ObjectRef(cn) => cn
+    case Primitive(t) => t.toString
+
 object ValueType:
   def ofPrimitive(t: Type): ValueType = Primitive(t)
   def ofObject(className: String): ValueType = ObjectRef(className)
   def ofObject(ot: ObjectType): ValueType = ObjectRef(ot.className)
+
+  /** Format parsed type options for error messages. */
+  def formatParsed(objOpt: Option[String], primOpt: Option[Type]): String =
+    objOpt.getOrElse(primOpt.fold("void")(_.toString))
 
 // Legacy type aliases for backward compatibility during refactoring
 type PrimitiveType = ValueType.Primitive

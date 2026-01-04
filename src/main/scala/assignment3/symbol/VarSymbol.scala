@@ -1,6 +1,7 @@
 package assignment3.symbol
 
 import assignment3.{Type, ValueType, ObjectType, PrimitiveType, ObjectRefType}
+import assignment3.Offsets.StackOffset
 
 final case class VarSymbol(
   name: String,
@@ -35,7 +36,8 @@ final case class VarSymbol(
 
   /** Stack frame offset based on calling convention. */
   def stackAddress(totalParams: Int): Int =
-    if (parameter) -(totalParams - index) else 2 + index
+    if (parameter) StackOffset.parameterOffset(index, totalParams).value
+    else StackOffset.localOffset(index).value
 
   override def toString: String = {
     val typeRepr = valueType match {

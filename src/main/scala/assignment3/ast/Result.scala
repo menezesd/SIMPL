@@ -3,10 +3,78 @@ package assignment3.ast
 /**
  * Canonical diagnostic-first result type for parser/semantic/codegen flows.
  *
- * Naming conventions for Result/Either-returning functions:
- * - `*D` suffix: Diagnostic-first public APIs (e.g., compileD, parseD, emitD)
- * - `*R` suffix: Result-returning internal parser methods (e.g., parseExprR, parseStmtR)
- * - `*E` suffix: Either-returning semantic/validation checks (e.g., checkExprE, checkStmtE)
+ * ## Naming Conventions for Error-Handling Methods
+ *
+ * This codebase uses consistent suffixes to indicate error-handling patterns:
+ *
+ * ### `*D` suffix: **Diagnostic-first public API**
+ * - Returns `Either[Diag, A]` (same as `Result[A]`)
+ * - Used for top-level entry points and public interfaces
+ * - Examples: `compileD()`, `parseD()`, `emitD()`, `buildD()`
+ * - Typical callers: External code, top-level orchestration
+ *
+ * ### `*R` suffix: **Result-returning internal methods**
+ * - Returns `Result[A]` (which is `Either[Diag, A]`)
+ * - Used primarily in parser internals for intermediate parsing steps
+ * - Examples: `parseExprR()`, `parseStmtR()`, `parseClassR()`
+ * - Typical callers: Internal parser logic, recursive parsing
+ * - Often composed with for-comprehensions for error propagation
+ *
+ * ### `*E` suffix: **Either-returning validation/checks**
+ * - Returns `Either[Diag, A]` (semantically same as Result but conceptually different)
+ * - Used for semantic validation, type checking, and constraint enforcement
+ * - Examples: `checkExprE()`, `checkStmtE()`, `validateTypeE()`
+ * - Typical callers: Semantic analysis passes, validation phases
+ *
+ * ### `*C` suffix: **Code-returning (infallible codegen)**
+ * - Returns `Code` (never fails)
+ * - Used for code generation that cannot fail
+ * - Examples: `emitLiteralC()`, `emitBinaryC()`
+ * - Typical callers: Code generation where failure is impossible
+ *
+ * ### No suffix: **Legacy or infallible operations**
+ * - May throw exceptions, return non-Either values, or be simple accessors
+ * - Examples: `parse()` (legacy throwing API), `getName()` (simple getter)
+ * - Avoid in new code; prefer diagnostic-first approach
+ *
+ * ## Best Practices
+ *
+ * 1. **Public APIs**: Always use `*D` suffix for top-level functions
+ * 2. **Parser internals**: Use `*R` for parsing methods that return Results
+ * 3. **Validation**: Use `*E` for semantic/type checking methods
+ * 4. **Infallible codegen**: Use `*C` when code emission cannot fail
+ * 5. **Error messages**: Use lazy parameters (`=> Diag`) to avoid unnecessary computation
+ * 6. **Composition**: Leverage for-comprehensions and Result extension methods
+ *
+ * ## Example Usage
+ *
+ * ```scala
+ * // Public API (diagnostic-first)
+ * def compileD(source: String): Either[Diag, Program] =
+ *   for
+ *     tokens <- tokenizeR(source)
+ *     ast <- parseR(tokens)
+ *     checked <- checkE(ast)
+ *     code <- emitD(checked)
+ *   yield code
+ *
+ * // Internal parser method
+ * private def parseExprR(): Result[Expr] =
+ *   for
+ *     left <- parseTermR()
+ *     _ <- expectCharR('+')
+ *     right <- parseTermR()
+ *   yield Binary(left, right)
+ *
+ * // Semantic validation
+ * private def checkTypeE(expr: Expr, expected: Type): Either[Diag, Unit] =
+ *   if expr.tpe == expected then Right(())
+ *   else Left(TypeDiag(s"Expected $expected, got ${expr.tpe}", expr.line))
+ *
+ * // Infallible codegen
+ * private def emitLiteralC(lit: IntLit): Code =
+ *   Code.from(s"PUSHIMM ${lit.value}")
+ * ```
  */
 type Result[+A] = Either[Diag, A]
 
@@ -24,8 +92,8 @@ object Result:
   /** Traverse a list, collecting results or short-circuiting on first error. */
   def traverseE[A, B](items: List[A])(f: A => Result[B]): Result[List[B]] =
     items.foldLeft[Result[List[B]]](Right(Nil)) { (accE, a) =>
-      for { acc <- accE; b <- f(a) } yield acc :+ b
-    }
+      for { acc <- accE; b <- f(a) } yield b :: acc
+    }.map(_.reverse)
 
   /** Fold items with an accumulator, short-circuiting on first error. */
   def foldE[A, B](items: Iterable[A], init: B)(f: (B, A) => Result[B]): Result[B] =
@@ -102,6 +170,59 @@ object Result:
 
     /** Convert Option to Result with a lazy diagnostic constructor. */
     inline def toResultWith(mkDiag: => Diag): Result[A] = opt.toRight(mkDiag)
+
+    /** Check an Option with a validation function, succeeding if None or if check passes. */
+    def checkWith[B](f: A => Result[B]): Result[Unit] =
+      opt.fold(Result.unit)(f(_).map(_ => ()))
+
+  /** Check an Option with a validation function, succeeding if None or if check passes. */
+  def ifSome[A](opt: Option[A])(f: A => Result[Unit]): Result[Unit] =
+    opt.fold(Result.unit)(f)
+
+  /** Validate all items with indexed errors. */
+  def validateIndexed[A](items: List[A])(pred: (A, Int) => Boolean, mkDiag: (A, Int) => Diag): Result[Unit] =
+    items.zipWithIndex.find { case (a, i) => !pred(a, i) } match
+      case Some((a, i)) => Left(mkDiag(a, i))
+      case None => Right(())
+
+  /** Check that exactly one of the options is defined. */
+  def requireExactlyOne[A](opts: Option[A]*)(noneErr: => Diag, multipleErr: => Diag): Result[A] =
+    opts.flatten.toList match
+      case Nil => Left(noneErr)
+      case single :: Nil => Right(single)
+      case _ => Left(multipleErr)
+
+  /** Validate a non-empty collection. */
+  def requireNonEmpty[A](items: Iterable[A], ifEmpty: => Diag): Result[Unit] =
+    if items.nonEmpty then Right(()) else Left(ifEmpty)
+
+  /** Chain validations with early exit. */
+  def validateChain[A](value: A)(validators: (A => Result[Unit])*): Result[A] =
+    validators.foldLeft[Result[Unit]](Right(())) { (acc, validator) =>
+      acc.flatMap(_ => validator(value))
+    }.map(_ => value)
+
+  /** Extension methods for Result composition. */
+  extension [A](self: Result[A])
+    /** Flatten nested Results. */
+    def flatten[B](using ev: A <:< Result[B]): Result[B] =
+      self.flatMap(identity)
+
+    /** Apply a function that may fail to a successful result. */
+    def andThen[B](f: A => Result[B]): Result[B] =
+      self.flatMap(f)
+
+    /** Execute an action for its side effects, preserving the result. */
+    def tap(f: A => Unit): Result[A] =
+      self.foreach(f); self
+
+    /** Conditional flatMap. */
+    def flatMapIf(cond: Boolean)(f: A => Result[A]): Result[A] =
+      if cond then self.flatMap(f) else self
+
+    /** Provide a default error message if Left. */
+    def withErrorDefault(msg: => String): Result[A] =
+      self.left.map(d => if d.message.isEmpty then d.withMessage(msg) else d)
 
   /** Extension methods for Either[String, A] to Diag conversions. */
   extension [A](either: Either[String, A])

@@ -18,8 +18,8 @@ private final class ProgramParser private (
   private def parseProgramR(): Result[ProgramNode] =
     def loop(acc: List[ClassNode]): Result[List[ClassNode]] =
       if tv.peekKind() != TokenType.EOF then
-        parseClassR().flatMap(cls => loop(acc :+ cls))
-      else ok(acc)
+        parseClassR().flatMap(cls => loop(cls :: acc))
+      else ok(acc.reverse)
     loop(Nil).map(ProgramNode(_))
 
   // Public diagnostic-first parsing
@@ -61,21 +61,6 @@ private final class ProgramParser private (
       body <- parseMethodBodyR(className, methodName, ms, returnSig)
     yield MethodNode(className, methodName, params, returnSig, body)
 
-  /** Check if parsed parameter type matches expected formal parameter type. */
-  private def typeMatches(formalType: ValueType, parsedPrimOpt: Option[Type], parsedObjOpt: Option[String]): Boolean =
-    formalType match
-      case ObjectRefType(cn) => parsedObjOpt.contains(cn)
-      case PrimitiveType(t) => parsedPrimOpt.contains(t)
-
-  /** Format type for error messages. */
-  private def formatType(valueType: ValueType): String = valueType match
-    case ObjectRefType(cn) => cn
-    case PrimitiveType(t) => t.toString
-
-  /** Format parsed type (from parser) for error messages. */
-  private def formatParsedType(objOpt: Option[String], primOpt: Option[Type]): String =
-    objOpt.getOrElse(primOpt.fold("void")(_.toString))
-
   private def parseParamsR(ms: MethodSymbol, methodName: String): Result[List[ParamNode]] =
     val expectedUserParams = ms.expectedUserArgs()
     def loop(paramIndex: Int, acc: List[ParamNode]): Result[List[ParamNode]] =
@@ -92,16 +77,16 @@ private final class ProgramParser private (
               syntax(Messages.tooManyParameters(methodName, expectedUserParams, paramIndex + 1))
             else ok(())
           formal = ms.parameters(paramIndex + 1) // +1 skips implicit 'this'
-          typeOk = typeMatches(formal.valueType, pTypeOpt, pobjOpt)
+          typeOk = formal.valueType.matches(pTypeOpt, pobjOpt)
           _ <- if !typeOk || formal.getName != pName then
-            val expectedType = formatType(formal.valueType)
-            val actualType = formatParsedType(pobjOpt, pTypeOpt)
+            val expectedType = formal.valueType.formatForError
+            val actualType = ValueType.formatParsed(pobjOpt, pTypeOpt)
             syntax(Messages.parameterMismatch(methodName, paramIndex + 1, expectedType, formal.getName, actualType, pName))
           else ok(())
           _ = tv.consumeChar(',')
-          result <- loop(paramIndex + 1, acc :+ ParamNode(pName, pobjOpt, pTypeOpt))
+          result <- loop(paramIndex + 1, ParamNode(pName, pobjOpt, pTypeOpt) :: acc)
         yield result
-      else ok(acc)
+      else ok(acc.reverse)
     loop(0, Nil)
 
   private def parseMethodBodyR(className: String, methodName: String, ms: MethodSymbol, returnSig: assignment3.ast.high.ReturnSig): Result[assignment3.ast.Block] =
@@ -113,9 +98,9 @@ private final class ProgramParser private (
           parsed <- stmtParser.parseStmtD()
           folded = folder.foldStmt(parsed)
           _ <- assignment3.ast.IdiomaticSemantic.checkStmtE(folded, ms, tv.line, symbols)
-          result <- loop(acc :+ folded)
+          result <- loop(folded :: acc)
         yield result
-      else ok(acc)
+      else ok(acc.reverse)
     for
       stmts <- loop(Nil)
       missingReturn = returnSig != assignment3.ast.high.ReturnSig.Void && (stmts.isEmpty || !endsWithReturn(stmts.last))

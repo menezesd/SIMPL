@@ -1,6 +1,6 @@
 package assignment3.ast
 
-import assignment3.{Code, Label, Messages, OperatorUtils, Operators, SamBuilder, StringRuntime, Type}
+import assignment3.{BinaryOpMapping, Code, Label, Messages, OperatorUtils, Operators, SamBuilder, StringRuntime, Type}
 import assignment3.Offsets.{FieldOffset, StackOffset}
 import assignment3.ast as id
 import assignment3.ast.high.ReturnSig
@@ -31,11 +31,26 @@ object IdiomaticCodegen:
     returnLabelOpt: Option[Label] = None
   )
 
+  /** Extension methods for Ctx to simplify symbol context access. */
+  extension (ctx: Ctx)
+    /** Execute function with symbol context if available, otherwise return fallback. */
+    def withSymbolContext[A](f: (SymbolMethodFrame, ProgramSymbols) => A, fallback: => A): A =
+      (ctx.frameOpt, ctx.programSymbolsOpt) match
+        case (Some(smf: SymbolMethodFrame), Some(ps)) => f(smf, ps)
+        case _ => fallback
+
+    /** Execute function with symbol context if available, otherwise return diagnostic. */
+    def withSymbolContextE[A](f: (SymbolMethodFrame, ProgramSymbols) => Either[Diag, A],
+                              mkDiag: => Diag): Either[Diag, A] =
+      (ctx.frameOpt, ctx.programSymbolsOpt) match
+        case (Some(smf: SymbolMethodFrame), Some(ps)) => f(smf, ps)
+        case _ => Left(mkDiag)
+
   private def typeOf(e: id.Expr, ctx: Ctx): assignment3.Type =
-    (ctx.frameOpt, ctx.programSymbolsOpt) match
-      case (Some(smf: SymbolMethodFrame), Some(ps)) =>
-        IdiomaticTypeUtils.typeOf(e, new NewMethodContext(smf.getSymbol, ps), ps)
-      case _ => Type.INT
+    ctx.withSymbolContext(
+      (smf, ps) => IdiomaticTypeUtils.typeOf(e, new NewMethodContext(smf.getSymbol, ps), ps),
+      Type.INT
+    )
 
   // Helper: emit a literal expression
   private def emitLiteralD(e: id.Expr): Either[Diag, Code] = e match
@@ -65,10 +80,10 @@ object IdiomaticCodegen:
     cachedInfoOpt.map(_.offset).filter(_ >= 0) match
       case Some(off) => Right(off)
       case None =>
-        (ctx.frameOpt, ctx.programSymbolsOpt) match
-          case (Some(smf: SymbolMethodFrame), Some(ps)) =>
-            AstEither.resolveFieldInfoD(target, field, new NewMethodContext(smf.getSymbol, ps), ps, pos).map(_.offset)
-          case _ => Left(ResolveDiag(Messages.Codegen.unknownField(field), pos))
+        ctx.withSymbolContextE(
+          (smf, ps) => AstEither.resolveFieldInfoD(target, field, new NewMethodContext(smf.getSymbol, ps), ps, pos).map(_.offset),
+          ResolveDiag(Messages.Codegen.unknownField(field), pos)
+        )
 
   // Helper: emit field access
   private def emitFieldAccessD(target: id.Expr, field: String, fieldInfoOpt: Option[assignment3.symbol.ClassSymbol.FieldInfo], pos: Int, ctx: Ctx): Either[Diag, Code] =
@@ -83,6 +98,28 @@ object IdiomaticCodegen:
   // Binary operation categories for clearer dispatch
   private enum BinaryOpCategory:
     case ShortCircuit, String, Numeric
+
+  /** ADT for string operations with type-safe emission. */
+  private enum StringOperation:
+    case Repeat(leftType: Type, rightType: Type)
+    case Concat
+    case Compare(op: Char)
+
+    /** Emit the runtime code for this string operation. */
+    def emitRuntime(): String = this match
+      case Repeat(lt, rt) => StringRuntime.repeatString(lt, rt)
+      case Concat => StringRuntime.concatString()
+      case Compare(op) => StringRuntime.compareString(op)
+
+  private object StringOperation:
+    /** Determine the string operation from BinaryOp and types. */
+    def from(op: id.BinaryOp, lt: Type, rt: Type): Option[StringOperation] = op match
+      case BinaryOp.Mul if lt == Type.STRING || rt == Type.STRING => Some(Repeat(lt, rt))
+      case BinaryOp.Add if lt == Type.STRING && rt == Type.STRING => Some(Concat)
+      case BinaryOp.Lt  if lt == Type.STRING && rt == Type.STRING => Some(Compare('<'))
+      case BinaryOp.Gt  if lt == Type.STRING && rt == Type.STRING => Some(Compare('>'))
+      case BinaryOp.Eq  if lt == Type.STRING && rt == Type.STRING => Some(Compare('='))
+      case _ => None
 
   private def categorizeBinaryOp(op: id.BinaryOp, lt: Type, rt: Type): BinaryOpCategory =
     if (op == BinaryOp.And || op == BinaryOp.Or) && lt == Type.BOOL && rt == Type.BOOL then
@@ -125,48 +162,49 @@ object IdiomaticCodegen:
       if op == BinaryOp.And then emitShortCircuitAndC(leftCode, rightCode, sb)
       else emitShortCircuitOrC(leftCode, rightCode, sb)
 
+  /** Operation constraint: defines validation rules for binary operations. */
+  private case class OpConstraint(
+    ops: Set[id.BinaryOp],
+    isValid: (Type, Type) => Boolean,
+    errorMsg: String
+  )
+
+  /** Table of operation constraints for string operations. */
+  private val stringOpConstraints: List[OpConstraint] = List(
+    OpConstraint(Set(BinaryOp.Add), (lt, rt) => lt == Type.STRING && rt == Type.STRING, Messages.Codegen.plusOnlyStringOrNumeric),
+    OpConstraint(Set(BinaryOp.Mul), (lt, rt) => (lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING), Messages.Codegen.repeatRequiresStringInt),
+    OpConstraint(Set(BinaryOp.Lt, BinaryOp.Gt, BinaryOp.Eq), (lt, rt) => lt == Type.STRING && rt == Type.STRING, Messages.Codegen.stringComparisonRequiresBothString),
+    OpConstraint(Set(BinaryOp.Le, BinaryOp.Ge, BinaryOp.Ne), (_, _) => false, Messages.Codegen.unsupportedStringOperator)
+  )
+
+  /** Unsupported operations (always fail). */
+  private val unsupportedOps: Map[id.BinaryOp, String] = Map(
+    BinaryOp.Concat -> Messages.Codegen.concatInternalOnly,
+    BinaryOp.Le -> Messages.Codegen.leNotSupported,
+    BinaryOp.Ge -> Messages.Codegen.geNotSupported,
+    BinaryOp.Ne -> Messages.Codegen.neNotSupported
+  )
+
   // Helper: check if binary operation is supported, return diagnostic if not
   private def checkBinaryOpSupported(op: id.BinaryOp, lt: Type, rt: Type, stringy: Boolean, pos: Int): Option[Diag] =
-    op match
-      case BinaryOp.Add if stringy && !(lt == Type.STRING && rt == Type.STRING) =>
-        Some(TypeDiag(Messages.Codegen.plusOnlyStringOrNumeric, pos))
-      case BinaryOp.Mul if stringy && !((lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING)) =>
-        Some(TypeDiag(Messages.Codegen.repeatRequiresStringInt, pos))
-      case BinaryOp.Lt | BinaryOp.Gt | BinaryOp.Eq if stringy && !(lt == Type.STRING && rt == Type.STRING) =>
-        Some(TypeDiag(Messages.Codegen.stringComparisonRequiresBothString, pos))
-      case BinaryOp.Le | BinaryOp.Ge | BinaryOp.Ne if stringy =>
-        Some(TypeDiag(Messages.Codegen.unsupportedStringOperator, pos))
-      case BinaryOp.Concat => Some(TypeDiag(Messages.Codegen.concatInternalOnly, pos))
-      case BinaryOp.Le => Some(TypeDiag(Messages.Codegen.leNotSupported, pos))
-      case BinaryOp.Ge => Some(TypeDiag(Messages.Codegen.geNotSupported, pos))
-      case BinaryOp.Ne => Some(TypeDiag(Messages.Codegen.neNotSupported, pos))
-      case _ => None
+    // Check for always-unsupported operations first
+    unsupportedOps.get(op).map(msg => TypeDiag(msg, pos)).orElse {
+      // For string operations, check constraints
+      if stringy then
+        stringOpConstraints.find(c => c.ops.contains(op) && !c.isValid(lt, rt))
+          .map(c => TypeDiag(c.errorMsg, pos))
+      else None
+    }
 
   // Helper: emit string binary operation (repeat, concat, compare)
   private def emitStringOp(op: id.BinaryOp, leftCode: Code, rightCode: Code, lt: Type, rt: Type): Code =
-    op match
-      case BinaryOp.Mul => leftCode + rightCode + Code.fromString(StringRuntime.repeatString(lt, rt))
-      case BinaryOp.Add => leftCode + rightCode + Code.fromString(StringRuntime.concatString())
-      case BinaryOp.Lt  => leftCode + rightCode + Code.fromString(StringRuntime.compareString('<'))
-      case BinaryOp.Gt  => leftCode + rightCode + Code.fromString(StringRuntime.compareString('>'))
-      case BinaryOp.Eq  => leftCode + rightCode + Code.fromString(StringRuntime.compareString('='))
-      case _ => leftCode + rightCode // should not occur due to checkBinaryOpSupported
+    StringOperation.from(op, lt, rt) match
+      case Some(stringOp) => leftCode + rightCode + Code.fromString(stringOp.emitRuntime())
+      case None => leftCode + rightCode // should not occur due to checkBinaryOpSupported
 
   // Helper: emit numeric binary operation (arithmetic, comparison, logical)
   private def emitNumericOp(op: id.BinaryOp, leftCode: Code, rightCode: Code): Code =
-    import Operators._
-    val ch = op match
-      case BinaryOp.Add => ADD
-      case BinaryOp.Sub => SUB
-      case BinaryOp.Mul => MUL
-      case BinaryOp.Div => DIV
-      case BinaryOp.Mod => MOD
-      case BinaryOp.And => AND
-      case BinaryOp.Or  => OR
-      case BinaryOp.Eq  => EQ
-      case BinaryOp.Lt  => LT
-      case BinaryOp.Gt  => GT
-      case _            => EQ
+    val ch = BinaryOpMapping.toChar(op)
     // Use Either variant; fail fast if operator is somehow invalid (indicates compiler bug)
     val opCode = OperatorUtils.getBinopE(ch).getOrElse {
       throw new AssertionError(s"Internal error: unknown binary operator '$ch'")
@@ -180,7 +218,7 @@ object IdiomaticCodegen:
       thenCode <- emitExprD(thenExpr, ctx)
       elseCode <- emitExprD(elseExpr, ctx)
     yield
-      val falseLabel = new Label(); val endLabel = new Label()
+      val falseLabel = Label(); val endLabel = Label()
       val sb = new SamBuilder()
       sb.append(condCode).jumpIfNil(falseLabel).append(thenCode).jump(endLabel).label(falseLabel).append(elseCode).label(endLabel)
       Code.from(sb)
@@ -237,25 +275,38 @@ object IdiomaticCodegen:
     case sm: ScalaCallableMethod => sm.getReturnSig != ReturnSig.Void
     case _ => false
 
+  // Helper: unified short-circuit boolean logic
+  private def emitShortCircuitBooleanC(
+    leftCode: Code,
+    rightCode: Code,
+    sb: SamBuilder,
+    isAnd: Boolean
+  ): Code =
+    if isAnd then
+      // AND: both must be truthy, otherwise false
+      val falseLbl = Label(); val endLabel = Label()
+      sb.append(leftCode).jumpIfNil(falseLbl)
+      sb.append(rightCode).jumpIfNil(falseLbl)
+      sb.pushBool(true).jump(endLabel)
+      sb.label(falseLbl).pushBool(false).label(endLabel)
+    else
+      // OR: if left true, skip right
+      val needRight = Label(); val falseLbl = Label(); val endLabel = Label()
+      sb.append(leftCode).jumpIfNil(needRight)
+      sb.pushBool(true).jump(endLabel)
+      sb.label(needRight)
+      sb.append(rightCode).jumpIfNil(falseLbl)
+      sb.pushBool(true).jump(endLabel)
+      sb.label(falseLbl).pushBool(false).label(endLabel)
+    Code.from(sb)
+
   // Helper: short-circuit AND (both sides must be truthy; otherwise false)
   private def emitShortCircuitAndC(leftCode: Code, rightCode: Code, sb: SamBuilder): Code =
-    val falseLbl = new Label(); val endLabel = new Label()
-    sb.append(leftCode).jumpIfNil(falseLbl)
-    sb.append(rightCode).jumpIfNil(falseLbl)
-    sb.pushBool(true).jump(endLabel)
-    sb.label(falseLbl).pushBool(false).label(endLabel)
-    Code.from(sb)
+    emitShortCircuitBooleanC(leftCode, rightCode, sb, isAnd = true)
 
   // Helper: short-circuit OR (if left true, skip right)
   private def emitShortCircuitOrC(leftCode: Code, rightCode: Code, sb: SamBuilder): Code =
-    val needRight = new Label(); val falseLbl = new Label(); val endLabel = new Label()
-    sb.append(leftCode).jumpIfNil(needRight)
-    sb.pushBool(true).jump(endLabel)
-    sb.label(needRight)
-    sb.append(rightCode).jumpIfNil(falseLbl)
-    sb.pushBool(true).jump(endLabel)
-    sb.label(falseLbl).pushBool(false).label(endLabel)
-    Code.from(sb)
+    emitShortCircuitBooleanC(leftCode, rightCode, sb, isAnd = false)
 
   /** Emit code for an expression. Returns Either for diagnostic flow. */
   def emitExprD(e: id.Expr, ctx: Ctx): Either[Diag, Code] = e match
@@ -325,7 +376,7 @@ object IdiomaticCodegen:
       thenCode <- emitStmtD(thenB, ctx)
       elseCode <- emitStmtD(elseB, ctx)
     yield
-      val elseLbl = new Label(); val endLbl = new Label()
+      val elseLbl = Label(); val endLbl = Label()
       val sb = new SamBuilder()
       sb.append(condCode).jumpIfNil(elseLbl)
         .append(thenCode)
@@ -336,13 +387,13 @@ object IdiomaticCodegen:
       Code.from(sb)
 
   private def emitWhileD(cond: id.Expr, body: id.Stmt, ctx: Ctx): Either[Diag, Code] =
-    val endLabel = new Label()
+    val endLabel = Label()
     val innerCtx = ctx.copy(loopEndLabels = endLabel :: ctx.loopEndLabels)
     for
       condCode <- emitExprD(cond, ctx)
       bodyCode <- emitStmtD(body, innerCtx)
     yield
-      val start = new Label(); val stop = endLabel
+      val start = Label(); val stop = endLabel
       val sb = new SamBuilder()
       sb.label(start)
         .append(condCode).jumpIfNil(stop)

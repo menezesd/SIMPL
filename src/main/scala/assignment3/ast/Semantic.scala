@@ -3,6 +3,17 @@ package assignment3.ast
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 import assignment3.{Messages, PrimitiveType, ObjectRefType}
 
+/** Helper for null literal validation. */
+private object NullCheck:
+  /** Reject null literals with a custom error. */
+  def rejectNull(expr: Expr, onNull: => Diag): Result[Unit] = expr match
+    case _: NullLit => Left(onNull)
+    case _ => Right(())
+
+  /** Require expression to be non-null for an operation. */
+  def requireNonNull(expr: Expr, diag: => Diag): Result[Unit] =
+    rejectNull(expr, diag)
+
 /** Idiomatic semantic checker for idiomatic AST. */
 object IdiomaticSemantic:
   import IdiomaticTypeUtils as TU
@@ -12,6 +23,14 @@ object IdiomaticSemantic:
   /** Semantic checking context - caches NewMethodContext to avoid repeated allocation. */
   private final class CheckContext(val method: MethodSymbol, val symbols: ProgramSymbols, val line: Int):
     lazy val methodCtx: NewMethodContext = new NewMethodContext(method, symbols)
+
+  // Shared helper: resolve field info from target expression and field name.
+  private def resolveFieldInfo(target: Expr, fieldName: String, ctx: CheckContext): Option[assignment3.symbol.ClassSymbol.FieldInfo] =
+    for
+      cn <- TU.classNameOf(target, ctx.methodCtx, ctx.symbols)
+      cs <- ctx.symbols.getClass(cn)
+      fi <- cs.getFieldInfo(fieldName)
+    yield fi
 
   // Shared helper: ensure RHS is assignable to expected ValueType (primitive/object rules, null allowed for objects).
   private def checkAssignable(
@@ -63,9 +82,9 @@ object IdiomaticSemantic:
     case InstanceCall(target, method, args, _) =>
       target match
         case This(_) => Left(SyntaxDiag(Messages.Semantic.thisMethodCallNotAllowed, ctx.line))
-        case NullLit(_) => Left(SyntaxDiag(Messages.Semantic.nullDerefInstanceCall, ctx.line))
         case _ =>
           val checked = for {
+            _ <- NullCheck.requireNonNull(target, SyntaxDiag(Messages.Semantic.nullDerefInstanceCall, ctx.line))
             _ <- checkExprImpl(target, ctx)
             _ <- Result.sequenceE(args)(a => checkExprImpl(a, ctx))
           } yield ()
@@ -83,9 +102,10 @@ object IdiomaticSemantic:
               case _ => Right(())
           }
     case FieldAccess(target, field, _, _) =>
-      target match
-        case NullLit(_) => Left(SyntaxDiag(Messages.Semantic.nullDerefFieldAccess(field), ctx.line))
-        case _ => checkExprImpl(target, ctx)
+      for
+        _ <- NullCheck.requireNonNull(target, SyntaxDiag(Messages.Semantic.nullDerefFieldAccess(field), ctx.line))
+        _ <- checkExprImpl(target, ctx)
+      yield ()
 
   def checkStmtE(s: Stmt, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] =
     checkStmtImpl(s, CheckContext(currentMethod, programSymbols, defaultLine))
@@ -164,15 +184,8 @@ object IdiomaticSemantic:
     for
       _ <- checkExprImpl(target, ctx)
       _ <- checkExprImpl(value, ctx)
-      _ <- target match
-             case _: NullLit => Left(SyntaxDiag(Messages.Semantic.nullDerefFieldAssign(fieldName), ctx.line))
-             case _ => Right(())
-      classNameOpt = TU.classNameOf(target, ctx.methodCtx, ctx.symbols)
-      _ <- (for {
-             cn <- classNameOpt
-             cs <- ctx.symbols.getClass(cn)
-             fi <- cs.getFieldInfo(fieldName)
-           } yield fi).fold(Right(()))(fi =>
+      _ <- NullCheck.requireNonNull(target, SyntaxDiag(Messages.Semantic.nullDerefFieldAssign(fieldName), ctx.line))
+      _ <- resolveFieldInfo(target, fieldName, ctx).fold(Right(()))(fi =>
              checkAssignable(fi.valueType, value, ctx,
                objMismatchMsg = Messages.Semantic.fieldObjAssignMismatch(fieldName),
                primMismatchMsg = Messages.Semantic.fieldPrimAssignMismatch(fieldName)

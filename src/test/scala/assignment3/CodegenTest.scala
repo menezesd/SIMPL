@@ -108,7 +108,7 @@ class CodegenTest {
 
   @Test
   def testEmitBreakInsideLoop(): Unit = {
-    val endLabel = new Label()
+    val endLabel = Label()
     val ctx = emptyCtx.copy(loopEndLabels = List(endLabel))
     val result = IdiomaticCodegen.emitStmtD(Break(), ctx)
     assertTrue(result.isRight, s"Break inside loop should succeed, got: $result")
@@ -122,7 +122,7 @@ class CodegenTest {
 
   @Test
   def testEmitReturnWithLabel(): Unit = {
-    val retLabel = new Label()
+    val retLabel = Label()
     val ctx = emptyCtx.copy(returnLabelOpt = Some(retLabel))
     val result = IdiomaticCodegen.emitStmtD(Return(Some(IntLit(42))), ctx)
     assertTrue(result.isRight, s"Return with label should succeed, got: $result")

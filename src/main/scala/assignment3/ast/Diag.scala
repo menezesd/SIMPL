@@ -11,6 +11,12 @@ enum Diag(val message: String, val line: Int, val column: Int = -1):
   case Resolve(override val message: String, override val line: Int, override val column: Int = -1)
     extends Diag(message, line, column)
 
+  /** Create a new diagnostic with updated message. */
+  def withMessage(newMsg: String): Diag = this match
+    case Syntax(_, l, c) => Syntax(newMsg, l, c)
+    case Type(_, l, c) => Type(newMsg, l, c)
+    case Resolve(_, l, c) => Resolve(newMsg, l, c)
+
 // Shorter aliases for common diagnostic constructors
 val SyntaxDiag = Diag.Syntax
 val TypeDiag = Diag.Type
@@ -43,3 +49,39 @@ object Diag:
   /** Create a resolve error from explicit line/column. */
   def resolve(msg: String, line: Int, col: Int): Resolve =
     Resolve(msg, line, col)
+
+  // Result-returning versions for cleaner error construction
+
+  /** Create a syntax error Result from a tokenizer position. */
+  inline def syntaxResult[A](msg: String, tz: SamTokenizer): Result[A] =
+    Left(syntax(msg, tz))
+
+  /** Create a type error Result from a tokenizer position. */
+  inline def typeErrResult[A](msg: String, tz: SamTokenizer): Result[A] =
+    Left(typeErr(msg, tz))
+
+  /** Create a resolve error Result from a tokenizer position. */
+  inline def resolveResult[A](msg: String, tz: SamTokenizer): Result[A] =
+    Left(resolve(msg, tz))
+
+  /** Create a syntax error Result from explicit line/column. */
+  inline def syntaxResult[A](msg: String, line: Int, col: Int = -1): Result[A] =
+    Left(Syntax(msg, line, col))
+
+  /** Create a type error Result from explicit line/column. */
+  inline def typeErrResult[A](msg: String, line: Int, col: Int = -1): Result[A] =
+    Left(Type(msg, line, col))
+
+  /** Create a resolve error Result from explicit line/column. */
+  inline def resolveResult[A](msg: String, line: Int, col: Int = -1): Result[A] =
+    Left(Resolve(msg, line, col))
+
+  /** Context-aware diagnostic builders using ParserSupport.At. */
+  def syntaxAt[A](msg: String, at: assignment3.ParserSupport.At[_]): Syntax =
+    Syntax(msg, at.line, at.col)
+
+  def typeAt[A](msg: String, at: assignment3.ParserSupport.At[_]): Type =
+    Type(msg, at.line, at.col)
+
+  def resolveAt[A](msg: String, at: assignment3.ParserSupport.At[_]): Resolve =
+    Resolve(msg, at.line, at.col)
