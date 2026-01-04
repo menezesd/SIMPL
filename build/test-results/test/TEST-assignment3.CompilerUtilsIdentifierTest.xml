@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="assignment3.CompilerUtilsIdentifierTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:51:50" hostname="axiom" time="0.37">
+<testsuite name="assignment3.CompilerUtilsIdentifierTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-04T03:53:37" hostname="axiom" time="0.603">
   <properties/>
-  <testcase name="accepts_valid_identifiers(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.329"/>
-  <testcase name="rejects_invalid_pattern_starting_underscore(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.007"/>
-  <testcase name="rejects_when_not_a_word(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.004"/>
-  <testcase name="rejects_reserved_words(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.022"/>
+  <testcase name="accepts_valid_identifiers(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.516"/>
+  <testcase name="rejects_invalid_pattern_starting_underscore(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.021"/>
+  <testcase name="rejects_when_not_a_word(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.012"/>
+  <testcase name="rejects_reserved_words(Path)" classname="assignment3.CompilerUtilsIdentifierTest" time="0.034"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

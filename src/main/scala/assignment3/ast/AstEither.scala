@@ -36,6 +36,22 @@ object AstEither:
   private def tryStringOp(cond: Boolean, op: BinaryOp, left: Expr, right: Expr, resultType: Type): Option[Expr] =
     if cond then Some(Binary(op, left, right, Some(resultType))) else None
 
+  /** Build a binary expression if types satisfy a predicate, otherwise return diagnostic. */
+  private def buildBinaryIfD(
+    typeOk: Boolean,
+    errorMsg: String,
+    op: Char,
+    left: Expr,
+    right: Expr,
+    resultType: Type,
+    line: Int,
+    column: Int
+  ): Either[Diag, Expr] =
+    if !typeOk then Left(TypeDiag(errorMsg, line, column))
+    else
+      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Eq) // fallback
+      Right(Binary(bop, left, right, Some(resultType)))
+
   /** Try to build a string repeat expression: String * Int or Int * String */
   private def tryStringRepeat(left: Expr, right: Expr, lt: Type, rt: Type): Option[Expr] =
     tryStringOp((lt == Type.STRING && rt == Type.INT) || (lt == Type.INT && rt == Type.STRING),
@@ -55,27 +71,42 @@ object AstEither:
 
   /** Build logical expression: & or | with BOOL operands */
   private def buildLogicalD(op: Char, left: Expr, right: Expr, lt: Type, rt: Type, line: Int, column: Int): Either[Diag, Expr] =
-    if lt != Type.BOOL || rt != Type.BOOL then
-      Left(TypeDiag(Messages.TypeCheck.logicalOpRequiresBool, line, column))
-    else
-      val bop = if op == AND then BinaryOp.And else BinaryOp.Or
-      Right(Binary(bop, left, right, Some(Type.BOOL)))
+    buildBinaryIfD(
+      lt == Type.BOOL && rt == Type.BOOL,
+      Messages.TypeCheck.logicalOpRequiresBool,
+      op,
+      left,
+      right,
+      Type.BOOL,
+      line,
+      column
+    )
 
   /** Build arithmetic expression: + - * / % with INT operands */
   private def buildArithmeticD(op: Char, left: Expr, right: Expr, lt: Type, rt: Type, line: Int, column: Int): Either[Diag, Expr] =
-    if lt != Type.INT || rt != Type.INT then
-      Left(TypeDiag(Messages.TypeCheck.arithmeticOpRequiresInt, line, column))
-    else
-      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Add) // fallback should not occur
-      Right(Binary(bop, left, right, Some(Type.INT)))
+    buildBinaryIfD(
+      lt == Type.INT && rt == Type.INT,
+      Messages.TypeCheck.arithmeticOpRequiresInt,
+      op,
+      left,
+      right,
+      Type.INT,
+      line,
+      column
+    )
 
   /** Build comparison expression: < > = with compatible types */
   private def buildComparisonD(op: Char, left: Expr, right: Expr, lt: Type, rt: Type, line: Int, column: Int): Either[Diag, Expr] =
-    if !lt.isCompatibleWith(rt) then
-      Left(TypeDiag(Messages.TypeCheck.comparisonRequiresMatchingTypes, line, column))
-    else
-      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Eq) // fallback should not occur
-      Right(Binary(bop, left, right, Some(Type.BOOL)))
+    buildBinaryIfD(
+      lt.isCompatibleWith(rt),
+      Messages.TypeCheck.comparisonRequiresMatchingTypes,
+      op,
+      left,
+      right,
+      Type.BOOL,
+      line,
+      column
+    )
 
   /** Type-check and build a binary expression with diagnostic result.
     * Delegates to specialized helpers based on operator category.
