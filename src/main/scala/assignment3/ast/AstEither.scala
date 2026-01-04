@@ -21,11 +21,13 @@ object AstEither:
 
   /** Resolve field info on a target expression. */
   def resolveFieldInfoD(target: Expr, fieldName: String, method: MethodContext, ps: ProgramSymbols, line: Int, column: Int = -1): Either[Diag, assignment3.symbol.ClassSymbol.FieldInfo] =
-    for
-      cn <- resolveClassNameD(target, method, ps, line, column)
-      cs <- ps.getClass(cn).toRight(ResolveDiag(Messages.TypeCheck.unknownClass(cn), line, column))
-      fi <- cs.getFieldInfo(fieldName).toRight(ResolveDiag(Messages.TypeCheck.unknownField(cn, fieldName), line, column))
-    yield fi
+    IdiomaticTypeUtils.resolveFieldInfo(target, fieldName, method, ps) match
+      case Some(fi) => Right(fi)
+      case None =>
+        // Try to get class name for better error message
+        IdiomaticTypeUtils.classNameOf(target, method, ps) match
+          case Some(cn) => Left(ResolveDiag(Messages.TypeCheck.unknownField(cn, fieldName), line, column))
+          case None => Left(TypeDiag(Messages.TypeCheck.unableToResolveClass, line, column))
 
   // --- Binary expression helpers ---
 

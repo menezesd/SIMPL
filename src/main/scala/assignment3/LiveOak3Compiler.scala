@@ -74,23 +74,14 @@ object LiveOak3Compiler {
   def compileEitherD(fileName: String): Either[Diag, String] =
     compileD(fileName).toEither
 
+  /** Legacy throwing API for backwards compatibility with tests. Use compileD or compileEitherD instead. */
   @deprecated("Use compileEitherD or compileD instead for diagnostic-first error handling", "3.0")
-  @static def compiler(fileName: String): String = {
-    try {
-      compileEitherD(fileName) match
-        case Right(code) => code
-        case Left(diag) =>
-          // Preserve test/legacy behavior: print failure message and throw Error
-          System.err.println("Failed to compile " + normalizePathUnix(fileName))
-          throw new Error(diag.message + " at " + diag.line + ":" + diag.column)
-    } catch {
-      // Only handle unexpected non-Error Throwables here; if we intentionally
-      // threw an Error above, let it propagate so we don't double-print.
-      case t: Throwable if !t.isInstanceOf[Error] =>
+  @static def compiler(fileName: String): String =
+    compileEitherD(fileName) match
+      case Right(code) => code
+      case Left(diag) =>
         System.err.println("Failed to compile " + normalizePathUnix(fileName))
-        throw new Error(t)
-    }
-  }
+        throw new Error(s"${diag.message} at ${diag.line}:${diag.column}")
 
   private def normalizePathUnix(path: String): String =
     Option(path).map(_.replace('\\', '/')).getOrElse("")

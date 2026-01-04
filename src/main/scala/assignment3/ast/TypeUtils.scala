@@ -57,3 +57,23 @@ object IdiomaticTypeUtils:
           nmc.lookupVar(name).flatMap(_.classTypeNameOpt)
         case _ => None
     case _ => None
+
+  /** Unified field resolution: className -> classSymbol -> fieldInfo. */
+  def resolveFieldInfo(
+    target: Expr,
+    fieldName: String,
+    method: assignment3.ast.MethodContext,
+    programSymbols: assignment3.symbol.ProgramSymbols
+  ): Option[assignment3.symbol.ClassSymbol.FieldInfo] =
+    for
+      cn <- classNameOf(target, method, programSymbols)
+      cs <- programSymbols.getClass(cn)
+      fi <- cs.getFieldInfo(fieldName)
+    yield fi
+
+  /** Check if a block ends with a return statement. */
+  def endsWithReturn(block: Block): Boolean =
+    block.statements.lastOption.exists {
+      case _: Return => true
+      case _ => false
+    }

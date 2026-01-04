@@ -1,6 +1,6 @@
 package assignment3.ast
 
-import assignment3.{BinaryOpMapping, Code, Label, Messages, OperatorUtils, Operators, SamBuilder, StringRuntime, Type}
+import assignment3.{BinaryOpMapping, Code, Label, Messages, OperatorUtils, Operators, ParserSupport, SamBuilder, StringRuntime, Type}
 import assignment3.Offsets.{FieldOffset, StackOffset}
 import assignment3.ast as id
 import assignment3.ast.high.ReturnSig
@@ -258,8 +258,9 @@ object IdiomaticCodegen:
 
   // Helper: emit new object instantiation
   private def emitNewObjectD(className: String, args: List[id.Expr], ctx: Ctx): Either[Diag, Code] =
-    val numFields = ctx.programSymbolsOpt.flatMap(_.getClass(className)).fold(CodegenConstants.DefaultFieldCount)(_.numFields())
-    val ctorExists = ctx.programSymbolsOpt.flatMap(_.getClass(className)).exists(_.method(className).isDefined)
+    val classOpt = ParserSupport.SymbolLookup.getClassOpt(ctx.programSymbolsOpt, className)
+    val numFields = classOpt.fold(CodegenConstants.DefaultFieldCount)(_.numFields())
+    val ctorExists = classOpt.exists(ParserSupport.SymbolLookup.hasConstructor)
     Result.traverseE(args)(emitExprD(_, ctx)).map { argCodes =>
       val sb = new SamBuilder()
       sb.pushImmInt(numFields).malloc()

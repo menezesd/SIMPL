@@ -4,6 +4,41 @@ import edu.utexas.cs.sam.io.SamTokenizer
 import edu.utexas.cs.sam.io.Tokenizer.TokenType
 import scala.util.matching.Regex
 
+/** Classifies tokens for type detection with clear separation of concerns. */
+private object TokenClassifier:
+  /** Check if current token is a primitive type keyword. */
+  private def isPrimitiveType(tz: SamTokenizer): Boolean =
+    tz.test("int") || tz.test("bool") || tz.test("String")
+
+  /** Check if current token matches the current class name. */
+  private def isSelfReference(tz: SamTokenizer, currentClassName: String): Boolean =
+    Option(currentClassName).exists(tz.test)
+
+  /** Check if current token matches any known class name. */
+  private def isKnownClass(tz: SamTokenizer, symbols: assignment3.symbol.ProgramSymbols): Boolean =
+    Option(symbols).exists(_.allClasses.exists(cls => tz.test(cls.getName)))
+
+  /** Main classification: determine if token represents a type word. */
+  def isTypeWord(
+    tz: SamTokenizer,
+    symbols: assignment3.symbol.ProgramSymbols,
+    currentClassName: String,
+    allowUnknownNames: Boolean,
+    excludeStmtStarters: Boolean,
+    rules: CompilerUtils.LexicalRules
+  ): Boolean =
+    // Early exits
+    if tz.peekAtKind != TokenType.WORD then return false
+    if excludeStmtStarters && rules.statementStarters.exists(tz.test) then return false
+
+    // Positive classifications
+    if isPrimitiveType(tz) then return true
+    if isSelfReference(tz, currentClassName) then return true
+    if isKnownClass(tz, symbols) then return true
+
+    // Fallback: allow unknown names if permitted
+    allowUnknownNames
+
 object CompilerUtils {
   final case class RecorderContext(recorder: Option[TokenRecorder])
   object RecorderContext {
@@ -124,14 +159,9 @@ object CompilerUtils {
     allowUnknownNames: Boolean,
     excludeStmtStarters: Boolean,
     rules: LexicalRules
-  ): Boolean = {
-    if (tz.peekAtKind != TokenType.WORD) return false
-    if (excludeStmtStarters && rules.statementStarters.exists(tz.test)) return false
-    if (tz.test("int") || tz.test("bool") || tz.test("String")) return true
-    if (Option(currentClassName).exists(tz.test)) return true
-    val classMatch = Option(symbols).exists(sym => sym.allClasses.exists(cls => tz.test(cls.getName)))
-    if (classMatch) true else allowUnknownNames
-  }
+  ): Boolean =
+    TokenClassifier.isTypeWord(tz, symbols, currentClassName, allowUnknownNames, excludeStmtStarters, rules)
+
   def parseTypeOrObjectName(raw: String, line: Int): ValueType =
     Type.parseE(raw, line) match
       case Right(t) => ValueType.ofPrimitive(t)

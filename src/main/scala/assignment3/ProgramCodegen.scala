@@ -3,7 +3,7 @@ package assignment3
 import assignment3.ast.high._
 import assignment3.symbol._
 import assignment3.ast as id
-import assignment3.ast.{Diag, ResolveDiag, SyntaxDiag}
+import assignment3.ast.{Diag, IdiomaticTypeUtils, ResolveDiag, SyntaxDiag}
 import assignment3.ast.SymbolMethodFrame
 import scala.util.control.NonFatal
 
@@ -61,11 +61,7 @@ private final class ProgramCodegen(symbols: ProgramSymbols, ctx: CompilerContext
 
   private def ensureVoidReturn(local: SamBuilder, b: id.Block, returnSig: assignment3.ast.high.ReturnSig): Unit =
     import assignment3.ast.high.ReturnSig
-    val hasReturnStmt = b.statements.lastOption.exists {
-      case _: id.Return => true
-      case _ => false
-    }
-    if returnSig == ReturnSig.Void && !hasReturnStmt then
+    if returnSig == ReturnSig.Void && !IdiomaticTypeUtils.endsWithReturn(b) then
       local.pushImm(0)
 
   private def appendProgramPreamble(sb: SamBuilder, ctx: CompilerContext): Unit = {

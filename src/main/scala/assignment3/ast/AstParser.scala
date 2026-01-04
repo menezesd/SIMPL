@@ -40,11 +40,7 @@ final class AstParser(
     } yield FieldAccess(This(), fieldName, Some(fi))
 
   private def resolveFieldInfo(target: Expr, fieldName: String): Option[assignment3.symbol.ClassSymbol.FieldInfo] =
-    for
-      cn <- IdiomaticTypeUtils.classNameOf(target, method, programSymbols)
-      cs <- programSymbols.getClass(cn)
-      fi <- cs.getFieldInfo(fieldName)
-    yield fi
+    IdiomaticTypeUtils.resolveFieldInfo(target, fieldName, method, programSymbols)
 
   private def parseVarDeclsR(): Result[List[VarDecl]] =
     if !declarationsEnabled then ok(Nil)

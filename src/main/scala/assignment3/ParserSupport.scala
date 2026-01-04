@@ -64,6 +64,18 @@ object ParserSupport:
     def requireFieldInfo(classSymbol: ClassSymbol, fieldName: String, diag: => Diag): Result[ClassSymbol.FieldInfo] =
       classSymbol.getFieldInfo(fieldName).toResult(diag)
 
+    /** Check if a class has a constructor (method with same name as class). */
+    def hasConstructor(classSymbol: ClassSymbol): Boolean =
+      classSymbol.method(classSymbol.getName).isDefined
+
+    /** Get class info from optional ProgramSymbols. */
+    def getClassOpt(symbolsOpt: Option[ProgramSymbols], className: String): Option[ClassSymbol] =
+      symbolsOpt.flatMap(_.getClass(className))
+
+    /** Check if a constructor exists for the given class name in optional symbols. */
+    def hasConstructorOpt(symbolsOpt: Option[ProgramSymbols], className: String): Boolean =
+      getClassOpt(symbolsOpt, className).exists(hasConstructor)
+
   def consumeChar(tz: SamTokenizer, ch: Char)(using CompilerUtils.RecorderContext): Boolean =
     CompilerUtils.check(tz, ch)
 

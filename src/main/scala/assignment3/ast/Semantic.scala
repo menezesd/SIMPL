@@ -26,11 +26,7 @@ object IdiomaticSemantic:
 
   // Shared helper: resolve field info from target expression and field name.
   private def resolveFieldInfo(target: Expr, fieldName: String, ctx: CheckContext): Option[assignment3.symbol.ClassSymbol.FieldInfo] =
-    for
-      cn <- TU.classNameOf(target, ctx.methodCtx, ctx.symbols)
-      cs <- ctx.symbols.getClass(cn)
-      fi <- cs.getFieldInfo(fieldName)
-    yield fi
+    TU.resolveFieldInfo(target, fieldName, ctx.methodCtx, ctx.symbols)
 
   // Shared helper: ensure RHS is assignable to expected ValueType (primitive/object rules, null allowed for objects).
   private def checkAssignable(
