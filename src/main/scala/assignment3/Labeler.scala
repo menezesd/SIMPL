@@ -27,6 +27,3 @@ object Labeler:
   import LabelTypes._
 
   def methodLabel(className: String, methodName: String): String = MethodLabel(className, methodName).value
-
-  /** Type-safe method label generation. */
-  def methodLabelTyped(className: String, methodName: String): MethodLabel = MethodLabel(className, methodName)

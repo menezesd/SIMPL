@@ -16,9 +16,7 @@ object ParserSupport:
   def resolveE(msg: String, tz: SamTokenizer): Diag = Diag.resolve(msg, tz)
 
   def requireClass(symbols: assignment3.symbol.ProgramSymbols, className: String, tz: SamTokenizer): Result[assignment3.symbol.ClassSymbol] =
-    symbols.getClass(className) match
-      case Some(cs) => Right(cs)
-      case None => Left(syntax(Messages.classSymbolMissing(className), tz))
+    symbols.getClass(className).toResult(syntax(Messages.classSymbolMissing(className), tz))
 
   def requireMethod(
     symbols: assignment3.symbol.ProgramSymbols,
@@ -26,18 +24,14 @@ object ParserSupport:
     methodName: String,
     tz: SamTokenizer
   ): Result[assignment3.symbol.MethodSymbol] =
-    symbols.getMethod(className, methodName) match
-      case Some(ms) => Right(ms)
-      case None => Left(syntax(Messages.methodSymbolMissing(className, methodName), tz))
+    symbols.getMethod(className, methodName).toResult(syntax(Messages.methodSymbolMissing(className, methodName), tz))
 
   def requireMethodResolved(
     symbols: assignment3.symbol.ProgramSymbols,
     className: String,
     methodName: String
   ): Result[assignment3.symbol.MethodSymbol] =
-    symbols.getMethod(className, methodName) match
-      case Some(ms) => Right(ms)
-      case None => Left(ResolveDiag(Messages.methodSymbolMissing(className, methodName), -1))
+    symbols.getMethod(className, methodName).toResult(ResolveDiag(Messages.methodSymbolMissing(className, methodName), -1))
 
   /** Symbol lookup helpers with custom diagnostic support. */
   object SymbolLookup:

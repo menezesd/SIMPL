@@ -35,12 +35,6 @@ object StringRuntime {
     val TwoArgs     = -2  // Full 2-argument cleanup
   }
 
-  // String operation constants
-  private object StringConstants:
-    val NullTerminator = '\u0000'
-    val MinimumBufferSize = 1  // Space for null terminator
-    val InvalidRepeatDefault = "\"\""  // Empty string for negative repeat count
-
   def repeatString(firstInputType: Type, secondInputType: Type): String =
     CodeBuilder.buildString { sb =>
       if (firstInputType == Type.STRING) sb.swap()
@@ -48,16 +42,8 @@ object StringRuntime {
     }
 
   // Java-friendly wrappers: avoid referencing Scala enum constants in Java tests
-  def repeatStringSI(): String = repeatString(Type.STRING, Type.INT) // first is String, second is Int
-  def repeatStringIS(): String = repeatString(Type.INT, Type.STRING) // first is Int, second is String
-
-  // Code-returning convenience wrappers (optional)
-  def repeatStringC(firstInputType: Type, secondInputType: Type): Code = Code.fromString(repeatString(firstInputType, secondInputType))
-  def getStringLengthC(): Code = Code.fromString(getStringLength())
-  def reverseStringC(): Code = Code.fromString(reverseString())
-  def appendStringHeapC(): Code = Code.fromString(appendStringHeap())
-  def concatStringC(): Code = Code.fromString(concatString())
-  def compareStringC(op: Char): Code = Code.fromString(compareString(op))
+  def repeatStringSI(): String = repeatString(Type.STRING, Type.INT)
+  def repeatStringIS(): String = repeatString(Type.INT, Type.STRING)
 
   def getStringLength(): String =
     CodeBuilder.buildString(_.jsr(LENGTH_LABEL))

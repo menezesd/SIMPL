@@ -1,6 +1,6 @@
 package assignment3
 
-import assignment3.symbol._
+import assignment3.symbol.{ProgramSymbols, SymbolTableBuilder}
 import edu.utexas.cs.sam.io.SamTokenizer
 import assignment3.ast.Diag
 import java.io.{BufferedWriter, FileWriter, IOException}

@@ -1,7 +1,7 @@
 package assignment3
 
-import assignment3.ast.high._
-import assignment3.symbol._
+import assignment3.ast.high.{MethodNode, ProgramNode, ReturnSig}
+import assignment3.symbol.ProgramSymbols
 import assignment3.ast as id
 import assignment3.ast.{Diag, IdiomaticTypeUtils, ResolveDiag, SyntaxDiag}
 import assignment3.ast.SymbolMethodFrame

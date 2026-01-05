@@ -1,7 +1,7 @@
 package assignment3
 
-import assignment3.ast.high._
-import assignment3.symbol._
+import assignment3.ast.high.{ClassNode, MethodNode, ParamNode, ProgramNode, ReturnSig, ReturnSigUtils}
+import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 import edu.utexas.cs.sam.io.SamTokenizer
 import edu.utexas.cs.sam.io.Tokenizer.TokenType
 import assignment3.ast.{Diag, Result}
@@ -89,7 +89,7 @@ private final class ProgramParser private (
       else ok(acc.reverse)
     loop(0, Nil)
 
-  private def parseMethodBodyR(className: String, methodName: String, ms: MethodSymbol, returnSig: assignment3.ast.high.ReturnSig): Result[assignment3.ast.Block] =
+  private def parseMethodBodyR(className: String, methodName: String, ms: MethodSymbol, returnSig: ReturnSig): Result[assignment3.ast.Block] =
     val stmtParser = new assignment3.ast.AstParser(tz, new assignment3.ast.NewMethodContext(ms, symbols), symbols, false, rules)
     val folder = assignment3.ast.IdiomaticConstFolder
     def loop(acc: List[assignment3.ast.Stmt]): Result[List[assignment3.ast.Stmt]] =
@@ -103,7 +103,7 @@ private final class ProgramParser private (
       else ok(acc.reverse)
     for
       stmts <- loop(Nil)
-      missingReturn = returnSig != assignment3.ast.high.ReturnSig.Void && (stmts.isEmpty || !endsWithReturn(stmts.last))
+      missingReturn = returnSig != ReturnSig.Void && (stmts.isEmpty || !endsWithReturn(stmts.last))
       _ <- if missingReturn then syntax(Messages.missingFinalReturn) else ok(())
     yield assignment3.ast.Block(stmts)
 
@@ -152,10 +152,10 @@ private final class ProgramParser private (
     loop()
   }
 
-  private def parseReturnSigR(): Result[assignment3.ast.high.ReturnSig] =
+  private def parseReturnSigR(): Result[ReturnSig] =
     if (tv.peekKind() == TokenType.WORD) then
       for rt <- getWordR()
-      yield assignment3.ast.high.ReturnSigUtils.fromRawType(rt, tv.line)
+      yield ReturnSigUtils.fromRawType(rt, tv.line)
     else syntax(Messages.expectedReturnType)
 
 }
