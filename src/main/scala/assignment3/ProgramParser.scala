@@ -139,7 +139,7 @@ private final class ProgramParser private (
       yield res
 
     def loop(): Result[Unit] =
-      if (tv.isTypeWord(symbols, className, false, true)) then
+      if (tv.isTypeWord(symbols, className, CompilerUtils.TypeCheckConfig.Strict)) then
         for
           rawType <- getWordR()
           _ = CompilerUtils.parseTypeOrObjectName(rawType, tv.line)

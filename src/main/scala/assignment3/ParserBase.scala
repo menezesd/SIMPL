@@ -2,6 +2,27 @@ package assignment3
 
 import assignment3.ast.{Diag, Result}
 
+/**
+ * Base trait for parsers providing common utilities and loop patterns.
+ *
+ * == List Building Pattern ==
+ * All list-collecting methods use the efficient "prepend + reverse" pattern:
+ * {{{
+ *   def loop(acc: List[A]): Result[List[A]] =
+ *     if done then ok(acc.reverse)
+ *     else parseItem.flatMap(item => loop(item :: acc))
+ *   loop(Nil)
+ * }}}
+ *
+ * This pattern is O(n) total: each prepend is O(1), and the final reverse is O(n).
+ * Using append (`acc :+ item`) would be O(n²) since each append copies the list.
+ *
+ * The methods in this trait abstract over this pattern for common use cases:
+ *   - `parseCommaSeparatedList`: items separated by commas, enclosed by delimiter
+ *   - `collectUntil`: items until terminator character
+ *   - `parseSemicolonSeparated`: items while condition holds
+ *   - `parseWhile`: items while condition is true
+ */
 trait ParserBase {
   protected def tv: TokenizerView
 
@@ -26,11 +47,10 @@ trait ParserBase {
   protected inline def isStringAhead: Boolean = tv.peekKind() == edu.utexas.cs.sam.io.Tokenizer.TokenType.STRING
   protected inline def isOpAhead: Boolean = tv.peekKind() == edu.utexas.cs.sam.io.Tokenizer.TokenType.OPERATOR
 
-  // Common loop patterns
+  // Common loop patterns (all use prepend + reverse for O(n) performance)
 
-  /** Parse a comma-separated list enclosed by closingChar (already consumed opening char).
+  /** Parse comma-separated list enclosed by closingChar (opening char already consumed).
    *  Returns empty list if closingChar is immediately consumed.
-   *  Uses efficient List prepending and reversal.
    */
   protected def parseCommaSeparatedList[A](closingChar: Char)(parseItem: => Result[A]): Result[List[A]] =
     if tv.consumeChar(closingChar) then ok(Nil)
@@ -43,20 +63,14 @@ trait ParserBase {
         loop(List(first))
       }
 
-  /** Collect items until terminator character is consumed.
-   *  Useful for parsing method bodies, class bodies, etc.
-   *  Uses efficient List prepending and reversal.
-   */
+  /** Collect items until terminator character is consumed. */
   protected def collectUntil[A](terminator: Char)(parseItem: => Result[A]): Result[List[A]] =
     def loop(acc: List[A]): Result[List[A]] =
       if tv.consumeChar(terminator) then ok(acc.reverse)
       else parseItem.flatMap(item => loop(item :: acc))
     loop(Nil)
 
-  /** Parse a semicolon-separated list (each item ends with semicolon).
-   *  Collects until predicate returns false for next token.
-   *  Uses efficient List prepending and reversal.
-   */
+  /** Parse items while predicate returns true. */
   protected def parseSemicolonSeparated[A](shouldContinue: => Boolean)(parseItem: => Result[A]): Result[List[A]] =
     def loop(acc: List[A]): Result[List[A]] =
       if !shouldContinue then ok(acc.reverse)
@@ -67,9 +81,7 @@ trait ParserBase {
   protected def parseOptional[A](cond: => Boolean)(parse: => Result[A]): Result[Option[A]] =
     if cond then parse.map(Some(_)) else ok(None)
 
-  /** Repeatedly parse while condition is true, accumulating results.
-   *  Uses efficient List prepending and reversal.
-   */
+  /** Repeatedly parse while condition is true, accumulating results. */
   protected def parseWhile[A](cond: => Boolean)(parse: => Result[A]): Result[List[A]] =
     def loop(acc: List[A]): Result[List[A]] =
       if !cond then ok(acc.reverse)

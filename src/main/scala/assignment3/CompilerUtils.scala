@@ -156,25 +156,13 @@ object CompilerUtils {
   def skipToken(f: SamTokenizer)(using RecorderContext): Unit = { f.skipToken(); rec(".") }
   def column(f: SamTokenizer): Int = TokenizerOps.column(f)
 
-  /** Overload with config object for type checking behavior. */
+  /** Check if current token represents a type word (primitive or class name). */
   def isTypeWord(
     tz: SamTokenizer,
     symbols: assignment3.symbol.ProgramSymbols,
     currentClassName: String,
     config: TypeCheckConfig
   ): Boolean =
-    TokenClassifier.isTypeWord(tz, symbols, currentClassName, config, LexicalRules.Default)
-
-  /** Java-compatible overload with boolean parameters (deprecated - use TypeCheckConfig). */
-  @deprecated("Use TypeCheckConfig instead of boolean parameters for clarity", "3.0")
-  def isTypeWord(
-    tz: SamTokenizer,
-    symbols: assignment3.symbol.ProgramSymbols,
-    currentClassName: String,
-    allowUnknownNames: Boolean,
-    excludeStmtStarters: Boolean
-  ): Boolean =
-    val config = TypeCheckConfig(allowUnknownNames, excludeStmtStarters)
     TokenClassifier.isTypeWord(tz, symbols, currentClassName, config, LexicalRules.Default)
 
   def parseTypeOrObjectName(raw: String, line: Int): ValueType =

@@ -28,13 +28,6 @@ object Code:
     codes.foreach(c => sb.append(c.s))
     Code(sb.toString)
 
-  /** Efficiently concatenate Code fragments with a prefix. */
-  def concat(prefix: Code, codes: Iterable[Code]): Code =
-    val sb = new StringBuilder
-    sb.append(prefix.s)
-    codes.foreach(c => sb.append(c.s))
-    Code(sb.toString)
-
   /** Escape a string literal for SaM string instructions. */
   def escapeStringLiteral(s: String): String =
     val escaped = s.flatMap {
