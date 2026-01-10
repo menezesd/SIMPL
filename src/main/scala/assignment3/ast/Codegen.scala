@@ -5,6 +5,7 @@ import assignment3.Offsets.{FieldOffset, StackOffset}
 import assignment3.ast as id
 import assignment3.ast.high.ReturnSig
 import assignment3.ast.Result.toResult
+import assignment3.ast.{BinaryOpCategory, BinaryOpUtils, StringOperation}
 import assignment3.symbol.ProgramSymbols
 
 /** Code generation using idiomatic, pattern-matching AST. */
@@ -109,44 +110,10 @@ object IdiomaticCodegen:
         sb.append(base).addFieldOff(FieldOffset(off)).pushInd()
       }
 
-  // Binary operation categories for clearer dispatch
-  private enum BinaryOpCategory:
-    case ShortCircuit, String, Numeric
-
-  /** ADT for string operations with type-safe emission. */
-  private enum StringOperation:
-    case Repeat(leftType: Type, rightType: Type)
-    case Concat
-    case Compare(op: Char)
-
-    /** Emit the runtime code for this string operation. */
-    def emitRuntime(): String = this match
-      case Repeat(lt, rt) => StringRuntime.repeatString(lt, rt)
-      case Concat => StringRuntime.concatString()
-      case Compare(op) => StringRuntime.compareString(op)
-
-  private object StringOperation:
-    /** Determine the string operation from BinaryOp and types. */
-    def from(op: id.BinaryOp, lt: Type, rt: Type): Option[StringOperation] = op match
-      case BinaryOp.Mul if lt == Type.STRING || rt == Type.STRING => Some(Repeat(lt, rt))
-      case BinaryOp.Add if lt == Type.STRING && rt == Type.STRING => Some(Concat)
-      case BinaryOp.Lt  if lt == Type.STRING && rt == Type.STRING => Some(Compare('<'))
-      case BinaryOp.Gt  if lt == Type.STRING && rt == Type.STRING => Some(Compare('>'))
-      case BinaryOp.Eq  if lt == Type.STRING && rt == Type.STRING => Some(Compare('='))
-      case _ => None
-
-  private def categorizeBinaryOp(op: id.BinaryOp, lt: Type, rt: Type): BinaryOpCategory =
-    if (op == BinaryOp.And || op == BinaryOp.Or) && lt == Type.BOOL && rt == Type.BOOL then
-      BinaryOpCategory.ShortCircuit
-    else if lt == Type.STRING || rt == Type.STRING then
-      BinaryOpCategory.String
-    else
-      BinaryOpCategory.Numeric
-
   // Helper: emit binary operation
   private def emitBinaryD(op: id.BinaryOp, left: id.Expr, right: id.Expr, pos: Int, ctx: Ctx): Either[Diag, Code] =
     val lt = typeOf(left, ctx); val rt = typeOf(right, ctx)
-    categorizeBinaryOp(op, lt, rt) match
+    BinaryOpUtils.categorize(op, lt, rt) match
       case BinaryOpCategory.ShortCircuit =>
         emitShortCircuitBinaryD(op, left, right, ctx)
       case BinaryOpCategory.String =>

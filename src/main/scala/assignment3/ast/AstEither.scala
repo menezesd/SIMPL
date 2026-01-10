@@ -36,7 +36,9 @@ object AstEither:
   private def tryStringOp(cond: Boolean, op: BinaryOp, left: Expr, right: Expr, resultType: Type): Option[Expr] =
     if cond then Some(Binary(op, left, right, Some(resultType))) else None
 
-  /** Build a binary expression if types satisfy a predicate, otherwise return diagnostic. */
+  /** Build a binary expression if types satisfy a predicate, otherwise return diagnostic.
+    * Note: Propagates error if operator is invalid rather than silently falling back.
+    */
   private def buildBinaryIfD(
     typeOk: Boolean,
     errorMsg: String,
@@ -49,8 +51,9 @@ object AstEither:
   ): Either[Diag, Expr] =
     if !typeOk then Left(TypeDiag(errorMsg, line, column))
     else
-      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Eq) // fallback
-      Right(Binary(bop, left, right, Some(resultType)))
+      BinaryOpMapping.fromChar(op) match
+        case Some(bop) => Right(Binary(bop, left, right, Some(resultType)))
+        case None => Left(SyntaxDiag(Messages.TypeCheck.unsupportedOperator(op), line, column))
 
   /** Try to build a string repeat expression: String * Int or Int * String */
   private def tryStringRepeat(left: Expr, right: Expr, lt: Type, rt: Type): Option[Expr] =
@@ -62,11 +65,12 @@ object AstEither:
     tryStringOp(lt == Type.STRING && rt == Type.STRING,
                 BinaryOp.Add, left, right, Type.STRING)
 
-  /** Try to build a string comparison: String < > = String */
+  /** Try to build a string comparison: String < > = String
+    * Returns None if types don't match or operator is invalid (propagates to error path).
+    */
   private def tryStringCompare(op: Char, left: Expr, right: Expr, lt: Type, rt: Type): Option[Expr] =
     if lt == Type.STRING && rt == Type.STRING then
-      val bop = BinaryOpMapping.fromChar(op).getOrElse(BinaryOp.Eq)
-      tryStringOp(true, bop, left, right, Type.BOOL)
+      BinaryOpMapping.fromChar(op).flatMap(bop => tryStringOp(true, bop, left, right, Type.BOOL))
     else None
 
   /** Build logical expression: & or | with BOOL operands */

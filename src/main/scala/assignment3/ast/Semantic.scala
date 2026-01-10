@@ -3,6 +3,13 @@ package assignment3.ast
 import assignment3.symbol.{MethodSymbol, ProgramSymbols}
 import assignment3.{Messages, PrimitiveType, ObjectRefType}
 
+/** Naming conventions used in this module:
+  *  - `ctx`: CheckContext (semantic checking context)
+  *  - `method`/`ms`: MethodSymbol
+  *  - `symbols`/`ps`: ProgramSymbols
+  *  - `methodCtx`: NewMethodContext (for type resolution)
+  */
+
 /** Helper for null literal validation. */
 private object NullCheck:
   /** Reject null literals with a custom error. */
@@ -45,13 +52,31 @@ object IdiomaticSemantic:
       Result.require(pt.isCompatibleWith(TU.typeOf(rhs, ctx.methodCtx, ctx.symbols)),
         TypeDiag(primMismatchMsg, ctx.line))
 
-  // Helper: validate parameter type match
-  private def validateParameterType(formal: assignment3.symbol.VarSymbol, argExpr: Expr, ctx: CheckContext): Option[Diag] =
-    val argType = TU.typeOf(argExpr, ctx.methodCtx, ctx.symbols)
-    formal.valueType match
-      case PrimitiveType(pt) if !pt.isCompatibleWith(argType) =>
-        Some(TypeDiag(Messages.Semantic.argTypeMismatch(formal.getName), ctx.line))
-      case _ => None
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Parameter Validation
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  /** Validates parameter types and argument counts for method calls. */
+  private object ParameterValidation:
+    /** Validate a single parameter type match. */
+    def checkParameterType(formal: assignment3.symbol.VarSymbol, argExpr: Expr, ctx: CheckContext): Option[Diag] =
+      val argType = TU.typeOf(argExpr, ctx.methodCtx, ctx.symbols)
+      formal.valueType match
+        case PrimitiveType(pt) if !pt.isCompatibleWith(argType) =>
+          Some(TypeDiag(Messages.Semantic.argTypeMismatch(formal.getName), ctx.line))
+        case _ => None
+
+    /** Validate all parameter types for a method call. */
+    def validateArgs(ms: assignment3.symbol.MethodSymbol, args: List[Expr], ctx: CheckContext): Either[Diag, Unit] =
+      val expected = ms.expectedUserArgs()
+      val provided = args.size
+      if expected != provided then
+        Left(SyntaxDiag(Messages.Semantic.incorrectArgCount, ctx.line))
+      else
+        val firstErr: Option[Diag] = (0 until provided).iterator
+          .map(i => checkParameterType(ms.parameters(i + 1), args(i), ctx))
+          .collectFirst { case Some(diag) => diag }
+        firstErr.fold(Right(()))(Left(_))
 
   // Helper: check that a condition expression is BOOL
   private def requireBoolCondition(c: Expr, ctx: CheckContext, errMsg: String): Either[Diag, Unit] =
@@ -60,6 +85,10 @@ object IdiomaticSemantic:
       _ <- Result.require(TU.typeOf(c, ctx.methodCtx, ctx.symbols) == assignment3.Type.BOOL,
              TypeDiag(errMsg, ctx.line))
     yield ()
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Expression Checking
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // Public API - creates context and delegates
   def checkExprE(e: Expr, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] =
@@ -76,32 +105,34 @@ object IdiomaticSemantic:
     case NewObject(_, args, _) =>
       Result.sequenceE(args)(a => checkExprImpl(a, ctx))
     case InstanceCall(target, method, args, _) =>
-      target match
-        case This(_) => Left(SyntaxDiag(Messages.Semantic.thisMethodCallNotAllowed, ctx.line))
-        case _ =>
-          val checked = for {
-            _ <- NullCheck.requireNonNull(target, SyntaxDiag(Messages.Semantic.nullDerefInstanceCall, ctx.line))
-            _ <- checkExprImpl(target, ctx)
-            _ <- Result.sequenceE(args)(a => checkExprImpl(a, ctx))
-          } yield ()
-          checked.flatMap { _ =>
-            method match
-              case ic: assignment3.ast.ScalaInstanceCallable =>
-                val ms = ic.getSymbol
-                val expected = ms.expectedUserArgs(); val provided = args.size
-                if expected != provided then Left(SyntaxDiag(Messages.Semantic.incorrectArgCount, ctx.line))
-                else
-                  val firstErr: Option[Diag] = (0 until provided).iterator
-                    .map(i => validateParameterType(ms.parameters(i + 1), args(i), ctx))
-                    .collectFirst { case Some(diag) => diag }
-                  firstErr.fold(Right(()))(Left(_))
-              case _ => Right(())
-          }
+      checkInstanceCallImpl(target, method, args, ctx)
     case FieldAccess(target, field, _, _) =>
-      for
-        _ <- NullCheck.requireNonNull(target, SyntaxDiag(Messages.Semantic.nullDerefFieldAccess(field), ctx.line))
-        _ <- checkExprImpl(target, ctx)
-      yield ()
+      checkFieldAccessImpl(target, field, ctx)
+
+  /** Check instance method call: validates target, arguments, and parameter types. */
+  private def checkInstanceCallImpl(target: Expr, method: CallableMethod, args: List[Expr], ctx: CheckContext): Either[Diag, Unit] =
+    target match
+      case This(_) => Left(SyntaxDiag(Messages.Semantic.thisMethodCallNotAllowed, ctx.line))
+      case _ =>
+        for
+          _ <- NullCheck.requireNonNull(target, SyntaxDiag(Messages.Semantic.nullDerefInstanceCall, ctx.line))
+          _ <- checkExprImpl(target, ctx)
+          _ <- Result.sequenceE(args)(a => checkExprImpl(a, ctx))
+          _ <- method match
+            case ic: ScalaInstanceCallable => ParameterValidation.validateArgs(ic.getSymbol, args, ctx)
+            case _ => Right(())
+        yield ()
+
+  /** Check field access: validates target is non-null. */
+  private def checkFieldAccessImpl(target: Expr, field: String, ctx: CheckContext): Either[Diag, Unit] =
+    for
+      _ <- NullCheck.requireNonNull(target, SyntaxDiag(Messages.Semantic.nullDerefFieldAccess(field), ctx.line))
+      _ <- checkExprImpl(target, ctx)
+    yield ()
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Statement Checking
+  // ─────────────────────────────────────────────────────────────────────────────
 
   def checkStmtE(s: Stmt, currentMethod: MethodSymbol, defaultLine: Int, programSymbols: ProgramSymbols): Either[Diag, Unit] =
     checkStmtImpl(s, CheckContext(currentMethod, programSymbols, defaultLine))

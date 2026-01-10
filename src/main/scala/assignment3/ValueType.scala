@@ -58,7 +58,13 @@ object ValueType:
   def formatParsed(objOpt: Option[String], primOpt: Option[Type]): String =
     objOpt.getOrElse(primOpt.fold("void")(_.toString))
 
-// Legacy type aliases for backward compatibility during refactoring
+// ─────────────────────────────────────────────────────────────────────────────
+// Legacy Type Aliases
+// ─────────────────────────────────────────────────────────────────────────────
+// These aliases exist for backward compatibility. New code should use:
+//   - ValueType.Primitive instead of PrimitiveType
+//   - ValueType.ObjectRef instead of ObjectRefType
+// Pattern matching works with both: case ValueType.Primitive(t) or case PrimitiveType(t)
 type PrimitiveType = ValueType.Primitive
 type ObjectRefType = ValueType.ObjectRef
 val PrimitiveType = ValueType.Primitive
