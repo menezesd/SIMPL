@@ -79,9 +79,17 @@ package assignment3.ast
 type Result[+A] = Either[Diag, A]
 
 object Result:
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Core Factories
+  // ─────────────────────────────────────────────────────────────────────────────
+
   inline def ok[A](a: A): Result[A] = Right(a)
   inline def err[A](d: Diag): Result[A] = Left(d)
   inline def unit: Result[Unit] = Right(())
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Sequencing & Traversal
+  // ─────────────────────────────────────────────────────────────────────────────
 
   /** Sequence a list of items through a fallible function, short-circuiting on first error. */
   def sequenceE[A](items: Iterable[A])(f: A => Result[Unit]): Result[Unit] =
@@ -109,14 +117,20 @@ object Result:
   def require(cond: Boolean, ifFalse: => Diag): Result[Unit] =
     if cond then Right(()) else Left(ifFalse)
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Result Extension Methods
+  // ─────────────────────────────────────────────────────────────────────────────
+
   /** Extension methods for Result values. */
   extension [A](self: Result[A])
+    // Recovery and conversion
     /** Recover from error with a default value. */
     def recover(default: => A): A = self.getOrElse(default)
 
     /** Convert to Option, discarding any error. */
     def toOpt: Option[A] = self.toOption
 
+    // Side effects
     /** Execute side effect on success. */
     def tapOk(f: A => Unit): Result[A] =
       self.foreach(f)
@@ -127,6 +141,17 @@ object Result:
       self.left.foreach(f)
       self
 
+    /** Execute an action for its side effects, preserving the result. */
+    def tap(f: A => Unit): Result[A] =
+      self.foreach(f); self
+
+    /** Execute side effect on both success and error. */
+    def tapBoth(onOk: A => Unit, onErr: Diag => Unit): Result[A] =
+      self match
+        case Right(a) => onOk(a); self
+        case Left(d)  => onErr(d); self
+
+    // Error handling
     /** Map the error. */
     def mapErr(f: Diag => Diag): Result[A] =
       self.left.map(f)
@@ -135,11 +160,26 @@ object Result:
     def orElseResult(alt: => Result[A]): Result[A] =
       self.orElse(alt)
 
-    /** Execute side effect on both success and error. */
-    def tapBoth(onOk: A => Unit, onErr: Diag => Unit): Result[A] =
-      self match
-        case Right(a) => onOk(a); self
-        case Left(d)  => onErr(d); self
+    /** Provide a default error message if Left. */
+    def withErrorDefault(msg: => String): Result[A] =
+      self.left.map(d => if d.message.isEmpty then d.withMessage(msg) else d)
+
+    // Composition
+    /** Flatten nested Results. */
+    def flatten[B](using ev: A <:< Result[B]): Result[B] =
+      self.flatMap(identity)
+
+    /** Apply a function that may fail to a successful result. */
+    def andThen[B](f: A => Result[B]): Result[B] =
+      self.flatMap(f)
+
+    /** Conditional flatMap. */
+    def flatMapIf(cond: Boolean)(f: A => Result[A]): Result[A] =
+      if cond then self.flatMap(f) else self
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Validation Utilities
+  // ─────────────────────────────────────────────────────────────────────────────
 
   /** Validate all items against a predicate, short-circuiting on first failure. */
   def validateAll[A](items: Iterable[A])(pred: A => Boolean, mkDiag: A => Diag): Result[Unit] =
@@ -162,6 +202,10 @@ object Result:
   /** Ensure a condition on the result value. */
   def ensure[A](result: Result[A])(pred: A => Boolean, ifFalse: => Diag): Result[A] =
     result.flatMap(a => if pred(a) then Right(a) else Left(ifFalse))
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Option Extension Methods
+  // ─────────────────────────────────────────────────────────────────────────────
 
   /** Extension methods for Option to Result conversions. */
   extension [A](opt: Option[A])
@@ -209,27 +253,9 @@ object Result:
       acc.flatMap(_ => validator(value))
     }.map(_ => value)
 
-  /** Extension methods for Result composition. */
-  extension [A](self: Result[A])
-    /** Flatten nested Results. */
-    def flatten[B](using ev: A <:< Result[B]): Result[B] =
-      self.flatMap(identity)
-
-    /** Apply a function that may fail to a successful result. */
-    def andThen[B](f: A => Result[B]): Result[B] =
-      self.flatMap(f)
-
-    /** Execute an action for its side effects, preserving the result. */
-    def tap(f: A => Unit): Result[A] =
-      self.foreach(f); self
-
-    /** Conditional flatMap. */
-    def flatMapIf(cond: Boolean)(f: A => Result[A]): Result[A] =
-      if cond then self.flatMap(f) else self
-
-    /** Provide a default error message if Left. */
-    def withErrorDefault(msg: => String): Result[A] =
-      self.left.map(d => if d.message.isEmpty then d.withMessage(msg) else d)
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Either[String, A] Conversions
+  // ─────────────────────────────────────────────────────────────────────────────
 
   /** Extension methods for Either[String, A] to Diag conversions. */
   extension [A](either: Either[String, A])

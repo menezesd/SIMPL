@@ -1,7 +1,7 @@
 package assignment3.symbol
 
-import assignment3.{CompilerUtils, LiveOak3Compiler, Messages, ObjectRefType, Offsets, ParserBase, PrimitiveType, TokenizerView, ValueType}
-import assignment3.ast.{Diag, SyntaxDiag, TypeDiag, ResolveDiag, Result}
+import assignment3.{CompilerUtils, LiveOak3Compiler, Messages, Offsets, ParserBase, TokenizerView, ValueType}
+import assignment3.ast.{Diag, SyntaxDiag, ResolveDiag, Result}
 import edu.utexas.cs.sam.io.{SamTokenizer, Tokenizer}
 import Tokenizer.TokenType
 
@@ -26,13 +26,10 @@ object SymbolTableBuilder {
     rules: CompilerUtils.LexicalRules
   )(using CompilerUtils.RecorderContext) extends ParserBase {
 
-    private inline def typeE[A](msg: String, line: Int, col: Int): Result[A] =
-      Left(TypeDiag(msg, line, col))
-
     def buildProgram(): Result[ProgramSymbols] =
       parseClasses(Vector.empty).flatMap { classes =>
         val program = ProgramSymbols(classes.map(c => c.name -> c).toMap)
-        validateTypes(program).map(_ => program)
+        TypeValidator.validateTypes(program).map(_ => program)
       }
 
     private def isTypeToken(knownClasses: Vector[ClassSymbol], currentClassName: String): Boolean =
@@ -161,61 +158,6 @@ object SymbolTableBuilder {
 
     private def skipBodyRemainder(): Result[Unit] =
       skipBalancedBraces(Messages.unbalancedBraces)
-
-    private def validateTypes(program: ProgramSymbols): Result[Unit] = {
-      import assignment3.ast.high.ReturnSig
-
-      /** Generic validation for object references that must exist in the program. */
-      def validateObjectRef(className: String, line: Int, col: Int)(mkError: String => String): Result[Unit] =
-        if !program.existsClass(className) then
-          err(TypeDiag(mkError(className), line, col))
-        else ok(())
-
-      def checkField(cls: ClassSymbol, f: VarSymbol): Result[Unit] =
-        f.valueType match {
-          case ObjectRefType(cn) =>
-            validateObjectRef(cn, f.getLine, f.getColumn)(Messages.unknownFieldType(cls.getName, f.getName, _))
-          case _ => ok(())
-        }
-
-      def checkParam(cls: ClassSymbol, m: MethodSymbol, p: VarSymbol): Result[Unit] =
-        p.valueType match {
-          case ObjectRefType(cn) =>
-            validateObjectRef(cn, p.getLine, p.getColumn)(Messages.unknownParamType(cls.getName, m.getName, p.getName, _))
-          case _ => ok(())
-        }
-
-      def checkLocal(cls: ClassSymbol, m: MethodSymbol, v: VarSymbol): Result[Unit] =
-        v.valueType match {
-          case ObjectRefType(cn) =>
-            validateObjectRef(cn, v.getLine, v.getColumn)(Messages.unknownLocalType(cls.getName, m.getName, v.getName, _))
-          case _ => ok(())
-        }
-
-      def checkMethodReturn(cls: ClassSymbol, m: MethodSymbol): Result[Unit] = m.getReturnSig match {
-        case ReturnSig.Obj(cn) =>
-          validateObjectRef(cn, m.getReturnTypeLine(), m.getReturnTypeColumn())(Messages.unknownReturnType(cls.getName, m.getName, _))
-        case _ => ok(())
-      }
-
-      def validateList[A](items: List[A])(check: A => Result[Unit]): Result[Unit] =
-        Result.sequenceE(items)(check)
-
-      def validateMethod(cls: ClassSymbol, m: MethodSymbol): Result[Unit] =
-        for
-          _ <- checkMethodReturn(cls, m)
-          _ <- validateList(m.parameters.toList)(p => checkParam(cls, m, p))
-          _ <- validateList(m.locals.toList)(v => checkLocal(cls, m, v))
-        yield ()
-
-      def validateClass(cls: ClassSymbol): Result[Unit] =
-        for
-          _ <- validateList(cls.allFields)(f => checkField(cls, f))
-          _ <- validateList(cls.allMethods)(m => validateMethod(cls, m))
-        yield ()
-
-      validateList(program.allClasses)(validateClass)
-    }
   }
 }
 

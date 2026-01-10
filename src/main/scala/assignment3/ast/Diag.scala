@@ -17,7 +17,17 @@ enum Diag(val message: String, val line: Int, val column: Int = -1):
     case Type(_, l, c) => Type(newMsg, l, c)
     case Resolve(_, l, c) => Resolve(newMsg, l, c)
 
-// Shorter aliases for common diagnostic constructors
+// ─────────────────────────────────────────────────────────────────────────────
+// Diagnostic Constructor Aliases
+// ─────────────────────────────────────────────────────────────────────────────
+// Use these when you have explicit line/column:
+//   SyntaxDiag("message", line, col)
+//   TypeDiag("message", line)
+//   ResolveDiag("message", line, col)
+//
+// Use Diag.syntax/typeErr/resolve when you have a SamTokenizer:
+//   Diag.syntax("message", tokenizer)
+//   Diag.typeErr("message", tokenizer)
 val SyntaxDiag = Diag.Syntax
 val TypeDiag = Diag.Type
 val ResolveDiag = Diag.Resolve
